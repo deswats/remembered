@@ -2915,7 +2915,9 @@ function applyTranslations(){
   // Nav
   var na=document.getElementById('navActions');
   if(na&&typeof CU!=='undefined'&&!CU){
-    na.innerHTML='<button type="button" class="nb" onclick="showPage('authPage');setAuthMode('login')">'+L.signIn+'</button>'+'<button type="button" class="nb prim" onclick="showPage('authPage');setAuthMode('register')">'+L.joinFree+'</button>';
+    var signInBtn='<button type="button" class="nb" onclick="showPage(&quot;authPage&quot;);setAuthMode(&quot;login&quot;)">'+L.signIn+'</button>';
+    var joinBtn='<button type="button" class="nb prim" onclick="showPage(&quot;authPage&quot;);setAuthMode(&quot;register&quot;)">'+L.joinFree+'</button>';
+    na.innerHTML=signInBtn+joinBtn;
   }
   // Hero
   se('heroEyebrow',L.eyebrow);se('heroTitle',L.heroTitle,true);se('heroSub',L.heroSub);
