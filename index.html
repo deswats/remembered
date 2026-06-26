@@ -1050,6 +1050,40 @@ function guestBrowse(){showPage('appPage');}
   <div style="margin-top:.8rem;font-size:.68rem;color:var(--muted)" id="footerRights">© 2025 DW Labs · All rights reserved</div>
 </footer>
 
+<!-- EMAIL CONFIRMATION MODAL -->
+<div class="ov" id="emailConfirmModal" style="z-index:500">
+  <div class="modal sm" style="max-width:400px;border-color:rgba(201,168,76,.4)">
+    <div style="padding:2rem 1.5rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:.8rem">
+      <div style="font-size:4rem;line-height:1">📧</div>
+      <h2 style="font-family:'Cormorant Garant',serif;font-size:1.6rem;font-weight:300;color:var(--gold)">Check Your Email!</h2>
+      <p style="font-size:.88rem;color:var(--lavender);line-height:1.7">
+        We sent a confirmation link to:
+      </p>
+      <div style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.3);border-radius:10px;padding:.7rem 1.2rem;width:100%">
+        <span id="confirmEmailAddress" style="font-size:.95rem;font-weight:600;color:var(--gold);word-break:break-all"></span>
+      </div>
+      <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:.9rem 1rem;width:100%;text-align:left;font-size:.8rem;color:var(--lavender);line-height:1.8">
+        <strong style="color:var(--ivory)">What to do next:</strong><br>
+        1. Open your email inbox now<br>
+        2. Find the email from <strong>Supabase / Remembered</strong><br>
+        3. Click the <strong style="color:var(--gold)">"Confirm your email"</strong> button<br>
+        4. You'll be redirected back here & logged in automatically<br>
+        5. Or return here and click <strong>Sign In</strong>
+      </div>
+      <div style="font-size:.75rem;color:var(--muted);padding:.5rem .8rem;background:rgba(255,255,255,.03);border-radius:8px;width:100%;text-align:left">
+        📁 <strong>Can't find it?</strong> Check your <strong>Spam</strong> or <strong>Junk</strong> folder
+      </div>
+      <button class="btn btn-g" style="width:100%;margin-top:.3rem" onclick="closeModal('emailConfirmModal');showPage('authPage');setAuthMode('login');resetLoginForm()">
+        ✅ I've confirmed my email — Sign In
+      </button>
+      <button class="btn btn-o btn-sm" style="width:100%" id="resendBtn" onclick="handleResend()">
+        📧 Resend confirmation email
+      </button>
+      <p style="font-size:.72rem;color:var(--muted)">You can close this and check back later</p>
+    </div>
+  </div>
+</div>
+
 <div id="toast">Done</div>
 
 <script>
@@ -1176,9 +1210,18 @@ async function doLogin(){
   try{
     const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
     showLoader(false);
-    if(error){toast('❌ '+error.message);return;}
+    if(error){
+      if(error.message.toLowerCase().includes('confirm')||error.message.toLowerCase().includes('verified')){
+        toast('📧 Please confirm your email first. Check your inbox and click the confirmation link.');
+      } else if(error.message.toLowerCase().includes('invalid')){
+        toast('❌ Wrong email or password. Please try again.');
+      } else {
+        toast('❌ '+error.message);
+      }
+      return;
+    }
     await afterAuth(data.user);
-  }catch(e){showLoader(false);toast('❌ Connection error. Please refresh and try again.');}
+  }catch(e){showLoader(false);console.error(e);toast('❌ Connection error. Please refresh and try again.');}
 }
 async function doRegister(){
   if(typeof sb==='undefined'||!sb){toast('Still connecting… please try again in a moment.');return;}
@@ -1187,42 +1230,64 @@ async function doRegister(){
   if(pass.length<6){toast('Password must be at least 6 characters.');return;}
   showLoader(true);
   try{
-    const {data,error}=await sb.auth.signUp({email,password:pass,options:{data:{first_name:first,last_name:last,country}}});
-    if(error){showLoader(false);toast('❌ '+error.message);return;}
-
-    // Check if email confirmation is required
-    if(data.user && !data.session){
-      // Email confirmation is ON — tell user to check email
-      showLoader(false);
-      showPage('authPage');
-      setAuthMode('login');
-      document.getElementById('loginF').innerHTML=`
-        <div style="text-align:center;padding:1rem 0">
-          <div style="font-size:3rem;margin-bottom:1rem">📧</div>
-          <p class="auth-t" style="font-size:1.4rem">Check Your Email!</p>
-          <p class="auth-s" style="margin-bottom:1rem;line-height:1.6">We sent a confirmation link to:<br><strong style="color:var(--gold)">${email}</strong></p>
-          <p style="font-size:.8rem;color:var(--muted);line-height:1.6">Click the link in that email to activate your account, then come back and sign in.</p>
-          <div style="margin-top:1.2rem;padding:.8rem;background:rgba(201,168,76,.08);border-radius:10px;font-size:.78rem;color:var(--lavender)">
-            💡 <strong>Tip:</strong> Check your spam/junk folder if you don't see it within 1 minute.
-          </div>
-          <button class="btn btn-g" style="width:100%;margin-top:1.2rem" onclick="resetLoginForm()">← Back to Sign In</button>
-        </div>`;
-      return;
-    }
-
-    // No email confirmation needed — proceed directly
-    await sb.from('profiles').upsert({
-      id:data.user.id,first_name:first,last_name:last,country,
-      invite_code:'INV'+Math.random().toString(36).slice(2,8).toUpperCase()
+    const {data,error}=await sb.auth.signUp({
+      email,password:pass,
+      options:{
+        data:{first_name:first,last_name:last,country},
+        emailRedirectTo:'https://deswats.github.io/remembered/'
+      }
     });
     showLoader(false);
-    toast('✅ Account created! Welcome to Remembered 🌻');
-    await afterAuth(data.user);
+    if(error){
+      // User already registered
+      if(error.message.toLowerCase().includes('already')){
+        toast('This email is already registered. Please Sign In instead.');
+        showPage('authPage');setAuthMode('login');
+      } else {
+        toast('❌ '+error.message);
+      }
+      return;
+    }
+    // Save profile data immediately
+    if(data.user){
+      await sb.from('profiles').upsert({
+        id:data.user.id,
+        first_name:first,last_name:last,country,
+        invite_code:'INV'+Math.random().toString(36).slice(2,8).toUpperCase()
+      });
+    }
+    // Store email for resend function
+    window._pendingConfirmEmail = email;
+    // If session exists = no email confirmation needed, go straight in
+    if(data.session){
+      toast('✅ Account created! Welcome to Remembered 🌻');
+      await afterAuth(data.user);
+      return;
+    }
+    // Email confirmation required — show modal
+    document.getElementById('confirmEmailAddress').textContent = email;
+    openModal('emailConfirmModal');
   }catch(e){
     showLoader(false);
     console.error('Register error:',e);
-    toast('❌ Error: '+e.message+'. Please try again.');
+    toast('❌ Error: '+(e.message||'Unknown error')+'. Please try again.');
   }
+}
+function handleResend(){
+  const email=window._pendingConfirmEmail||document.getElementById('confirmEmailAddress')?.textContent;
+  if(!email){toast('No email to resend to.');return;}
+  resendConfirmation(email);
+}
+async function resendConfirmation(email){
+  if(!email)return;
+  showLoader(true);
+  const {error}=await sb.auth.resend({
+    type:'signup',email,
+    options:{emailRedirectTo:'https://deswats.github.io/remembered/'}
+  });
+  showLoader(false);
+  if(error)toast('❌ '+error.message);
+  else toast('📧 Confirmation email resent! Check your inbox.');
 }
 function resetLoginForm(){
   document.getElementById('loginF').innerHTML=`
@@ -1234,16 +1299,36 @@ function resetLoginForm(){
       <button class="btn btn-g" style="width:100%;margin-top:.2rem" onclick="doLogin()" id="loginBtn">Sign In</button>
     </div>
     <div class="auth-sw"><span id="loginNoAccount">New here?</span> <a onclick="setAuthMode('register')" id="loginCreateLink">Create an account →</a></div>`;
+  if(typeof applyTranslations==='function')applyTranslations();
+}
+async function resendConfirmation(email){
+  showLoader(true);
+  const {error}=await sb.auth.resend({type:'signup',email,options:{emailRedirectTo:'https://deswats.github.io/remembered/'}});
+  showLoader(false);
+  if(error)toast('❌ '+error.message);
+  else toast('📧 Confirmation email resent to '+email+'! Please check your inbox.');
 }
 async function afterAuth(user){
   showLoader(true);
   try{
-    const {data:profile}=await sb.from('profiles').select('*').eq('id',user.id).single();
+    let {data:profile}=await sb.from('profiles').select('*').eq('id',user.id).single();
+    // Create profile if it doesn't exist yet (first login after email confirm)
+    if(!profile){
+      const meta=user.user_metadata||{};
+      const {data:np}=await sb.from('profiles').upsert({
+        id:user.id,
+        first_name:meta.first_name||'Friend',
+        last_name:meta.last_name||'',
+        country:meta.country||'',
+        invite_code:'INV'+Math.random().toString(36).slice(2,8).toUpperCase()
+      }).select().single();
+      profile=np;
+    }
     CU={
-      id:user.id, email:user.email,
+      id:user.id,email:user.email,
       firstName:profile?.first_name||user.user_metadata?.first_name||'Friend',
       lastName:profile?.last_name||user.user_metadata?.last_name||'',
-      country:profile?.country||'',
+      country:profile?.country||user.user_metadata?.country||'',
       avatar:profile?.avatar_url||'',
       inviteCode:profile?.invite_code||user.id.slice(0,8),
       joined:new Date(user.created_at).getTime()
@@ -1258,7 +1343,10 @@ async function afterAuth(user){
   }catch(e){
     showLoader(false);
     console.error('afterAuth error:',e);
-    toast('❌ Error loading your profile. Please refresh.');
+    // Still try to show the app even if profile load fails
+    showPageDirect('appPage');
+    renderApp();
+    toast('Signed in! Some features may take a moment to load.');
   }
 }
 async function doLogout(){
