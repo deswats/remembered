@@ -482,9 +482,6 @@ function setAuthMode(m){
   if(m==='login'){lf.classList.remove('hidden');rf.classList.add('hidden');}
   else{lf.classList.add('hidden');rf.classList.remove('hidden');}
 }
-// Stub — real version defined later after Supabase loads
-function doLogin(){var e=document.getElementById('liEmail'),p=document.getElementById('liPass');if(!e||!p){return;}if(typeof sb==='undefined'){alert('Still loading… please wait a moment and try again.');return;}}
-function doRegister(){if(typeof sb==='undefined'){alert('Still loading… please wait a moment and try again.');return;}}
 function guestBrowse(){showPage('appPage');}
 </script>
 
@@ -512,6 +509,7 @@ function guestBrowse(){showPage('appPage');}
     <button class="btn btn-g" onclick="showPage('authPage');setAuthMode('register')">🌻 Celebrate Someone</button>
     <button class="btn btn-o" onclick="guestBrowse()">Browse Memorials</button>
   </div>
+  <div id="loadingHint" style="margin-top:1rem;font-size:.75rem;color:var(--muted);display:none">⏳ Connecting to server…</div>
 </div>
 
 <!-- ═══════════════ AUTH ═══════════════ -->
@@ -1141,26 +1139,31 @@ function setAuthMode(m){
   else{document.getElementById('loginF').classList.add('hidden');document.getElementById('regF').classList.remove('hidden');}
 }
 async function doLogin(){
+  if(typeof sb==='undefined'||!sb){toast('Still connecting… please try again in a moment.');return;}
   const email=v('liEmail'),pass=v('liPass');
   if(!email||!pass){toast('Please fill in all fields.');return;}
   showLoader(true);
-  const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
-  showLoader(false);
-  if(error){toast('❌ '+error.message);return;}
-  await afterAuth(data.user);
+  try{
+    const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
+    showLoader(false);
+    if(error){toast('❌ '+error.message);return;}
+    await afterAuth(data.user);
+  }catch(e){showLoader(false);toast('❌ Connection error. Please refresh and try again.');}
 }
 async function doRegister(){
+  if(typeof sb==='undefined'||!sb){toast('Still connecting… please try again in a moment.');return;}
   const first=v('rgFirst'),last=v('rgLast'),email=v('rgEmail'),pass=v('rgPass'),country=v('rgCountry');
   if(!first||!last||!email||!pass){toast('Please fill all required fields.');return;}
   if(pass.length<6){toast('Password must be at least 6 characters.');return;}
   showLoader(true);
-  const {data,error}=await sb.auth.signUp({email,password:pass,options:{data:{first_name:first,last_name:last,country}}});
-  if(error){showLoader(false);toast('❌ '+error.message);return;}
-  // Update profile
-  await sb.from('profiles').upsert({id:data.user.id,first_name:first,last_name:last,country,invite_code:'INV'+Math.random().toString(36).slice(2,8).toUpperCase()});
-  showLoader(false);
-  toast('✅ Account created! Welcome to Remembered 🌻');
-  await afterAuth(data.user);
+  try{
+    const {data,error}=await sb.auth.signUp({email,password:pass,options:{data:{first_name:first,last_name:last,country}}});
+    if(error){showLoader(false);toast('❌ '+error.message);return;}
+    await sb.from('profiles').upsert({id:data.user.id,first_name:first,last_name:last,country,invite_code:'INV'+Math.random().toString(36).slice(2,8).toUpperCase()});
+    showLoader(false);
+    toast('✅ Account created! Welcome to Remembered 🌻');
+    await afterAuth(data.user);
+  }catch(e){showLoader(false);toast('❌ Connection error. Please refresh and try again.');}
 }
 async function afterAuth(user){
   showLoader(true);
@@ -2151,14 +2154,18 @@ function updateMobileNav(){
 // ═══════════════════════════════════════════════════════════
 (async()=>{
   showLoader(true);
+  const lh=document.getElementById('loadingHint');
+  if(lh)lh.style.display='block';
   // Load public data first so guests can browse
   await loadAllData();
   // Check if user already has a session
   const {data:{session}}=await sb.auth.getSession();
   if(session){
+    if(lh)lh.style.display='none';
     await afterAuth(session.user);
   }else{
     showLoader(false);
+    if(lh)lh.style.display='none';
     showPageDirect('heroPage');
     updateNav();
   }
