@@ -53,6 +53,8 @@ nav{position:sticky;top:0;z-index:200;background:rgba(13,27,42,.97);backdrop-fil
 /* LAYOUT */
 .page{position:relative;z-index:1;display:none;}
 .page.active{display:block;}
+#authPage.active{display:flex;}
+#heroPage.active{display:flex;}
 .three-col{display:grid;grid-template-columns:240px 1fr 260px;gap:1.2rem;max-width:1180px;margin:0 auto;padding:1.2rem;}
 @media(max-width:960px){.three-col{grid-template-columns:1fr;}.side-l,.side-r{display:none;}}
 .side-l,.side-r{display:flex;flex-direction:column;gap:1rem;}
@@ -202,7 +204,8 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
 .ni-time{color:var(--muted);font-size:.7rem;margin-top:.15rem;}
 
 /* HERO PAGE */
-#heroPage{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem;position:relative;z-index:1;}
+#heroPage{min-height:100vh;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem;position:relative;z-index:1;}
+#heroPage.active{display:flex;}
 .h-eye{font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:1.2rem;}
 .h-title{font-family:'Cormorant Garant',serif;font-size:clamp(2.8rem,7vw,5.5rem);font-weight:300;line-height:1.1;margin-bottom:.9rem;}
 .h-title em{font-style:italic;color:var(--gold);}
@@ -210,7 +213,8 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
 .h-acts{display:flex;gap:.9rem;flex-wrap:wrap;justify-content:center;}
 
 /* AUTH */
-#authPage{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem;position:relative;z-index:1;}
+#authPage{min-height:100vh;display:none;align-items:center;justify-content:center;padding:1.5rem;position:relative;z-index:1;}
+#authPage.active{display:flex;}
 .auth-card{background:var(--card);border:1px solid var(--border);border-radius:18px;width:100%;max-width:400px;padding:2rem;}
 .auth-t{font-family:'Cormorant Garant',serif;font-size:1.8rem;font-weight:300;color:var(--gold);margin-bottom:.3rem;}
 .auth-s{font-size:.82rem;color:var(--muted);margin-bottom:1.3rem;}
@@ -461,6 +465,29 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 <body>
 
 <canvas id="bgCanvas"></canvas>
+
+<script>
+// Early page switcher — works immediately, before Supabase loads
+function showPage(id){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');p.style.display='none';});
+  var el=document.getElementById(id);
+  if(el){el.classList.add('active');el.style.display=(['authPage','heroPage'].includes(id)?'flex':'block');}
+  var sw=document.getElementById('navSearchWrap');
+  if(sw)sw.style.display=(['appPage','deceasedPage','userPage','peoplePage'].includes(id))?'flex':'none';
+}
+function setAuthMode(m){
+  var lf=document.getElementById('loginF');
+  var rf=document.getElementById('regF');
+  if(!lf||!rf)return;
+  if(m==='login'){lf.classList.remove('hidden');rf.classList.add('hidden');}
+  else{lf.classList.add('hidden');rf.classList.remove('hidden');}
+}
+// Stub — real version defined later after Supabase loads
+function doLogin(){var e=document.getElementById('liEmail'),p=document.getElementById('liPass');if(!e||!p){return;}if(typeof sb==='undefined'){alert('Still loading… please wait a moment and try again.');return;}}
+function doRegister(){if(typeof sb==='undefined'){alert('Still loading… please wait a moment and try again.');return;}}
+function guestBrowse(){showPage('appPage');}
+</script>
+
 
 <!-- NAV -->
 <nav>
@@ -1202,16 +1229,20 @@ document.querySelectorAll('.ov').forEach(ov=>ov.addEventListener('click',e=>{if(
 function showPageDirect(id){
   document.querySelectorAll('.page').forEach(p=>{p.classList.remove('active');p.style.display='none';});
   const el=document.getElementById(id);
-  if(el){el.classList.add('active');el.style.display='block';}
+  if(el){
+    el.classList.add('active');
+    el.style.display=['authPage','heroPage'].includes(id)?'flex':'block';
+  }
+  const sw=document.getElementById('navSearchWrap');
   const showSearch=['appPage','deceasedPage','userPage','peoplePage'].includes(id);
-  document.getElementById('navSearchWrap').style.display=showSearch?'flex':'none';
+  if(sw)sw.style.display=showSearch?'flex':'none';
   // Mobile nav active
   const map={appPage:'mnav-home',heroPage:'mnav-home',peoplePage:'mnav-people'};
   document.querySelectorAll('.mnav-btn').forEach(b=>b.classList.remove('act'));
   if(map[id]){const el2=document.getElementById(map[id]);if(el2)el2.classList.add('act');}
-  updateMobileNav();
+  if(typeof updateMobileNav==="function")updateMobileNav();
 }
-function showPage(id){showPageDirect(id);}
+// showPage already defined in early script above
 function goHome(){if(CU){showPageDirect('appPage');renderApp();}else{showPageDirect('heroPage');}}
 function goBack(){showPageDirect(prevPage||'appPage');if(prevPage==='appPage')renderApp();}
 function guestBrowse(){showPageDirect('appPage');renderApp();}
@@ -1973,7 +2004,7 @@ function updateNotifBadge(){
   const unread=CACHE.notifications.filter(n=>!n.read).length;
   const badge=document.getElementById('notifCount');
   if(badge){badge.textContent=unread;badge.style.display=unread?'block':'none';}
-  updateMobileNav();
+  if(typeof updateMobileNav==="function")updateMobileNav();
 }
 function renderNotifications(){
   const el=document.getElementById('notifList');if(!el||!CU)return;
