@@ -1894,33 +1894,99 @@ function prevDMedia(input){
 }
 async function saveDeceased(){
   const name=v('dName'),dob=v('dDob'),dod=v('dDod');
-  if(!name||!dob||!dod){toast('Name, DOB and Date of Passing are required.');return;}
+  if(!name){toast('Please enter the full name.');return;}
+  if(!dob){toast('Please enter the date of birth.');return;}
+  if(!dod){toast('Please enter the date of passing.');return;}
   if(!selectedRel){toast('Please select your relationship to them.');return;}
-  showLoader(true);toast('Saving memorial…');
-  let photoUrl='';
-  if(dPhotoData){try{photoUrl=await uploadBase64(dPhotoData,'photos');}catch(e){console.error(e);}}
-  const {data:dec,error}=await sb.from('deceased').insert({
-    name,nickname:v('dNick'),dob,dod,
-    place_of_birth:v('dPob'),burial:v('dBurial'),
-    country:v('dCountry'),religion:v('dRel')||'General',
-    photo_url:photoUrl,created_by:CU.id
-  }).select().single();
-  if(error){showLoader(false);toast('❌ Error: '+error.message);return;}
-  CACHE.deceased.unshift(dec);
-  for(const m of dMediaData){
+
+  // Disable button to prevent double submit
+  const pubBtn=document.querySelector('#deceasedModal .btn-g');
+  if(pubBtn){pubBtn.disabled=true;pubBtn.textContent='Publishing…';}
+
+  showLoader(true);
+  toast('Saving memorial…');
+
+  try{
+    // Upload profile photo
+    let photoUrl='';
+    if(dPhotoData){
+      try{
+        photoUrl=await uploadBase64(dPhotoData,'photos');
+      }catch(e){
+        console.warn('Photo upload failed:',e);
+        photoUrl='';
+      }
+    }
+
+    // Insert memorial
+    const insertData={
+      name:name,
+      nickname:v('dNick')||null,
+      dob:dob,
+      dod:dod,
+      place_of_birth:v('dPob')||null,
+      burial:v('dBurial')||null,
+      country:v('dCountry')||null,
+      religion:v('dRel')||'General',
+      photo_url:photoUrl||null,
+      created_by:CU.id
+    };
+    console.log('Inserting memorial:', insertData);
+
+    const {data:dec,error}=await sb.from('deceased').insert(insertData).select().single();
+
+    if(error){
+      console.error('Memorial insert error:',error);
+      showLoader(false);
+      if(pubBtn){pubBtn.disabled=false;pubBtn.textContent='🌻 Publish Memorial';}
+      toast('❌ Error saving memorial: '+error.message);
+      return;
+    }
+
+    console.log('Memorial saved:', dec);
+    CACHE.deceased.unshift(dec);
+
+    // Upload media files
+    for(const m of dMediaData){
+      try{
+        const url=await uploadBase64(m.data,'media');
+        if(url){
+          const {data:med}=await sb.from('media').insert({
+            deceased_id:dec.id,
+            url:url,
+            media_type:m.type&&m.type.startsWith('video')?'video':'image'
+          }).select().single();
+          if(med)CACHE.media.push(med);
+        }
+      }catch(e){console.warn('Media upload:',e);}
+    }
+
+    // Auto-connect creator to memorial
     try{
-      const url=await uploadBase64(m.data,'media');
-      const {data:med}=await sb.from('media').insert({deceased_id:dec.id,url,media_type:m.type.startsWith('video')?'video':'image'}).select().single();
-      if(med)CACHE.media.push(med);
-    }catch(e){console.error(e);}
+      const {data:conn}=await sb.from('connections').insert({
+        user_id:CU.id,
+        deceased_id:dec.id,
+        relationship:selectedRel,
+        smiled:true
+      }).select().single();
+      if(conn)CACHE.connections.push(conn);
+    }catch(e){console.warn('Connection insert:',e);}
+
+    showLoader(false);
+    if(pubBtn){pubBtn.disabled=false;pubBtn.textContent='🌻 Publish Memorial';}
+    closeModal('deceasedModal');
+    toast('🌻 Memorial published! Their story lives on.');
+    renderFeed();
+    renderStats();
+    renderTopMemorials();
+    await addNotif(CU.id,'You published a memorial for '+name+' 🌻','🌻');
+
+  }catch(e){
+    console.error('saveDeceased error:',e);
+    showLoader(false);
+    if(pubBtn){pubBtn.disabled=false;pubBtn.textContent='🌻 Publish Memorial';}
+    toast('❌ Error: '+(e.message||'Could not save memorial. Check your connection.'));
   }
-  const {data:conn}=await sb.from('connections').insert({user_id:CU.id,deceased_id:dec.id,relationship:selectedRel,smiled:true}).select().single();
-  if(conn)CACHE.connections.push(conn);
-  showLoader(false);
-  closeModal('deceasedModal');
-  toast('🌻 Memorial published! Their story lives on.');
-  renderFeed();renderStats();renderTopMemorials();
-  await addNotif(CU.id,'You published a memorial for '+name+' 🌻','🌻');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2264,15 +2330,7 @@ async function sendFriendReq(toId){
   const fs=document.getElementById('friendSearch');if(fs)searchFriends(fs.value);
   renderMyFriends();updateNotifBadge();renderFriendSuggestions();
 }
-async function acceptFriendById(frId){
-  await sb.from('friends').update({status:'accepted'}).eq('id',frId);
-  const fr=CACHE.friends.find(x=>x.id===frId);
-  if(fr){fr.status='accepted';await addNotif(fr.from_id,uName(CU)+' accepted your friend request! 🤝','🤝');}
-  toast('🤝 Friend accepted!');
-  renderMyFriends();renderNotifications();updateNotifBadge();
-  renderPendingRequests();renderFeed();renderFriendSuggestions();renderSidebarProfile();
-  renderPeopleResults(document.getElementById('peopleSearchInput')?.value||'');
-}
+// acceptFriendById defined below with relationship modal
 async function declineFriend(frId){
   await sb.from('friends').delete().eq('id',frId);
   CACHE.friends=CACHE.friends.filter(f=>f.id!==frId);
@@ -2348,11 +2406,31 @@ function openUserProfile(uid){
   document.getElementById('upTags').innerHTML=`<div class="u-tag">🌻 ${memCount} Memorial${memCount!==1?'s':''}</div><div class="u-tag">🤝 ${friendCount} Friend${friendCount!==1?'s':''}</div>`;
   const acts=document.getElementById('upActions');
   if(isMe){
-    acts.innerHTML=`<button type="button" class="btn btn-o btn-sm" onclick="openEditProfile()">✏️ Edit Profile</button><button type="button" class="btn btn-o btn-sm" onclick="doLogout()">Sign Out</button>`;
+    acts.innerHTML='<button type="button" class="btn btn-o btn-sm" onclick="openEditProfile()">✏️ Edit Profile</button><button type="button" class="btn btn-o btn-sm" onclick="doLogout()">Sign Out</button>';
   }else if(CU){
     const ex=CACHE.friends.find(f=>(f.from_id===CU.id&&f.to_id===uid)||(f.from_id===uid&&f.to_id===CU.id));
     const st=ex?ex.status:null;
-    acts.innerHTML=st==='accepted'?`<button type="button" class="btn btn-o btn-sm">🤝 Friends</button>`:st==='pending'?`<button type="button" class="btn btn-o btn-sm">Pending…</button>`:`<button type="button" class="btn btn-g btn-sm" onclick="sendFriendReq('${uid}');openUserProfile('${uid}')">+ Add Friend</button>`;
+    const rel=ex?.relationship||'';
+    if(st==='accepted'){
+      var relText=rel||'Friends';
+      var relBtn=document.createElement('button');
+      relBtn.type='button';
+      relBtn.className='btn btn-o btn-sm';
+      relBtn.textContent='🤝 '+relText+' ✏️';
+      relBtn.onclick=function(){openSetRelationship(uid);};
+      acts.innerHTML='';
+      acts.appendChild(relBtn);
+    } else if(st==='pending'){
+      acts.innerHTML='<button type="button" class="btn btn-o btn-sm">Pending…</button>';
+    } else {
+      var addBtn=document.createElement('button');
+      addBtn.type='button';
+      addBtn.className='btn btn-g btn-sm';
+      addBtn.textContent='+ Add Friend';
+      addBtn.onclick=function(){sendFriendReq(uid);openUserProfile(uid);};
+      acts.innerHTML='';
+      acts.appendChild(addBtn);
+    }
   }
   showUTab('memorials',null,uid);
   showPageDirect('userPage');
@@ -2702,14 +2780,19 @@ async function submitPost(){
     // Upload image if any
     let imageUrl='';
     if(postImageData){
-      try{imageUrl=await uploadBase64(postImageData,'posts');}catch(e){console.warn('Image upload:',e);}
+      try{
+        imageUrl=await uploadBase64(postImageData,'posts');
+      }catch(e){
+        console.warn('Image upload failed, posting text only:',e);
+        imageUrl='';
+      }
     }
     // Save to Supabase
     const {data,error}=await sb.from('posts').insert({
       user_id:CU.id,
-      text:text,
-      image_url:imageUrl,
-      visibility:visibility,
+      text:text||'',
+      image_url:imageUrl||null,
+      visibility:visibility||'friends',
       created_at:new Date().toISOString()
     }).select().single();
     if(error)throw error;
@@ -2728,13 +2811,11 @@ async function submitPost(){
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='Share Post';}
     console.error('Post error:',e);
-    // If posts table doesn't exist yet, save locally
-    const localPost={id:'lp'+Date.now(),user_id:CU.id,text:text,image_url:postImageData,visibility:visibility,created_at:new Date().toISOString()};
-    CACHE.posts.unshift(localPost);
-    closeCreatePost();
-    if(btn){btn.disabled=false;btn.textContent='Share Post';}
-    toast('✅ Post shared!');
-    renderFeed();
+    if(e.message&&e.message.includes('relation')){
+      toast('❌ Posts table not set up in Supabase yet. Please run the SQL setup.');
+    } else {
+      toast('❌ Could not share post: '+e.message);
+    }
   }
 }
 function renderPostCard(p){
@@ -2853,16 +2934,39 @@ async function saveFriendRel(){
   closeModal('friendRelModal');
   await completeFriendReq(pendingFriendReqId,rel);
 }
+// Open relationship modal from profile page (for existing friends)
+function openSetRelationship(uid){
+  const fr=CACHE.friends.find(f=>(f.from_id===CU.id&&f.to_id===uid)||(f.from_id===uid&&f.to_id===CU.id));
+  if(!fr){toast('Not connected yet.');return;}
+  pendingFriendReqId=fr.id;
+  selectedFriendRel=fr.relationship||'Friend';
+  const u=CACHE.users.find(x=>x.id===uid);
+  const nameEl=document.getElementById('friendRelName');
+  if(nameEl)nameEl.textContent=u?uName(u):'your friend';
+  // Reset and pre-select current relationship
+  document.querySelectorAll('.friend-rel-opt').forEach(function(b){
+    b.classList.remove('sel');
+    if(b.textContent.trim().includes(selectedFriendRel))b.classList.add('sel');
+  });
+  const custom=document.getElementById('friendRelCustom');
+  if(custom)custom.value='';
+  openModal('friendRelModal');
+}
 async function completeFriendReq(frId,relationship){
   if(!frId)return;
-  await sb.from('friends').update({status:'accepted',relationship}).eq('id',frId);
+  try{
+    await sb.from('friends').update({status:'accepted',relationship:relationship}).eq('id',frId);
+  }catch(e){console.warn('Friend update:',e);}
   const fr=CACHE.friends.find(x=>x.id===frId);
   if(fr){fr.status='accepted';fr.relationship=relationship;}
-  const fromUser=CACHE.users.find(x=>x.id===fr?.from_id);
-  if(fr)await addNotif(fr.from_id,uName(CU)+' accepted your friend request! You are connected as '+relationship+' 🤝','🤝');
-  toast('🤝 You are now connected as: '+relationship+'!');
+  if(fr&&fr.from_id!==CU.id){
+    await addNotif(fr.from_id,uName(CU)+' connected with you as '+relationship+' 🤝','🤝');
+  }
+  toast('🤝 Connection set as: '+relationship+'!');
   renderMyFriends();renderNotifications();updateNotifBadge();
   renderFeed();renderFriendSuggestions();renderSidebarProfile();
+  // Refresh profile page if open
+  if(viewingUserId)openUserProfile(viewingUserId);
   renderPeopleResults(document.getElementById('peopleSearchInput')?.value||'');
 }
 
