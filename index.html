@@ -309,7 +309,7 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
 .avatar-edit-badge{position:absolute;bottom:2px;right:2px;width:28px;height:28px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.8rem;opacity:0;transition:.2s;pointer-events:none;}
 .avatar-upload-wrap input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;border-radius:50%;}
 /* TOAST */
-#toast{position:fixed;bottom:1.8rem;left:50%;transform:translateX(-50%) translateY(80px);background:var(--gold);color:var(--navy);padding:.6rem 1.4rem;border-radius:24px;font-size:.83rem;font-weight:600;z-index:600;transition:transform .3s;pointer-events:none;white-space:nowrap;}
+#toast{position:fixed;bottom:5rem;left:50%;transform:translateX(-50%) translateY(120px);background:var(--gold);color:var(--navy);padding:.65rem 1.5rem;border-radius:24px;font-size:.83rem;font-weight:600;z-index:9999;transition:transform .35s cubic-bezier(.34,1.56,.64,1);pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.4);}
 #toast.show{transform:translateX(-50%) translateY(0);}
 
 /* UTILS */
@@ -335,7 +335,7 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
 ═══════════════════════════════════════ */
 
 /* Bottom nav bar for mobile */
-.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:300;background:rgba(13,27,42,.98);backdrop-filter:blur(14px);border-top:1px solid var(--border);padding:.5rem 0 calc(.5rem + env(safe-area-inset-bottom));safe-area-inset-bottom:0;}
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:500;background:rgba(13,27,42,.99);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:.5rem 0 calc(.5rem + env(safe-area-inset-bottom));}
 .mobile-nav-inner{display:flex;justify-content:space-around;align-items:center;}
 .mnav-btn{display:flex;flex-direction:column;align-items:center;gap:.18rem;background:none;border:none;color:var(--muted);font-size:.58rem;cursor:pointer;font-family:'Inter',sans-serif;padding:.3rem .6rem;border-radius:10px;transition:.15s;position:relative;min-width:52px;}
 .mnav-btn.act{color:var(--gold);}
@@ -347,22 +347,24 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
   .mobile-nav{display:block;}
   body{padding-bottom:calc(64px + env(safe-area-inset-bottom));}
 
-  /* Hide desktop nav buttons, keep brand + search */
-  .nav-actions .nb:not(:first-child){display:none;}
-  nav{padding:0 .8rem;gap:.5rem;height:52px;}
-  .brand{font-size:1.25rem;}
-  .nav-search{max-width:none;}
-  .nav-actions{gap:.3rem;}
-  /* Hide People + Sign Out buttons in nav on mobile (moved to bottom nav) */
+  /* Mobile nav adjustments */
+  nav{padding:0 .8rem;gap:.4rem;height:52px;}
+  .brand{font-size:1.2rem;}
+  .nav-search{max-width:none;flex:1;}
+  .nav-actions{gap:.3rem;flex-shrink:0;}
+  /* On mobile: hide People & Sign Out from top nav (they're in bottom nav) */
   #navActions .nb[onclick*="openPeoplePage"],
   #navActions .nb[onclick*="doLogout"]{display:none;}
+  /* Keep Sign In and Join Free visible when logged out */
+  /* Lang selector: make smaller on mobile */
+  .lang-btn{padding:.28rem .5rem;font-size:.7rem;}
 
   /* Three col → single col */
   .three-col{padding:.7rem .7rem 0;gap:.8rem;}
 
-  /* Modals full-screen on mobile */
+  /* Modals - slide up from bottom on mobile */
   .ov{align-items:flex-end;padding:0;}
-  .modal{border-radius:20px 20px 0 0;max-height:92vh;max-width:100%;}
+  .modal{border-radius:20px 20px 0 0;max-height:90vh;max-width:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;}
   .modal.sm{max-width:100%;}
   .mhdr{padding:1rem 1.2rem .8rem;}
   .mbody{padding:1rem 1.2rem;}
@@ -382,9 +384,9 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
   .h-acts{flex-direction:column;width:100%;}
   .h-acts .btn{width:100%;justify-content:center;}
 
-  /* Auth page */
-  #authPage{padding:.8rem;align-items:flex-end;}
-  .auth-card{border-radius:20px 20px 0 0;padding:1.5rem 1.2rem;}
+  /* Auth page - full scrollable on mobile */
+  #authPage{padding:0;align-items:stretch;justify-content:flex-end;}
+  .auth-card{border-radius:20px 20px 0 0;padding:1.5rem 1.2rem 2rem;max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 
   /* Feed */
   .feed{gap:.8rem;}
@@ -446,8 +448,7 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
   /* Footer */
   footer{padding:1.5rem 1rem 1rem;}
 
-  /* Toast higher up on mobile (above bottom nav) */
-  #toast{bottom:calc(80px + env(safe-area-inset-bottom));}
+  /* Toast clears mobile nav automatically via base bottom:5rem */
 
   /* Touch targets — make all buttons minimum 44px tall for iOS */
   .btn,.nb,.act-btn,.feed-tab,.u-tab,.mnav-btn{min-height:36px;}
@@ -457,12 +458,23 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
 /* iPhone notch / Dynamic Island support */
 @supports(padding:max(0px)){
   nav{padding-left:max(.8rem, env(safe-area-inset-left));padding-right:max(.8rem, env(safe-area-inset-right));}
-  .mobile-nav{padding-bottom:max(.5rem, env(safe-area-inset-bottom));}
+  .mobile-nav{padding-bottom:max(.6rem, env(safe-area-inset-bottom));}
+  body{padding-bottom:max(64px, calc(64px + env(safe-area-inset-bottom)));}
+}
+/* Prevent iOS elastic bounce causing layout issues */
+#heroPage,#authPage,#appPage,#deceasedPage,#userPage,#peoplePage{
+  -webkit-overflow-scrolling:touch;
+  overflow-y:auto;
+}
+/* Smooth touch scrolling everywhere */
+.modal,.auth-card,.mbody,.feed,.prof-body,.upage,.people-page{
+  -webkit-overflow-scrolling:touch;
+  overflow-y:auto;
 }
 
 /* Smooth scroll & tap highlight */
-*{-webkit-tap-highlight-color:transparent;}
-html{scroll-behavior:smooth;}
+*{-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
 input,textarea,select{-webkit-appearance:none;appearance:none;}
 
 /* ═══════════════════════════════════════
@@ -1018,20 +1030,20 @@ function guestBrowse(){showPage('appPage');}
 <nav class="mobile-nav">
   <div class="mobile-nav-inner">
     <button class="mnav-btn act" id="mnav-home" onclick="mnavGo('home',this)">
-      <span class="mni">🏠</span>Home
+      <span class="mni">🏠</span><span style="font-size:.55rem">Home</span>
     </button>
     <button class="mnav-btn" id="mnav-search" onclick="mnavGo('search',this)">
-      <span class="mni">🔍</span>Search
+      <span class="mni">🔍</span><span style="font-size:.55rem">Search</span>
     </button>
-    <button class="mnav-btn" id="mnav-add" onclick="openDeceasedModal()">
-      <span class="mni" style="width:40px;height:40px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--navy);font-size:1.4rem;margin-bottom:.1rem">+</span>
+    <button class="mnav-btn" id="mnav-add" onclick="openDeceasedModal()" style="padding:.2rem .4rem">
+      <span style="width:44px;height:44px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--navy);font-size:1.6rem;line-height:1">+</span>
     </button>
     <button class="mnav-btn" id="mnav-people" onclick="mnavGo('people',this)">
-      <span class="mni">👥</span>People
+      <span class="mni">👥</span><span style="font-size:.55rem">People</span>
       <span class="mnav-badge" id="mnavFriendBadge">0</span>
     </button>
-    <button class="mnav-btn" id="mnav-notif" onclick="mnavGo('notif',this)">
-      <span class="mni">🔔</span>Alerts
+    <button class="mnav-btn" id="mnav-profile" onclick="mnavGo('profile',this)">
+      <span class="mni" id="mnavProfileIcon">👤</span><span style="font-size:.55rem">Me</span>
       <span class="mnav-badge" id="mnavNotifBadge">0</span>
     </button>
   </div>
@@ -1340,6 +1352,7 @@ async function afterAuth(user){
     showPageDirect('appPage');
     renderApp();
     toast('Welcome, '+CU.firstName+'! 🌻');
+    updateMnavProfileIcon();
   }catch(e){
     showLoader(false);
     console.error('afterAuth error:',e);
@@ -2277,12 +2290,32 @@ function doDonate(){
 function mnavGo(tab,btn){
   document.querySelectorAll('.mnav-btn').forEach(b=>b.classList.remove('act'));
   if(btn)btn.classList.add('act');
-  if(tab==='home'){if(CU){showPageDirect('appPage');renderApp();}else{showPageDirect('heroPage');}}
-  else if(tab==='search'){
+  if(tab==='home'){
     if(CU){showPageDirect('appPage');renderApp();}else{showPageDirect('heroPage');}
-    setTimeout(()=>{const s=document.getElementById('globalSearch');if(s){s.focus();document.getElementById('navSearchWrap').style.display='flex';}},200);
-  }else if(tab==='people'){openPeoplePage();}
-  else if(tab==='notif'){if(!CU){toast('Please sign in.');showPageDirect('authPage');setAuthMode('login');return;}showPageDirect('appPage');renderApp();showNotifs();}
+  }else if(tab==='search'){
+    if(CU){showPageDirect('appPage');renderApp();}else{showPage('authPage');setAuthMode('login');return;}
+    setTimeout(()=>{
+      const sw=document.getElementById('navSearchWrap');
+      const s=document.getElementById('globalSearch');
+      if(sw)sw.style.display='flex';
+      if(s){s.focus();}
+    },300);
+  }else if(tab==='people'){
+    openPeoplePage();
+  }else if(tab==='profile'){
+    if(!CU){showPage('authPage');setAuthMode('login');return;}
+    openMyProfile();
+  }
+}
+function updateMnavProfileIcon(){
+  const icon=document.getElementById('mnavProfileIcon');
+  if(!icon||!CU)return;
+  if(CU.avatar){
+    icon.innerHTML=`<img src="${CU.avatar}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid var(--gold)">`;
+  } else {
+    icon.textContent=(CU.firstName?.charAt(0)||'👤')+(CU.lastName?.charAt(0)||'');
+    icon.style.cssText='font-size:.9rem;width:28px;height:28px;border-radius:50%;background:var(--navy-m);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;';
+  }
 }
 function updateMobileNav(){
   if(!CU)return;
@@ -2308,7 +2341,8 @@ function updateMobileNav(){
     u(){this.y-=this.vy;this.x+=this.vx;this.a-=this.da;if(this.a<=0||this.y<-5)this.r();}
     d(){ctx.save();ctx.globalAlpha=this.a*.35;ctx.fillStyle=`hsl(${this.h},88%,62%)`;ctx.beginPath();ctx.arc(this.x,this.y,this.s,0,Math.PI*2);ctx.fill();ctx.restore();}
   }
-  for(let i=0;i<55;i++){const p=new P();p.y=Math.random()*c.height;pts.push(p);}
+  const particleCount=window.innerWidth<640?20:55;
+for(let i=0;i<particleCount;i++){const p=new P();p.y=Math.random()*c.height;pts.push(p);}
   function loop(){ctx.clearRect(0,0,c.width,c.height);pts.forEach(p=>{p.u();p.d();});requestAnimationFrame(loop);}
   loop();
 })();
