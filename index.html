@@ -2846,8 +2846,13 @@ async function acceptFriendById(frId){
   if(nameEl)nameEl.textContent=fromUser?uName(fromUser):'your friend';
   // Reset selection
   document.querySelectorAll('.friend-rel-opt').forEach(b=>b.classList.remove('sel'));
-  const friendBtn=document.querySelector('.friend-rel-opt[onclick*="'Friend'"]');
-  if(friendBtn)friendBtn.classList.add('sel');
+  // Select 'Friend' option by default
+  document.querySelectorAll('.friend-rel-opt').forEach(function(b){
+    if(b.textContent.trim().indexOf('Friend')>-1 && b.textContent.trim().indexOf('Close')===-1){
+      b.classList.add('sel');
+      selectedFriendRel='Friend';
+    }
+  });
   if(document.getElementById('friendRelCustom'))document.getElementById('friendRelCustom').value='';
   openModal('friendRelModal');
 }
