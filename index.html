@@ -464,6 +464,20 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
 *{-webkit-tap-highlight-color:transparent;}
 html{scroll-behavior:smooth;}
 input,textarea,select{-webkit-appearance:none;appearance:none;}
+
+/* ═══════════════════════════════════════
+   LANGUAGE SELECTOR
+═══════════════════════════════════════ */
+.lang-btn{display:flex;align-items:center;gap:.3rem;padding:.32rem .7rem;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--ivory);font-size:.75rem;cursor:pointer;transition:.2s;font-family:'Inter',sans-serif;white-space:nowrap;}
+.lang-btn:hover{border-color:var(--gold);color:var(--gold);}
+.lang-flag{font-size:.95rem;line-height:1;}
+.lang-dropdown{position:absolute;top:calc(100% + 6px);right:0;background:var(--navy-l);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:none;z-index:400;min-width:160px;box-shadow:var(--shadow);}
+.lang-dropdown.open{display:block;}
+.lang-wrap{position:relative;}
+.lang-option{padding:.6rem 1rem;cursor:pointer;display:flex;align-items:center;gap:.65rem;font-size:.82rem;color:var(--lavender);transition:.15s;font-family:'Inter',sans-serif;border:none;background:transparent;width:100%;text-align:left;}
+.lang-option:hover{background:rgba(201,168,76,.1);color:var(--ivory);}
+.lang-option.active{color:var(--gold);font-weight:600;}
+.lang-option .lf{font-size:1.1rem;}
 </style>
 </head>
 <body>
@@ -498,20 +512,33 @@ function guestBrowse(){showPage('appPage');}
     <input type="text" id="globalSearch" placeholder="Search deceased by name…" oninput="handleSearch(this.value)" autocomplete="off">
     <div id="searchDropdown"></div>
   </div>
+  <div class="lang-wrap" id="langWrap">
+    <button class="lang-btn" onclick="toggleLangMenu()" id="langBtn">
+      <span class="lang-flag" id="currentFlag">🇬🇧</span>
+      <span id="currentLangLabel">EN</span> ▾
+    </button>
+    <div class="lang-dropdown" id="langDropdown">
+      <button class="lang-option active" onclick="setLang('en',this)"><span class="lf">🇬🇧</span> English</button>
+      <button class="lang-option" onclick="setLang('ms',this)"><span class="lf">🇲🇾</span> Bahasa Malaysia</button>
+      <button class="lang-option" onclick="setLang('fil',this)"><span class="lf">🇵🇭</span> Filipino</button>
+      <button class="lang-option" onclick="setLang('zh',this)"><span class="lf">🇨🇳</span> 中文</button>
+    </div>
+  </div>
   <div class="nav-actions" id="navActions">
     <button class="nb" onclick="showPage('authPage');setAuthMode('login')">Sign In</button>
     <button class="nb prim" onclick="showPage('authPage');setAuthMode('register')">Join Free</button>
   </div>
+</div>
 </nav>
 
 <!-- ═══════════════ HERO ═══════════════ -->
 <div id="heroPage" class="page active">
-  <p class="h-eye">A celebration of lives lived</p>
-  <h1 class="h-title">Laugh. <em>Celebrate.</em><br>Always Remember.</h1>
-  <p class="h-sub">Remembered is where families and friends come together to honour those who have passed — sharing photos, stories, prayers, and the connections that keep them alive in our hearts.</p>
+  <p class="h-eye" id="heroEyebrow">A celebration of lives lived</p>
+  <h1 class="h-title" id="heroTitle">Laugh. <em>Celebrate.</em><br>Always Remember.</h1>
+  <p class="h-sub" id="heroSub">Remembered is where families and friends come together to honour those who have passed — sharing photos, stories, prayers, and the connections that keep them alive in our hearts.</p>
   <div class="h-acts">
-    <button class="btn btn-g" onclick="showPage('authPage');setAuthMode('register')">🌻 Celebrate Someone</button>
-    <button class="btn btn-o" onclick="guestBrowse()">Browse Memorials</button>
+    <button class="btn btn-g" onclick="showPage('authPage');setAuthMode('register')" id="heroCelebBtn">🌻 Celebrate Someone</button>
+    <button class="btn btn-o" onclick="guestBrowse()" id="heroBrowseBtn">Browse Memorials</button>
   </div>
   <div id="loadingHint" style="margin-top:1rem;font-size:.75rem;color:var(--muted);display:none">⏳ Connecting to server…</div>
 </div>
@@ -520,34 +547,34 @@ function guestBrowse(){showPage('appPage');}
 <div id="authPage" class="page">
   <div class="auth-card">
     <div id="loginF">
-      <p class="auth-t">Welcome back</p>
-      <p class="auth-s">Sign in to celebrate someone you love</p>
+      <p class="auth-t" id="loginTitle">Welcome back</p>
+      <p class="auth-s" id="loginSub">Sign in to celebrate someone you love</p>
       <div style="display:flex;flex-direction:column;gap:.7rem">
-        <div class="fg"><label>Email</label><input type="email" id="liEmail" placeholder="you@email.com"></div>
-        <div class="fg"><label>Password</label><input type="password" id="liPass" placeholder="••••••••"></div>
-        <button class="btn btn-g" style="width:100%;margin-top:.2rem" onclick="doLogin()">Sign In</button>
+        <div class="fg"><label id="loginEmailLabel">Email</label><input type="email" id="liEmail" placeholder="you@email.com"></div>
+        <div class="fg"><label id="loginPassLabel">Password</label><input type="password" id="liPass" placeholder="••••••••"></div>
+        <button class="btn btn-g" style="width:100%;margin-top:.2rem" onclick="doLogin()" id="loginBtn">Sign In</button>
       </div>
-      <div class="auth-sw">New here? <a onclick="setAuthMode('register')">Create an account →</a></div>
+      <div class="auth-sw"><span id="loginNoAccount">New here?</span> <a onclick="setAuthMode('register')" id="loginCreateLink">Create an account →</a></div>
     </div>
     <div id="regF" class="hidden">
-      <p class="auth-t">Join Remembered</p>
-      <p class="auth-s">Create a free account to honour those you love</p>
+      <p class="auth-t" id="regTitle">Join Remembered</p>
+      <p class="auth-s" id="regSub">Create a free account to honour those you love</p>
       <div style="display:flex;flex-direction:column;gap:.7rem">
         <div class="fr">
-          <div class="fg"><label>First Name</label><input type="text" id="rgFirst" placeholder="First"></div>
-          <div class="fg"><label>Last Name</label><input type="text" id="rgLast" placeholder="Last"></div>
+          <div class="fg"><label id="regFirstLabel">First Name</label><input type="text" id="rgFirst" placeholder="First"></div>
+          <div class="fg"><label id="regLastLabel">Last Name</label><input type="text" id="rgLast" placeholder="Last"></div>
         </div>
         <div class="fg"><label>Email</label><input type="email" id="rgEmail" placeholder="you@email.com"></div>
         <div class="fg"><label>Password</label><input type="password" id="rgPass" placeholder="min. 6 characters"></div>
-        <div class="fg"><label>Country</label>
+        <div class="fg"><label id="regCountryLabel">Country</label>
           <select id="rgCountry">
             <option value="">Select country…</option>
             <option>Malaysia</option><option>Indonesia</option><option>Philippines</option><option>Singapore</option><option>Thailand</option><option>Vietnam</option><option>China</option><option>India</option><option>United States</option><option>United Kingdom</option><option>Australia</option><option>Canada</option><option>Japan</option><option>South Korea</option><option>Other</option>
           </select>
         </div>
-        <button class="btn btn-g" style="width:100%;margin-top:.2rem" onclick="doRegister()">Create Account</button>
+        <button class="btn btn-g" style="width:100%;margin-top:.2rem" onclick="doRegister()" id="regCreateBtn">Create Account</button>
       </div>
-      <div class="auth-sw">Already a member? <a onclick="setAuthMode('login')">Sign in →</a></div>
+      <div class="auth-sw"><span id="regAlreadyMember">Already a member?</span> <a onclick="setAuthMode('login')" id="regSignInLink">Sign in →</a></div>
     </div>
   </div>
 </div>
@@ -559,12 +586,12 @@ function guestBrowse(){showPage('appPage');}
     <aside class="side-l">
       <div class="w" id="myProfileCard"></div>
       <div class="w">
-        <p class="wt">👥 My Connections</p>
+        <p class="wt" id="sidebarConnectionsTitle">👥 My Connections</p>
         <div id="myFriendsList" style="display:flex;flex-direction:column;gap:.5rem"></div>
-        <button class="btn btn-o btn-sm" style="width:100%;margin-top:.6rem" onclick="openInviteModal()">+ Invite Friends</button>
+        <button class="btn btn-o btn-sm" style="width:100%;margin-top:.6rem" onclick="openInviteModal()" id="sidebarInviteBtn">+ Invite Friends</button>
       </div>
       <div class="w">
-        <p class="wt">📅 Sacred Observances</p>
+        <p class="wt" id="sidebarCalTitle">📅 Sacred Observances</p>
         <div id="calList"></div>
         <div class="divider"></div>
         <div style="font-size:.72rem;color:var(--muted)">All dates are indicative. Actual observances may vary by year and region.</div>
@@ -576,18 +603,18 @@ function guestBrowse(){showPage('appPage');}
       <div class="feed">
         <div class="create-bar" onclick="openDeceasedModal()">
           <div class="ua" id="feedAvatar">🌻</div>
-          <div style="flex:1;color:var(--muted);font-size:.88rem">Celebrate someone who made you smile…</div>
-          <button class="btn btn-g btn-sm">+ Celebrate</button>
+          <div style="flex:1;color:var(--muted);font-size:.88rem" id="feedPlaceholder">Celebrate someone who made you smile…</div>
+          <button class="btn btn-g btn-sm" id="feedAddBtn">+ Celebrate</button>
         </div>
         <div class="feed-tab-row">
-          <button class="feed-tab act" id="ftAll" onclick="setFeedTab('all',this)">🌍 All Posts</button>
-          <button class="feed-tab" id="ftFriends" onclick="setFeedTab('friends',this)">👥 Friends <span class="new-badge" id="friendsFeedBadge" style="display:none">New</span></button>
+          <button class="feed-tab act" id="feedTabAll" onclick="setFeedTab('all',this)">🌍 All Posts</button>
+          <button class="feed-tab" id="feedTabFriends" onclick="setFeedTab('friends',this)">👥 Friends <span class="new-badge" id="friendsFeedBadge" style="display:none">New</span></button>
         </div>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap" id="feedFilters">
-          <button class="nb act" id="fAll" onclick="setFeedFilter('all',this)">All</button>
-          <button class="nb" id="fC" onclick="setFeedFilter('Christian',this)">✝ Christian</button>
-          <button class="nb" id="fM" onclick="setFeedFilter('Muslim',this)">☪ Muslim</button>
-          <button class="nb" id="fB" onclick="setFeedFilter('Buddhist',this)">☸ Buddhist</button>
+          <button class="nb act" id="fAll" onclick="setFeedFilter('all',this)" id="filterAll">All</button>
+          <button class="nb" id="fC" onclick="setFeedFilter('Christian',this)" id="filterC">✝ Christian</button>
+          <button class="nb" id="fM" onclick="setFeedFilter('Muslim',this)" id="filterM">☪ Muslim</button>
+          <button class="nb" id="fB" onclick="setFeedFilter('Buddhist',this)" id="filterB">☸ Buddhist</button>
           <button class="nb" id="fG" onclick="setFeedFilter('General',this)">🌟 General</button>
         </div>
         <div id="mainFeed"></div>
@@ -597,29 +624,29 @@ function guestBrowse(){showPage('appPage');}
     <!-- RIGHT -->
     <aside class="side-r">
       <div class="w">
-        <p class="wt">📊 Community</p>
+        <p class="wt" id="sidebarCommunityTitle">📊 Community</p>
         <div class="grid2" id="statsGrid"></div>
       </div>
       <div class="w">
-        <p class="wt">🔔 Notifications</p>
+        <p class="wt" id="sidebarNotifTitle">🔔 Notifications</p>
         <div id="notifList" style="display:flex;flex-direction:column;gap:.5rem;max-height:200px;overflow-y:auto"></div>
       </div>
       <div class="w">
-        <p class="wt">💡 People You May Know</p>
+        <p class="wt" id="sidebarSuggestTitle">💡 People You May Know</p>
         <div class="suggest-row" id="suggestList"></div>
         <button class="btn btn-o btn-sm" style="width:100%;margin-top:.6rem" onclick="openPeoplePage()">Browse All Members →</button>
       </div>
       <div class="w">
-        <p class="wt">😊 Most Celebrated</p>
+        <p class="wt" id="sidebarTopTitle">😊 Most Celebrated</p>
         <div id="topMemorials" style="display:flex;flex-direction:column;gap:.5rem"></div>
       </div>
       <div class="w" style="background:linear-gradient(135deg,rgba(201,168,76,.1),rgba(201,168,76,.02));border-color:rgba(201,168,76,.25)">
-        <p class="wt">☀️ Keep Their Story Alive</p>
-        <p style="font-size:.74rem;color:var(--muted);margin-bottom:.5rem;line-height:1.55">Help us keep this celebration of lives alive — ad-free, always here.</p>
+        <p class="wt" id="sidebarDonateTitle">☀️ Keep Their Story Alive</p>
+        <p style="font-size:.74rem;color:var(--muted);margin-bottom:.5rem;line-height:1.55" id="sidebarDonateSub">Help us keep this celebration of lives alive — ad-free, always here.</p>
         <div style="display:flex;flex-direction:column;gap:.4rem">
           <button class="btn btn-sm" style="width:100%;background:rgba(220,30,30,.15);border:1px solid rgba(220,30,30,.35);color:#ff5252;font-weight:600" onclick="openDonationModal();switchPayTab('duitnow')">📱 Scan QR to Donate (DuitNow)</button>
-          <button class="btn btn-sm" style="width:100%;background:rgba(0,177,79,.1);border:1px solid rgba(0,177,79,.3);color:#00b14f" onclick="openDonationModal();switchPayTab('grab')">🟢 GrabPay</button>
-          <button class="btn btn-sm" style="width:100%;background:rgba(0,112,186,.1);border:1px solid rgba(0,112,186,.3);color:#009CDE" onclick="openDonationModal();switchPayTab('paypal')">💙 PayPal (International)</button>
+          <button class="btn btn-sm" style="width:100%;background:rgba(0,177,79,.1);border:1px solid rgba(0,177,79,.3);color:#00b14f" onclick="openDonationModal();switchPayTab('grab')" id="donateGrabBtn">🟢 GrabPay</button>
+          <button class="btn btn-sm" style="width:100%;background:rgba(0,112,186,.1);border:1px solid rgba(0,112,186,.3);color:#009CDE" onclick="openDonationModal();switchPayTab('paypal')" id="donatePaypalBtn">💙 PayPal (International)</button>
         </div>
       </div>
     </aside>
@@ -708,7 +735,7 @@ function guestBrowse(){showPage('appPage');}
         <div class="fg"><label>Place of Rest <span class="opt">optional</span></label><input id="dBurial" placeholder="e.g. Nirvana Memorial Park"></div>
       </div>
       <div class="fr">
-        <div class="fg"><label>Country</label>
+        <div class="fg"><label id="regCountryLabel">Country</label>
           <select id="dCountry"><option value="">Country…</option><option>Malaysia</option><option>Indonesia</option><option>Philippines</option><option>Singapore</option><option>Thailand</option><option>Vietnam</option><option>China</option><option>India</option><option>United States</option><option>United Kingdom</option><option>Australia</option><option>Canada</option><option>Japan</option><option>Other</option></select>
         </div>
         <div class="fg"><label>Faith / Religion</label>
@@ -970,10 +997,10 @@ function guestBrowse(){showPage('appPage');}
       </div>
       <div class="divider"></div>
       <div class="fr">
-        <div class="fg"><label>First Name</label><input id="epFirst" placeholder="First name"></div>
-        <div class="fg"><label>Last Name</label><input id="epLast" placeholder="Last name"></div>
+        <div class="fg"><label id="regFirstLabel">First Name</label><input id="epFirst" placeholder="First name"></div>
+        <div class="fg"><label id="regLastLabel">Last Name</label><input id="epLast" placeholder="Last name"></div>
       </div>
-      <div class="fg"><label>Country</label>
+      <div class="fg"><label id="regCountryLabel">Country</label>
         <select id="epCountry">
           <option value="">Select country…</option>
           <option>Malaysia</option><option>Indonesia</option><option>Philippines</option><option>Singapore</option><option>Thailand</option><option>Vietnam</option><option>China</option><option>India</option><option>United States</option><option>United Kingdom</option><option>Australia</option><option>Canada</option><option>Japan</option><option>South Korea</option><option>Other</option>
@@ -1012,16 +1039,15 @@ function guestBrowse(){showPage('appPage');}
 
 <!-- FOOTER -->
 <footer style="position:relative;z-index:1;text-align:center;padding:2.5rem 1rem 2rem;border-top:1px solid rgba(201,168,76,.12);margin-top:2rem">
-  <div style="font-family:'Cormorant Garant',serif;font-size:1.1rem;color:var(--gold);margin-bottom:.3rem;letter-spacing:.04em">🌻 Remembered</div>
-  <div style="font-size:.75rem;color:var(--muted);margin-bottom:.6rem;line-height:1.6">A place to celebrate the lives they lived.</div>
+  <div style="font-family:'Cormorant Garant',serif;font-size:1.1rem;color:var(--gold);margin-bottom:.3rem;letter-spacing:.04em" id="footerBrand">🌻 Remembered</div>
+  <div style="font-size:.75rem;color:var(--muted);margin-bottom:.6rem;line-height:1.6" id="footerTagline">A place to celebrate the lives they lived.</div>
   <div style="display:inline-flex;align-items:center;gap:.5rem;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.18);border-radius:20px;padding:.35rem .9rem">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
       <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
-    <span style="font-size:.72rem;color:var(--lavender)">Created by</span>
-    <span style="font-size:.78rem;font-weight:600;color:var(--gold);letter-spacing:.03em">DW Labs</span>
+    <span style="font-size:.78rem;font-weight:600;color:var(--gold);letter-spacing:.03em" id="footerCredit">Created by DW Labs</span>
   </div>
-  <div style="margin-top:.8rem;font-size:.68rem;color:var(--muted)">© 2025 DW Labs · All rights reserved</div>
+  <div style="margin-top:.8rem;font-size:.68rem;color:var(--muted)" id="footerRights">© 2025 DW Labs · All rights reserved</div>
 </footer>
 
 <div id="toast">Done</div>
@@ -1163,31 +1189,77 @@ async function doRegister(){
   try{
     const {data,error}=await sb.auth.signUp({email,password:pass,options:{data:{first_name:first,last_name:last,country}}});
     if(error){showLoader(false);toast('❌ '+error.message);return;}
-    await sb.from('profiles').upsert({id:data.user.id,first_name:first,last_name:last,country,invite_code:'INV'+Math.random().toString(36).slice(2,8).toUpperCase()});
+
+    // Check if email confirmation is required
+    if(data.user && !data.session){
+      // Email confirmation is ON — tell user to check email
+      showLoader(false);
+      showPage('authPage');
+      setAuthMode('login');
+      document.getElementById('loginF').innerHTML=`
+        <div style="text-align:center;padding:1rem 0">
+          <div style="font-size:3rem;margin-bottom:1rem">📧</div>
+          <p class="auth-t" style="font-size:1.4rem">Check Your Email!</p>
+          <p class="auth-s" style="margin-bottom:1rem;line-height:1.6">We sent a confirmation link to:<br><strong style="color:var(--gold)">${email}</strong></p>
+          <p style="font-size:.8rem;color:var(--muted);line-height:1.6">Click the link in that email to activate your account, then come back and sign in.</p>
+          <div style="margin-top:1.2rem;padding:.8rem;background:rgba(201,168,76,.08);border-radius:10px;font-size:.78rem;color:var(--lavender)">
+            💡 <strong>Tip:</strong> Check your spam/junk folder if you don't see it within 1 minute.
+          </div>
+          <button class="btn btn-g" style="width:100%;margin-top:1.2rem" onclick="resetLoginForm()">← Back to Sign In</button>
+        </div>`;
+      return;
+    }
+
+    // No email confirmation needed — proceed directly
+    await sb.from('profiles').upsert({
+      id:data.user.id,first_name:first,last_name:last,country,
+      invite_code:'INV'+Math.random().toString(36).slice(2,8).toUpperCase()
+    });
     showLoader(false);
     toast('✅ Account created! Welcome to Remembered 🌻');
     await afterAuth(data.user);
-  }catch(e){showLoader(false);toast('❌ Connection error. Please refresh and try again.');}
+  }catch(e){
+    showLoader(false);
+    console.error('Register error:',e);
+    toast('❌ Error: '+e.message+'. Please try again.');
+  }
+}
+function resetLoginForm(){
+  document.getElementById('loginF').innerHTML=`
+    <p class="auth-t" id="loginTitle">Welcome back</p>
+    <p class="auth-s" id="loginSub">Sign in to celebrate someone you love</p>
+    <div style="display:flex;flex-direction:column;gap:.7rem">
+      <div class="fg"><label id="loginEmailLabel">Email</label><input type="email" id="liEmail" placeholder="you@email.com"></div>
+      <div class="fg"><label id="loginPassLabel">Password</label><input type="password" id="liPass" placeholder="••••••••"></div>
+      <button class="btn btn-g" style="width:100%;margin-top:.2rem" onclick="doLogin()" id="loginBtn">Sign In</button>
+    </div>
+    <div class="auth-sw"><span id="loginNoAccount">New here?</span> <a onclick="setAuthMode('register')" id="loginCreateLink">Create an account →</a></div>`;
 }
 async function afterAuth(user){
   showLoader(true);
-  const {data:profile}=await sb.from('profiles').select('*').eq('id',user.id).single();
-  CU={
-    id:user.id, email:user.email,
-    firstName:profile?.first_name||user.user_metadata?.first_name||'Friend',
-    lastName:profile?.last_name||user.user_metadata?.last_name||'',
-    country:profile?.country||'',
-    avatar:profile?.avatar_url||'',
-    inviteCode:profile?.invite_code||user.id.slice(0,8),
-    joined:new Date(user.created_at).getTime()
-  };
-  localStorage.setItem('rb_cu',JSON.stringify(CU));
-  await loadAllData();
-  await loadMyNotifications();
-  showLoader(false);
-  showPageDirect('appPage');
-  renderApp();
-  toast('Welcome back, '+CU.firstName+'! 🌻');
+  try{
+    const {data:profile}=await sb.from('profiles').select('*').eq('id',user.id).single();
+    CU={
+      id:user.id, email:user.email,
+      firstName:profile?.first_name||user.user_metadata?.first_name||'Friend',
+      lastName:profile?.last_name||user.user_metadata?.last_name||'',
+      country:profile?.country||'',
+      avatar:profile?.avatar_url||'',
+      inviteCode:profile?.invite_code||user.id.slice(0,8),
+      joined:new Date(user.created_at).getTime()
+    };
+    localStorage.setItem('rb_cu',JSON.stringify(CU));
+    await loadAllData();
+    await loadMyNotifications();
+    showLoader(false);
+    showPageDirect('appPage');
+    renderApp();
+    toast('Welcome, '+CU.firstName+'! 🌻');
+  }catch(e){
+    showLoader(false);
+    console.error('afterAuth error:',e);
+    toast('❌ Error loading your profile. Please refresh.');
+  }
 }
 async function doLogout(){
   await sb.auth.signOut();
@@ -2173,6 +2245,8 @@ function updateMobileNav(){
     showPageDirect('heroPage');
     updateNav();
   }
+  // Apply language
+  initLang();
   // Listen for future auth changes
   sb.auth.onAuthStateChange(async(event,session)=>{
     if(event==='SIGNED_IN'&&session&&(!CU||CU.id!==session.user.id)){
@@ -2183,6 +2257,69 @@ function updateMobileNav(){
       updateNav();showPageDirect('heroPage');
     }
   });
+
+// ═══════════════════════════════════════════════════════════
+// LANGUAGE SYSTEM
+// ═══════════════════════════════════════════════════════════
+const LANGS={
+  en:{flag:'🇬🇧',label:'EN',signIn:'Sign In',joinFree:'Join Free',people:'👥 People',signOut:'Sign Out',eyebrow:'A celebration of lives lived',heroTitle:'Laugh. <em>Celebrate.</em><br>Always Remember.',heroSub:"Remembered is where families and friends come together to honour those who have passed.",celebrate:'🌻 Celebrate Someone',browse:'Browse Memorials',welcomeBack:'Welcome back',signInSub:'Sign in to celebrate someone you love',emailLabel:'Email',passLabel:'Password',signInBtn:'Sign In',noAccount:'New here?',createAccountLink:'Create an account →',joinTitle:'Join Remembered',joinSub:'Create a free account to honour those you love',firstName:'First Name',lastName:'Last Name',country:'Country',selectCountry:'Select country…',createBtn:'Create Account',alreadyMember:'Already a member?',signInLink:'Sign in →',celebratePlaceholder:'Celebrate someone who made you smile…',addBtn:'+ Celebrate',allPosts:'🌍 All Posts',friendsPosts:'👥 Friends',allFilter:'All',christianFilter:'✝ Christian',muslimFilter:'☪ Muslim',buddhistFilter:'☸ Buddhist',smiles:'Smiles',prayers:'Prayers',iKnewThem:'🤝 I Knew Them',view:'👁 View',share:'↗ Share',community:'📊 Community',notifications:'🔔 Notifications',myConnections:'👥 My Connections',inviteFriends:'+ Invite Friends',sacredDates:'📅 Sacred Observances',peopleMayKnow:'💡 People You May Know',browseAll:'Browse All Members →',mostCelebrated:'😊 Most Celebrated',keepAlive:'☀️ Keep Their Story Alive',keepAliveSub:'Help us keep this celebration of lives alive — ad-free, always here.',donateQR:'📱 Scan QR to Donate (DuitNow)',donateGrab:'🟢 GrabPay',donatePaypal:'💙 PayPal (International)',memorials:'Memorials',friends:'Friends',members:'Members',footerTag:'A place to celebrate the lives they lived.',createdBy:'Created by',rights:'All rights reserved'},
+  ms:{flag:'🇲🇾',label:'MY',signIn:'Log Masuk',joinFree:'Daftar Percuma',people:'👥 Kenalan',signOut:'Log Keluar',eyebrow:'Meraikan kehidupan yang telah dilalui',heroTitle:'Ketawa. <em>Raikan.</em><br>Sentiasa Ingat.',heroSub:'Remembered adalah tempat keluarga dan sahabat berkumpul untuk menghormati mereka yang telah pergi — berkongsi foto, cerita, doa, dan kenangan yang menghidupkan mereka dalam hati kita.',celebrate:'🌻 Raikan Seseorang',browse:'Lihat Kenangan',welcomeBack:'Selamat kembali',signInSub:'Log masuk untuk meraikan seseorang yang anda sayangi',emailLabel:'E-mel',passLabel:'Kata Laluan',signInBtn:'Log Masuk',noAccount:'Baru di sini?',createAccountLink:'Buat akaun →',joinTitle:'Sertai Remembered',joinSub:'Buat akaun percuma untuk menghormati orang tersayang',firstName:'Nama Pertama',lastName:'Nama Akhir',country:'Negara',selectCountry:'Pilih negara…',createBtn:'Buat Akaun',alreadyMember:'Sudah ada akaun?',signInLink:'Log masuk →',celebratePlaceholder:'Raikan seseorang yang membuatkan anda tersenyum…',addBtn:'+ Raikan',allPosts:'🌍 Semua',friendsPosts:'👥 Rakan',allFilter:'Semua',christianFilter:'✝ Kristian',muslimFilter:'☪ Islam',buddhistFilter:'☸ Buddha',smiles:'Senyuman',prayers:'Doa',iKnewThem:'🤝 Saya Kenali Mereka',view:'👁 Lihat',share:'↗ Kongsi',community:'📊 Komuniti',notifications:'🔔 Pemberitahuan',myConnections:'👥 Kenalan Saya',inviteFriends:'+ Jemput Rakan',sacredDates:'📅 Hari Kebesaran',peopleMayKnow:'💡 Orang Yang Mungkin Anda Kenal',browseAll:'Lihat Semua Ahli →',mostCelebrated:'😊 Paling Diingati',keepAlive:'☀️ Kekalkan Kenangan Mereka',keepAliveSub:'Bantu kami mengekalkan platform ini — bebas iklan, sentiasa ada.',donateQR:'📱 Imbas QR untuk Derma (DuitNow)',donateGrab:'🟢 GrabPay',donatePaypal:'💙 PayPal (Antarabangsa)',memorials:'Kenangan',friends:'Rakan',members:'Ahli',footerTag:'Tempat meraikan kehidupan yang telah dilalui.',createdBy:'Dicipta oleh',rights:'Hak cipta terpelihara'},
+  fil:{flag:'🇵🇭',label:'FIL',signIn:'Mag-login',joinFree:'Sumali Libre',people:'👥 Mga Kaibigan',signOut:'Mag-logout',eyebrow:'Pagdiriwang ng mga buhay na nabuhay',heroTitle:'Tumawa. <em>Magdiwang.</em><br>Laging Alalahanin.',heroSub:'Ang Remembered ay isang lugar kung saan nagtitipon ang pamilya at mga kaibigan para parangalan ang mga yumaong mahal natin.',celebrate:'🌻 Ipagdiwang ang Isang Tao',browse:'Tingnan ang mga Alaala',welcomeBack:'Maligayang pagbabalik',signInSub:'Mag-login para ipagdiwang ang mahal mo sa buhay',emailLabel:'Email',passLabel:'Password',signInBtn:'Mag-login',noAccount:'Bago dito?',createAccountLink:'Gumawa ng account →',joinTitle:'Sumali sa Remembered',joinSub:'Gumawa ng libreng account para parangalan ang iyong mahal sa buhay',firstName:'Unang Pangalan',lastName:'Apelyido',country:'Bansa',selectCountry:'Pumili ng bansa…',createBtn:'Gumawa ng Account',alreadyMember:'May account na?',signInLink:'Mag-login →',celebratePlaceholder:'Ipagdiwang ang isang taong nagpasaya sa iyo…',addBtn:'+ Ipagdiwang',allPosts:'🌍 Lahat',friendsPosts:'👥 Mga Kaibigan',allFilter:'Lahat',christianFilter:'✝ Kristiyano',muslimFilter:'☪ Muslim',buddhistFilter:'☸ Budista',smiles:'Ngiti',prayers:'Panalangin',iKnewThem:'🤝 Kilala Ko Siya',view:'👁 Tingnan',share:'↗ Ibahagi',community:'📊 Komunidad',notifications:'🔔 Abiso',myConnections:'👥 Aking mga Koneksyon',inviteFriends:'+ Imbitahan ang mga Kaibigan',sacredDates:'📅 Mga Banal na Araw',peopleMayKnow:'💡 Mga Taong Maaari Mong Makilala',browseAll:'Tingnan Lahat ng Miyembro →',mostCelebrated:'😊 Pinakamaraming Ngiti',keepAlive:'☀️ Panatilihing Buhay ang Kanilang Kwento',keepAliveSub:'Tulungan kaming panatilihing buhay ang platform na ito — walang ads.',donateQR:'📱 I-scan ang QR para Mag-donate',donateGrab:'🟢 GrabPay',donatePaypal:'💙 PayPal (International)',memorials:'Alaala',friends:'Kaibigan',members:'Miyembro',footerTag:'Isang lugar para ipagdiwang ang mga buhay na nabuhay.',createdBy:'Nilikha ng',rights:'Lahat ng karapatan ay nakalaan'},
+  zh:{flag:'🇨🇳',label:'中文',signIn:'登录',joinFree:'免费注册',people:'👥 朋友',signOut:'退出',eyebrow:'纪念他们走过的生命',heroTitle:'欢笑。<em>庆祝。</em><br>永远铭记。',heroSub:'Remembered 是家人和朋友聚集在一起，缅怀逝去亲人的地方——分享照片、故事、祈祷，以及让他们在我们心中永存的美好记忆。',celebrate:'🌻 纪念一个人',browse:'浏览纪念馆',welcomeBack:'欢迎回来',signInSub:'登录以纪念您爱的人',emailLabel:'电子邮件',passLabel:'密码',signInBtn:'登录',noAccount:'还没有账户？',createAccountLink:'创建账户 →',joinTitle:'加入 Remembered',joinSub:'创建免费账户以纪念您爱的人',firstName:'名字',lastName:'姓氏',country:'国家',selectCountry:'选择国家…',createBtn:'创建账户',alreadyMember:'已有账户？',signInLink:'登录 →',celebratePlaceholder:'纪念一个曾让您微笑的人…',addBtn:'+ 纪念',allPosts:'🌍 全部',friendsPosts:'👥 朋友',allFilter:'全部',christianFilter:'✝ 基督教',muslimFilter:'☪ 伊斯兰教',buddhistFilter:'☸ 佛教',smiles:'微笑',prayers:'祈祷',iKnewThem:'🤝 我认识他/她',view:'👁 查看',share:'↗ 分享',community:'📊 社区',notifications:'🔔 通知',myConnections:'👥 我的联系',inviteFriends:'+ 邀请朋友',sacredDates:'📅 神圣纪念日',peopleMayKnow:'💡 你可能认识的人',browseAll:'浏览所有成员 →',mostCelebrated:'😊 最多微笑',keepAlive:'☀️ 让他们的故事永存',keepAliveSub:'帮助我们保持这个平台的运营——无广告，永远在这里。',donateQR:'📱 扫描二维码捐款',donateGrab:'🟢 GrabPay',donatePaypal:'💙 PayPal（国际）',memorials:'纪念馆',friends:'朋友',members:'成员',footerTag:'一个纪念他们走过生命的地方。',createdBy:'由以下创建',rights:'版权所有'}
+};
+let currentLang=localStorage.getItem('rb_lang')||'en';
+function t(k){return LANGS[currentLang]?.[k]||LANGS.en[k]||k;}
+function toggleLangMenu(){const d=document.getElementById('langDropdown');if(d)d.classList.toggle('open');}
+document.addEventListener('click',function(e){if(!e.target.closest('#langWrap')){const d=document.getElementById('langDropdown');if(d)d.classList.remove('open');}});
+function setLang(lang,btn){
+  currentLang=lang;localStorage.setItem('rb_lang',lang);
+  const L=LANGS[lang];
+  const f=document.getElementById('currentFlag'),lb=document.getElementById('currentLangLabel');
+  if(f)f.textContent=L.flag;if(lb)lb.textContent=L.label;
+  document.querySelectorAll('.lang-option').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  const d=document.getElementById('langDropdown');if(d)d.classList.remove('open');
+  applyTranslations();
+}
+function se(id,val,isHtml){const el=document.getElementById(id);if(el){if(isHtml)el.innerHTML=val;else el.textContent=val;}}
+function applyTranslations(){
+  const L=LANGS[currentLang]||LANGS.en;
+  const na=document.getElementById('navActions');
+  if(na&&!CU)na.innerHTML=`<button class="nb" onclick="showPage('authPage');setAuthMode('login')">${L.signIn}</button><button class="nb prim" onclick="showPage('authPage');setAuthMode('register')">${L.joinFree}</button>`;
+  se('heroEyebrow',L.eyebrow);se('heroTitle',L.heroTitle,true);se('heroSub',L.heroSub);
+  se('heroCelebBtn',L.celebrate);se('heroBrowseBtn',L.browse);
+  se('loginTitle',L.welcomeBack);se('loginSub',L.signInSub);se('loginEmailLabel',L.emailLabel);
+  se('loginPassLabel',L.passLabel);se('loginBtn',L.signInBtn);se('loginNoAccount',L.noAccount);se('loginCreateLink',L.createAccountLink);
+  se('regTitle',L.joinTitle);se('regSub',L.joinSub);se('regFirstLabel',L.firstName);se('regLastLabel',L.lastName);
+  se('regCountryLabel',L.country);se('regCreateBtn',L.createBtn);se('regAlreadyMember',L.alreadyMember);se('regSignInLink',L.signInLink);
+  const gs=document.getElementById('globalSearch');if(gs)gs.placeholder='🔍 '+L.browse+'…';
+  se('feedPlaceholder',L.celebratePlaceholder);se('feedAddBtn',L.addBtn);
+  se('feedTabAll',L.allPosts);se('feedTabFriends',L.friendsPosts);
+  se('filterAll',L.allFilter);se('filterC',L.christianFilter);se('filterM',L.muslimFilter);se('filterB',L.buddhistFilter);
+  se('sidebarCommunityTitle',L.community);se('sidebarNotifTitle',L.notifications);
+  se('sidebarConnectionsTitle',L.myConnections);se('sidebarInviteBtn',L.inviteFriends);
+  se('sidebarCalTitle',L.sacredDates);se('sidebarSuggestTitle',L.peopleMayKnow);
+  se('sidebarBrowseAll',L.browseAll);se('sidebarTopTitle',L.mostCelebrated);
+  se('sidebarDonateTitle',L.keepAlive);se('sidebarDonateSub',L.keepAliveSub);
+  se('donateQRBtn',L.donateQR);se('donateGrabBtn',L.donateGrab);se('donatePaypalBtn',L.donatePaypal);
+  se('footerBrand','🌻 Remembered');se('footerTagline',L.footerTag);
+  se('footerCredit',L.createdBy+' DW Labs');se('footerRights','© 2025 DW Labs · '+L.rights);
+  const lh=document.getElementById('loadingHint');if(lh)lh.textContent='⏳ '+( currentLang==='ms'?'Menyambung ke pelayan…':currentLang==='fil'?'Nagkokonekta sa server…':currentLang==='zh'?'正在连接服务器…':'Connecting to server…');
+  const page=document.querySelector('.page.active');
+  if(page&&page.id==='appPage')renderFeed();
+}
+function initLang(){
+  const L=LANGS[currentLang]||LANGS.en;
+  const f=document.getElementById('currentFlag'),lb=document.getElementById('currentLangLabel');
+  if(f)f.textContent=L.flag;if(lb)lb.textContent=L.label;
+  document.querySelectorAll('.lang-option').forEach(btn=>{
+    const oc=btn.getAttribute('onclick')||'';
+    if(oc.includes("'"+currentLang+"'"))btn.classList.add('active');
+    else btn.classList.remove('active');
+  });
+  applyTranslations();
+}
+
 })();
 </body>
 </html>
