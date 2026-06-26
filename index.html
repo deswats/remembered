@@ -1305,7 +1305,9 @@ function guestBrowse(){showPage('appPage');}
 // ═══════════════════════════════════════════════════════════
 var SUPABASE_URL = 'https://bemukaghdzqqjszwtfrk.supabase.co';
 var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJlbXVrYWdoZHpxcWpzend0ZnJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MzA1NDgsImV4cCI6MjA5ODAwNjU0OH0.QF4eOTvHu418VCRH599SuEErkLbnEtCbi7pNMhIWb6U';
-var sb = null; // initialized after CDN loads
+// Initialize Supabase immediately — it's bundled inline so always available
+var sb = (typeof supabase !== 'undefined') ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON) : null;
+console.log('sb initialized at load time:', sb ? '✓' : '✗ supabase not available yet');
 
 // ═══════════════════════════════════════════════════════════
 // CONSTANTS
@@ -1365,6 +1367,17 @@ function showLoader(on){
 // SUPABASE DATA — load all into cache
 // ═══════════════════════════════════════════════════════════
 async function loadAllData(){
+  if(!sb){
+    // Try to initialize sb if not ready yet
+    if(typeof supabase !== 'undefined'){
+      sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+      console.log('sb re-initialized in loadAllData');
+    } else {
+      console.warn('Supabase not ready, skipping data load');
+      showLoader(false);
+      return;
+    }
+  }
   showLoader(true);
   // 15 second timeout to prevent freezing on slow connections
   const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),15000));
@@ -1430,9 +1443,13 @@ function setAuthMode(m){
 }
 async function doLogin(){
   if(!sb){
-    toast('Still connecting… please wait and try again.');
-    startWhenReady();
-    return;
+    if(typeof supabase !== 'undefined'){
+      sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    }
+    if(!sb){
+      toast('Not connected yet. Please wait a moment and try again.');
+      return;
+    }
   }
   const email=v('liEmail'),pass=v('liPass');
   if(!email||!pass){toast('Please fill in all fields.');return;}
@@ -1455,9 +1472,13 @@ async function doLogin(){
 }
 async function doRegister(){
   if(!sb){
-    toast('Still connecting… please wait and try again.');
-    startWhenReady();
-    return;
+    if(typeof supabase !== 'undefined'){
+      sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    }
+    if(!sb){
+      toast('Not connected yet. Please wait a moment and try again.');
+      return;
+    }
   }
   const first=v('rgFirst'),last=v('rgLast'),email=v('rgEmail'),pass=v('rgPass'),country=v('rgCountry');
   if(!first||!last||!email||!pass){toast('Please fill all required fields.');return;}
@@ -3118,9 +3139,14 @@ if(document.readyState==='loading'){
 // ═══════════════════════════════════════════════════════════
 async function initApp(){
   try{
-    // Supabase is bundled inline — always available
-    sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-    console.log('Supabase client initialized ✓');
+    // Ensure sb is initialized (should already be from load time)
+    if(!sb && typeof supabase !== 'undefined'){
+      sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    }
+    if(!sb){
+      throw new Error('Supabase client could not be initialized');
+    }
+    console.log('Supabase client ready ✓');
 
     showLoader(true);
     var lh=document.getElementById('loadingHint');
