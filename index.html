@@ -658,6 +658,72 @@ function setAuthMode(m){
   else{lf.classList.add('hidden');rf.classList.remove('hidden');}
 }
 function guestBrowse(){showPage('appPage');}
+
+// ── STUB FUNCTIONS ──
+// These allow HTML elements to call functions before Script 3 loads
+// They delegate to the real implementations
+function handlePostInput(){if(typeof window._handlePostInput==='function')window._handlePostInput();}
+function submitPost(){if(typeof window._submitPost==='function')window._submitPost();else setTimeout(submitPost,200);}
+function saveDeceased(){if(typeof window._saveDeceased==='function')window._saveDeceased();else setTimeout(saveDeceased,200);}
+function openDeceasedModal(){if(typeof window._openDeceasedModal==='function')window._openDeceasedModal();else setTimeout(openDeceasedModal,200);}
+function switchPostType(t,b){if(typeof window._switchPostType==='function')window._switchPostType(t,b);}
+function previewPostImage(i){if(typeof window._previewPostImage==='function')window._previewPostImage(i);}
+function prevDPhoto(i){if(typeof window._prevDPhoto==='function')window._prevDPhoto(i);}
+function prevDMedia(i){if(typeof window._prevDMedia==='function')window._prevDMedia(i);}
+function selectFriendRel(r,b){if(typeof window._selectFriendRel==='function')window._selectFriendRel(r,b);}
+function saveFriendRel(){if(typeof window._saveFriendRel==='function')window._saveFriendRel();}
+function skipFriendRel(){if(typeof window._skipFriendRel==='function')window._skipFriendRel();}
+function openSetRelationship(u){if(typeof window._openSetRelationship==='function')window._openSetRelationship(u);}
+function acceptFriendById(i){if(typeof window._acceptFriendById==='function')window._acceptFriendById(i);}
+function declineFriend(i){if(typeof window._declineFriend==='function')window._declineFriend(i);}
+function sendFriendReq(i){if(typeof window._sendFriendReq==='function')window._sendFriendReq(i);}
+function doLogin(){if(typeof window._doLogin==='function')window._doLogin();else setTimeout(doLogin,200);}
+function doRegister(){if(typeof window._doRegister==='function')window._doRegister();else setTimeout(doRegister,200);}
+function openConnect(d,n){if(typeof window._openConnect==='function')window._openConnect(d,n);}
+function saveConnection(){if(typeof window._saveConnection==='function')window._saveConnection();}
+function quickPrayer(i,n){if(typeof window._quickPrayer==='function')window._quickPrayer(i,n);}
+function submitPrayer(){if(typeof window._submitPrayer==='function')window._submitPrayer();}
+function setTpl(k){if(typeof window._setTpl==='function')window._setTpl(k);}
+function toggleSmile(i){if(typeof window._toggleSmile==='function')window._toggleSmile(i);}
+function openDeceased(i){if(typeof window._openDeceased==='function')window._openDeceased(i);}
+function toggleComments(i){if(typeof window._toggleComments==='function')window._toggleComments(i);}
+function postComment(i){if(typeof window._postComment==='function')window._postComment(i);}
+function replyToComment(d,c,a){if(typeof window._replyToComment==='function')window._replyToComment(d,c,a);}
+function openShare(i){if(typeof window._openShare==='function')window._openShare(i);}
+function openInviteModal(){if(typeof window._openInviteModal==='function')window._openInviteModal();}
+function openPeoplePage(){if(typeof window._openPeoplePage==='function')window._openPeoplePage();}
+function openUserProfile(i){if(typeof window._openUserProfile==='function')window._openUserProfile(i);}
+function openMyProfile(){if(typeof window._openMyProfile==='function')window._openMyProfile();}
+function doLogout(){if(typeof window._doLogout==='function')window._doLogout();}
+function showUTab(t,b,u){if(typeof window._showUTab==='function')window._showUTab(t,b,u);}
+function openEditProfile(){if(typeof window._openEditProfile==='function')window._openEditProfile();}
+function saveProfile(){if(typeof window._saveProfile==='function')window._saveProfile();}
+function copyInvite(){if(typeof window._copyInvite==='function')window._copyInvite();}
+function sendInvite(){if(typeof window._sendInvite==='function')window._sendInvite();}
+function searchFriends(q){if(typeof window._searchFriends==='function')window._searchFriendss(q);}
+function openDonationModal(){if(typeof window._openDonationModal==='function')window._openDonationModal();}
+function switchPayTab(t){if(typeof window._switchPayTab==='function')window._switchPayTab(t);}
+function doDonate(){if(typeof window._doDonate==='function')window._doDonate();}
+function pickDon(b,v){if(typeof window._pickDon==='function')window._pickDon(b,v);}
+function copyDuitNow(){if(typeof window._copyDuitNow==='function')window._copyDuitNow();}
+function copyGrabPay(){if(typeof window._copyGrabPay==='function')window._copyGrabPay();}
+function setFeedTab(t,b){if(typeof window._setFeedTab==='function')window._setFeedTab(t,b);}
+function setFeedFilter(f,b){if(typeof window._setFeedFilter==='function')window._setFeedFilter(f,b);}
+function renderPeopleResults(q){if(typeof window._renderPeopleResults==='function')window._renderPeopleResults(q);}
+function acceptFriend(i){if(typeof window._acceptFriend==='function')window._acceptFriend(i);}
+function acceptFriendById2(i){if(typeof window._acceptFriendById2==='function')window._acceptFriendById2(i);}
+function mnavGo(t,b){if(typeof window._mnavGo==='function')window._mnavGo(t,b);}
+function toggleLangMenu(){if(typeof window._toggleLangMenu==='function')window._toggleLangMenu();}
+function setLang(l,b){if(typeof window._setLang==='function')window._setLang(l,b);}
+function togglePostLike(i){if(typeof window._togglePostLike==='function')window._togglePostLike(i);}
+function togglePostComments(i){if(typeof window._togglePostComments==='function')window._togglePostComments(i);}
+function submitPostComment(i){if(typeof window._submitPostComment==='function')window._submitPostComment(i);}
+function previewEpPhoto(i){if(typeof window._previewEpPhoto==='function')window._previewEpPhoto(i);}
+function quickAvatarUpload(i){if(typeof window._quickAvatarUpload==='function')window._quickAvatarUpload(i);}
+function handleResend(){if(typeof window._handleResend==='function')window._handleResend();}
+function resendConfirmation(e){if(typeof window._resendConfirmation==='function')window._resendConfirmation(e);}
+function submitInlinePrayer(i){if(typeof window._submitInlinePrayer==='function')window._submitInlinePrayer(i);}
+function showNotifs(){if(typeof window._showNotifs==='function')window._showNotifs();}
 </script>
 
 
@@ -2614,6 +2680,70 @@ function updateMobileNav(){
 for(let i=0;i<particleCount;i++){const p=new P();p.y=Math.random()*c.height;pts.push(p);}
   function loop(){ctx.clearRect(0,0,c.width,c.height);pts.forEach(p=>{p.u();p.d();});requestAnimationFrame(loop);}
   loop();
+// ── REGISTER REAL FUNCTIONS for stub delegation ──
+window._handlePostInput=handlePostInput;
+window._submitPost=submitPost;
+window._saveDeceased=saveDeceased;
+window._openDeceasedModal=openDeceasedModal;
+window._switchPostType=switchPostType;
+window._previewPostImage=previewPostImage;
+window._prevDPhoto=prevDPhoto;
+window._prevDMedia=prevDMedia;
+window._selectFriendRel=selectFriendRel;
+window._saveFriendRel=saveFriendRel;
+window._skipFriendRel=skipFriendRel;
+window._openSetRelationship=openSetRelationship;
+window._acceptFriendById=acceptFriendById;
+window._declineFriend=declineFriend;
+window._sendFriendReq=sendFriendReq;
+window._doLogin=doLogin;
+window._doRegister=doRegister;
+window._openConnect=openConnect;
+window._saveConnection=saveConnection;
+window._quickPrayer=quickPrayer;
+window._submitPrayer=submitPrayer;
+window._setTpl=setTpl;
+window._toggleSmile=toggleSmile;
+window._openDeceased=openDeceased;
+window._toggleComments=toggleComments;
+window._postComment=postComment;
+window._replyToComment=replyToComment;
+window._openShare=openShare;
+window._openInviteModal=openInviteModal;
+window._openPeoplePage=openPeoplePage;
+window._openUserProfile=openUserProfile;
+window._openMyProfile=openMyProfile;
+window._doLogout=doLogout;
+window._showUTab=showUTab;
+window._openEditProfile=openEditProfile;
+window._saveProfile=saveProfile;
+window._copyInvite=copyInvite;
+window._sendInvite=sendInvite;
+window._searchFriends=searchFriends;
+window._openDonationModal=openDonationModal;
+window._switchPayTab=switchPayTab;
+window._doDonate=doDonate;
+window._pickDon=pickDon;
+window._copyDuitNow=copyDuitNow;
+window._copyGrabPay=copyGrabPay;
+window._setFeedTab=setFeedTab;
+window._setFeedFilter=setFeedFilter;
+window._renderPeopleResults=renderPeopleResults;
+window._acceptFriend=acceptFriend;
+window._mnavGo=mnavGo;
+window._toggleLangMenu=toggleLangMenu;
+window._setLang=setLang;
+window._togglePostLike=togglePostLike;
+window._togglePostComments=togglePostComments;
+window._submitPostComment=submitPostComment;
+window._previewEpPhoto=previewEpPhoto;
+window._quickAvatarUpload=quickAvatarUpload;
+window._handleResend=handleResend;
+window._resendConfirmation=resendConfirmation;
+window._submitInlinePrayer=submitInlinePrayer;
+window._showNotifs=showNotifs;
+console.log('All functions registered ✓');
+
 })();
 
 // ═══════════════════════════════════════════════════════════
@@ -3102,6 +3232,10 @@ function initLang(){
   console.log('Language initialized:',currentLang);
 }
 
+
+// Register lang functions
+window._toggleLangMenu=typeof toggleLangMenu==='function'?toggleLangMenu:window._toggleLangMenu;
+window._setLang=typeof setLang==='function'?setLang:window._setLang;
 // Auto-init when DOM ready
 if(document.readyState==='loading'){
   document.addEventListener('DOMContentLoaded',initLang);
