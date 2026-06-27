@@ -2124,6 +2124,210 @@ function startWhenReady(){
 
 // Start the app
 startWhenReady();
+
+// ═══════════════════════════════════════════════════════════
+// POST FUNCTIONS (were missing after refactor)
+// ═══════════════════════════════════════════════════════════
+var postImageData='';
+var _mentionStart=0;
+
+function switchPostType(type,btn){
+  document.querySelectorAll('.post-type-tab').forEach(function(b){b.classList.remove('act');});
+  if(btn)btn.classList.add('act');
+  if(type==='memorial'){openDeceasedModal();}
+}
+
+function previewPostImage(input){
+  var f=input.files[0];if(!f)return;
+  var r=new FileReader();
+  r.onload=function(e){
+    postImageData=e.target.result;
+    var prev=document.getElementById('postImagePreview');
+    if(!prev)return;
+    prev.style.display='block';
+    prev.innerHTML='<div style="position:relative">'
+      +'<img src="'+e.target.result+'" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">'
+      +'<button type="button" onclick="removePostImage()" style="position:absolute;top:.3rem;right:.3rem;background:rgba(0,0,0,.7);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:.9rem;line-height:1">✕</button>'
+      +'</div>';
+  };
+  r.readAsDataURL(f);
+}
+
+function removePostImage(){
+  postImageData='';
+  var prev=document.getElementById('postImagePreview');
+  if(prev){prev.style.display='none';prev.innerHTML='';}
+  var fi=document.getElementById('postImageFile');
+  if(fi)fi.value='';
+}
+
+async function submitPost(){
+  if(!CU){toast('Please sign in to post.');showPage('authPage');setAuthMode('login');return;}
+  if(!sb){toast('Not connected. Please refresh.');return;}
+  var input=document.getElementById('postTextInput');
+  var text=input?input.value.trim():'';
+  if(!text&&!postImageData){toast('Please write something or add a photo.');return;}
+  var visEl=document.getElementById('postVisibility');
+  var visibility=visEl?visEl.value:'friends';
+  var btn=document.getElementById('postSubmitBtn');
+  if(btn){btn.disabled=true;btn.textContent='Posting…';}
+  hideMentionDropdown();
+  try{
+    var imageUrl='';
+    if(postImageData){
+      try{imageUrl=await uploadBase64(postImageData,'posts');}
+      catch(e){console.warn('Image upload:',e);}
+    }
+    var res=await sb.from('posts').insert({
+      user_id:CU.id,text:text,image_url:imageUrl||null,
+      visibility:visibility,created_at:new Date().toISOString()
+    }).select().single();
+    if(res.error)throw new Error(res.error.message);
+    CACHE.posts.unshift(res.data);
+    if(input)input.value='';
+    postImageData='';
+    var prev=document.getElementById('postImagePreview');
+    if(prev){prev.style.display='none';prev.innerHTML='';}
+    var fi=document.getElementById('postImageFile');if(fi)fi.value='';
+    if(btn){btn.disabled=false;btn.textContent='Share Post';}
+    toast('✅ Post shared!');
+    renderFeed();
+    getMyFriendIds().forEach(function(fid){addNotif(fid,uName(CU)+' shared a post','📝');});
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Share Post';}
+    console.error('Post error:',e);
+    toast('❌ '+e.message);
+  }
+}
+
+function handlePostInput(){
+  var input=document.getElementById('postTextInput');
+  if(!input)return;
+  var text=input.value;
+  var pos=input.selectionStart||text.length;
+  var before=text.slice(0,pos);
+  var atIdx=before.lastIndexOf('@');
+  if(atIdx>=0&&(atIdx===0||/\s/.test(before[atIdx-1]))){
+    var q=before.slice(atIdx+1);
+    if(!q.includes(' ')){_mentionStart=atIdx;showMentionDropdown(q);return;}
+  }
+  hideMentionDropdown();
+}
+
+function showMentionDropdown(q){
+  var dd=document.getElementById('mentionDropdown');
+  if(!dd){
+    dd=document.createElement('div');
+    dd.id='mentionDropdown';
+    dd.style.cssText='position:absolute;bottom:100%;left:0;right:0;background:var(--navy-l);border:1px solid var(--border);border-radius:10px;z-index:500;max-height:180px;overflow-y:auto;box-shadow:0 -4px 20px rgba(0,0,0,.5);';
+    var box=document.getElementById('createPostBox');
+    if(box){box.style.position='relative';box.appendChild(dd);}
+    else{document.body.appendChild(dd);}
+  }
+  var fids=CU?getMyFriendIds():[];
+  if(CU)fids.push(CU.id);
+  var matches=CACHE.users.filter(function(u){
+    return fids.includes(u.id)&&uName(u).toLowerCase().indexOf(q.toLowerCase())>=0;
+  }).slice(0,6);
+  if(!matches.length){dd.style.display='none';return;}
+  dd.innerHTML='';
+  matches.forEach(function(u){
+    var d=document.createElement('div');
+    d.style.cssText='display:flex;align-items:center;gap:.6rem;padding:.55rem .9rem;cursor:pointer;font-size:.84rem;color:var(--ivory);';
+    var av=(u.avatar_url||u.avatar)?'<img src="'+(u.avatar_url||u.avatar)+'" style="width:28px;height:28px;border-radius:50%;object-fit:cover">':'<div style="width:28px;height:28px;border-radius:50%;background:var(--navy-m);display:flex;align-items:center;justify-content:center;font-size:.75rem;color:var(--gold)">'+(u.first_name||'?').charAt(0)+'</div>';
+    d.innerHTML=av+'<span>'+uName(u)+'</span>';
+    d.onmouseover=function(){this.style.background='rgba(201,168,76,.12)';};
+    d.onmouseout=function(){this.style.background='';};
+    var name=uName(u);
+    d.onclick=function(){insertMention(name);};
+    dd.appendChild(d);
+  });
+  dd.style.display='block';
+}
+
+function hideMentionDropdown(){
+  var dd=document.getElementById('mentionDropdown');
+  if(dd)dd.style.display='none';
+}
+
+function insertMention(name){
+  var input=document.getElementById('postTextInput');
+  if(!input)return;
+  var text=input.value;
+  var pos=input.selectionStart||text.length;
+  input.value=text.slice(0,_mentionStart)+'@'+name+' '+text.slice(pos);
+  input.focus();
+  var np=_mentionStart+name.length+2;
+  input.setSelectionRange(np,np);
+  hideMentionDropdown();
+}
+
+document.addEventListener('click',function(e){
+  if(e.target&&e.target.id!=='postTextInput'&&!e.target.closest('#mentionDropdown'))hideMentionDropdown();
+});
+
+// ═══════════════════════════════════════════════════════════
+// FRIEND RELATIONSHIP FUNCTIONS (were missing after refactor)
+// ═══════════════════════════════════════════════════════════
+var pendingFriendReqId=null;
+var selectedFriendRel='Friend';
+
+function selectFriendRel(rel,btn){
+  selectedFriendRel=rel;
+  document.querySelectorAll('.friend-rel-opt').forEach(function(b){b.classList.remove('sel');});
+  if(btn)btn.classList.add('sel');
+  var custEl=document.getElementById('friendRelCustom');
+  if(custEl)custEl.value='';
+}
+
+function skipFriendRel(){
+  closeModal('friendRelModal');
+  completeFriendReq(pendingFriendReqId,'Friend');
+}
+
+async function saveFriendRel(){
+  var custEl=document.getElementById('friendRelCustom');
+  var custom=custEl?custEl.value.trim():'';
+  var rel=custom||selectedFriendRel||'Friend';
+  closeModal('friendRelModal');
+  await completeFriendReq(pendingFriendReqId,rel);
+}
+
+async function acceptFriendById(frId){
+  pendingFriendReqId=frId;
+  selectedFriendRel='Friend';
+  var fr=CACHE.friends.find(function(x){return x.id===frId;});
+  var fromUser=fr?CACHE.users.find(function(x){return x.id===fr.from_id;}):null;
+  var nameEl=document.getElementById('friendRelName');
+  if(nameEl)nameEl.textContent=fromUser?uName(fromUser):'your friend';
+  document.querySelectorAll('.friend-rel-opt').forEach(function(b){b.classList.remove('sel');});
+  var custEl=document.getElementById('friendRelCustom');
+  if(custEl)custEl.value='';
+  openModal('friendRelModal');
+}
+
+// openDeceased wrapper (in case it got disconnected)
+function openDeceased(id){
+  if(typeof openDeceasedProfile==='function')openDeceasedProfile(id);
+  else{
+    // find and open the deceased profile page directly
+    prevPage=document.querySelector('.page.active')?document.querySelector('.page.active').id:'appPage';
+    var d=CACHE.deceased.find(function(x){return x.id===id;});
+    if(!d){toast('Memorial not found.');return;}
+    viewingDeceasedId=id;
+    var ph=document.getElementById('dpPhoto');
+    if(ph)ph.innerHTML=d.photo_url?'<img src="'+d.photo_url+'" style="width:100%;height:100%;object-fit:cover">':(d.name?d.name.charAt(0):'?');
+    var dpName=document.getElementById('dpName');
+    if(dpName)dpName.textContent=d.name+(d.nickname?' "'+d.nickname+'"':'');
+    var dpDates=document.getElementById('dpDates');
+    if(dpDates)dpDates.textContent=fmtD(d.dob)+' — '+fmtD(d.dod)+ageCalc(d.dob,d.dod);
+    var dpLoc=document.getElementById('dpLoc');
+    if(dpLoc)dpLoc.textContent=[d.place_of_birth&&'Born in '+d.place_of_birth,d.burial&&'Resting at '+d.burial,d.country].filter(Boolean).join(' · ');
+    renderDpActions(id);renderDpConnections(id);renderDpPrayers(id);
+    showPageDirect('deceasedPage');
+  }
+}
+console.log('Post + Friend functions loaded ✓');
 </script>
 </head>
 <body>
