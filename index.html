@@ -617,6 +617,43 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .wall-add-box textarea:focus{border-color:var(--gold);}
 .wall-add-row{display:flex;align-items:center;gap:.5rem;margin-top:.5rem;flex-wrap:wrap;}
 .wall-media-preview{border-radius:8px;overflow:hidden;margin-top:.4rem;position:relative;}
+
+/* ── COVER PHOTO / WALLPAPER ── */
+.prof-hero{position:relative;padding:0 0 1.2rem 0;text-align:center;border-bottom:1px solid var(--border);}
+.prof-cover{width:100%;height:180px;object-fit:cover;display:block;background:linear-gradient(160deg,var(--navy-m),#1a2a3a);position:relative;}
+.prof-cover img{width:100%;height:100%;object-fit:cover;display:block;}
+.prof-cover-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(13,27,42,.85));pointer-events:none;}
+.prof-cover-change{position:absolute;top:.6rem;right:.6rem;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:.3rem .6rem;color:#fff;font-size:.7rem;cursor:pointer;display:flex;align-items:center;gap:.3rem;backdrop-filter:blur(4px);}
+.prof-cover-change:hover{background:rgba(0,0,0,.75);}
+.ph-photo{width:100px;height:100px;border-radius:50%;border:3px solid var(--gold);margin:-50px auto .5rem;position:relative;z-index:2;object-fit:cover;background:var(--navy-m);display:flex;align-items:center;justify-content:center;font-size:2.5rem;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.4);}
+.ph-photo img{width:100%;height:100%;object-fit:cover;}
+.ph-name{margin-top:.3rem;}
+/* User profile cover */
+.u-cover{width:100%;height:160px;border-radius:14px 14px 0 0;object-fit:cover;display:block;background:linear-gradient(135deg,var(--navy-m),#1a2a3a);position:relative;overflow:hidden;}
+.u-cover img{width:100%;height:100%;object-fit:cover;display:block;}
+.u-cover-change{position:absolute;top:.5rem;right:.5rem;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.2);border-radius:7px;padding:.25rem .5rem;color:#fff;font-size:.65rem;cursor:pointer;}
+.u-hero-with-cover{padding-top:0;border-radius:14px;overflow:hidden;display:block;}
+.u-hero-with-cover .u-cover{border-radius:0;}
+.u-hero-inner{padding:0 1.2rem 1.2rem;display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;margin-top:-40px;position:relative;z-index:2;}
+.u-av-lg-wrap{flex-shrink:0;}
+
+/* ── PROFILE BIO OVERLAY ── */
+.cover-bio{position:absolute;bottom:0;left:0;right:0;padding:.8rem 1rem;z-index:3;pointer-events:none;}
+.cover-bio-text{font-size:1rem;line-height:1.5;text-shadow:0 1px 6px rgba(0,0,0,.8);word-break:break-word;white-space:pre-wrap;}
+/* Font styles */
+.font-serif{font-family:'Georgia','Times New Roman',serif;}
+.font-script{font-family:'Palatino Linotype','Book Antiqua',Palatino,serif;font-style:italic;}
+.font-modern{font-family:'Inter','Helvetica Neue',sans-serif;font-weight:300;letter-spacing:.03em;}
+.font-bold{font-family:'Inter','Helvetica Neue',sans-serif;font-weight:700;}
+.font-classic{font-family:'Courier New',Courier,monospace;letter-spacing:.05em;}
+/* Font picker buttons */
+.font-picker{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.4rem;}
+.font-opt{padding:.3rem .7rem;border-radius:8px;border:1.5px solid var(--border);background:var(--navy-m);color:var(--lavender);cursor:pointer;font-size:.8rem;transition:.15s;}
+.font-opt.sel{border-color:var(--gold);background:rgba(201,168,76,.12);color:var(--gold);}
+/* Colour picker */
+.colour-picker{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.4rem;}
+.colour-opt{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:.15s;flex-shrink:0;}
+.colour-opt.sel{border-color:var(--gold);transform:scale(1.15);}
 </style>
 
 <script defer>
@@ -702,7 +739,7 @@ async function loadAllData(){
       sb.from('friends').select('*').limit(200),
       sb.from('prayers').select('*').order('created_at',{ascending:false}).limit(200),
       sb.from('comments').select('*').order('created_at',{ascending:false}).limit(500),
-      sb.from('profiles').select('id,first_name,last_name,country,avatar_url,invite_code,created_at').limit(500),
+      sb.from('profiles').select('id,first_name,last_name,country,avatar_url,invite_code,created_at,cover_url').limit(500),
       sb.from('media').select('*').limit(200),
       sb.from('posts').select('*').order('created_at',{ascending:false}).limit(100),
       sb.from('post_reactions').select('*').limit(1000),
@@ -1722,6 +1759,10 @@ function openUserProfile(uid){
     wrap.innerHTML=`<div class="u-av-lg" id="upAvatar">${uAvHtml(u,90)}</div>`;
   }
   document.getElementById('upName').textContent=uName(u);
+  // Set cover photo and bio
+  setUserCover(u.cover_url||CU?.cover_url||'');
+  showUserCoverBtn(uid);
+  renderUserBio(u);
   document.getElementById('upMeta').textContent=(u.country||'')+' · Member since '+(u.created_at?new Date(u.created_at).getFullYear():new Date().getFullYear());
   const memCount=CACHE.deceased.filter(d=>d.created_by===uid).length;
   const friendCount=CACHE.friends.filter(f=>(f.from_id===uid||f.to_id===uid)&&f.status==='accepted').length;
@@ -1792,6 +1833,23 @@ function openEditProfile(){
   document.getElementById('epCountry').value=CU.country||'';
   document.getElementById('epPhotoFile').value='';
   window._epNewAvatarFile=null;
+  // Bio fields
+  var bioEl=document.getElementById('epBio');
+  if(bioEl){
+    var cu2=CACHE.users.find(function(x){return x.id===CU.id;});
+    bioEl.value=(cu2&&cu2.bio)||CU.bio||'';
+    bioEl.oninput=previewBioOverlay;
+    bioEl.maxLength=200;
+  }
+  // Restore font
+  _bioFont=(CU.bio_font)||'font-serif';
+  _bioColour=(CU.bio_colour)||'#FFFFFF';
+  document.querySelectorAll('.font-opt').forEach(function(b){
+    b.classList.toggle('sel',b.dataset.font===_bioFont);
+  });
+  document.querySelectorAll('.colour-opt').forEach(function(c){
+    c.classList.toggle('sel',c.dataset.colour===_bioColour);
+  });
   openModal('editProfileModal');
 }
 function previewEpPhoto(input){
@@ -1805,16 +1863,21 @@ async function saveProfile(){
   const first=v('epFirst'),last=v('epLast'),country=v('epCountry');
   if(!first){toast('Name cannot be empty.');return;}
   showLoader(true);
-  const patch={first_name:first,last_name:last,country};
+  var bioEl=document.getElementById('epBio');
+  var bio=bioEl?bioEl.value.slice(0,200):'';
+  const patch={first_name:first,last_name:last,country,bio:bio,bio_font:_bioFont,bio_colour:_bioColour};
   if(window._epNewAvatarFile){try{patch.avatar_url=await uploadFile(window._epNewAvatarFile,'avatars');}catch(e){console.error(e);}}
   await sb.from('profiles').update(patch).eq('id',CU.id);
   CU.firstName=first;CU.lastName=last;CU.country=country;
+  CU.bio=bio;CU.bio_font=_bioFont;CU.bio_colour=_bioColour;
   if(patch.avatar_url)CU.avatar=patch.avatar_url;
   localStorage.setItem('rb_cu',JSON.stringify(CU));
   const cu=CACHE.users.find(x=>x.id===CU.id);
-  if(cu){cu.first_name=first;cu.last_name=last;cu.country=country;if(patch.avatar_url)cu.avatar_url=patch.avatar_url;}
+  if(cu){cu.first_name=first;cu.last_name=last;cu.country=country;cu.bio=bio;cu.bio_font=_bioFont;cu.bio_colour=_bioColour;if(patch.avatar_url)cu.avatar_url=patch.avatar_url;}
   showLoader(false);closeModal('editProfileModal');
-  toast('✅ Profile saved!');updateNav();renderSidebarProfile();openUserProfile(CU.id);
+  toast('✅ Profile saved!');updateNav();renderSidebarProfile();
+  // Re-render user profile with bio
+  openUserProfile(CU.id);
 }
 function showUTab(tab,btn,uid){
   uid=uid||viewingUserId;
@@ -2598,6 +2661,10 @@ function openDeceased(id){
     renderDpActions(id);renderDpConnections(id);renderDpPrayers(id);
     renderDpWall(id);
     loadWallPosts(id);
+    // Set cover photo
+    var dpD=CACHE.deceased.find(function(x){return x.id===id;});
+    if(dpD)setDeceasedCover(dpD.cover_url||'');
+    showDeceasedCoverBtn(id);
     showPageDirect('deceasedPage');
   }
 }
@@ -3647,6 +3714,149 @@ function openAdminDashboard(){
   openModal('adminDashModal');
 }
 
+
+// ═══════════════════════════════════════════════════════════
+// COVER PHOTO / WALLPAPER
+// ═══════════════════════════════════════════════════════════
+
+// Upload cover for deceased memorial (creator only)
+async function uploadDeceasedCover(input){
+  var f=input.files[0];if(!f)return;
+  if(!f.type.startsWith('image/')){toast('Please select an image.');return;}
+  if(f.size>10*1024*1024){toast('Max 10MB for cover photo.');return;}
+  if(!CU||!sb){toast('Please sign in.');return;}
+  toast('Uploading cover…');
+  var r=new FileReader();
+  r.onload=async function(e){
+    try{
+      var url=await uploadBase64(e.target.result,'covers');
+      if(!url){toast('Upload failed.');return;}
+      // Save to deceased record
+      var decId=viewingDeceasedId;
+      if(!decId)return;
+      await sb.from('deceased').update({cover_url:url}).eq('id',decId);
+      var d=CACHE.deceased.find(function(x){return x.id===decId;});
+      if(d)d.cover_url=url;
+      // Update the cover display
+      setDeceasedCover(url);
+      toast('🖼️ Cover photo updated!');
+    }catch(err){toast('❌ '+err.message);}
+  };
+  r.readAsDataURL(f);
+}
+
+function setDeceasedCover(url){
+  var bg=document.getElementById('dpCoverBg');
+  var cover=document.getElementById('dpCover');
+  if(!bg||!cover)return;
+  if(url){
+    bg.innerHTML='<img src="'+url+'" style="width:100%;height:100%;object-fit:cover;display:block">';
+  }else{
+    bg.innerHTML='';
+    bg.style.background='linear-gradient(160deg,#162233,#1a3045)';
+  }
+}
+
+// Upload cover for user profile (self only)
+async function uploadUserCover(input){
+  var f=input.files[0];if(!f)return;
+  if(!f.type.startsWith('image/')){toast('Please select an image.');return;}
+  if(f.size>10*1024*1024){toast('Max 10MB for cover photo.');return;}
+  if(!CU||!sb){toast('Please sign in.');return;}
+  toast('Uploading cover…');
+  var r=new FileReader();
+  r.onload=async function(e){
+    try{
+      var url=await uploadBase64(e.target.result,'covers');
+      if(!url){toast('Upload failed.');return;}
+      await sb.from('profiles').update({cover_url:url}).eq('id',CU.id);
+      CU.cover_url=url;
+      localStorage.setItem('rb_cu',JSON.stringify(CU));
+      setUserCover(url);
+      toast('🖼️ Cover photo updated!');
+    }catch(err){toast('❌ '+err.message);}
+  };
+  r.readAsDataURL(f);
+}
+
+function setUserCover(url){
+  var bg=document.getElementById('upCoverBg');
+  if(!bg)return;
+  if(url){
+    bg.innerHTML='<img src="'+url+'" style="width:100%;height:100%;object-fit:cover;display:block">';
+  }else{
+    bg.innerHTML='';
+    bg.style.background='linear-gradient(135deg,#162233,#1a3045)';
+  }
+}
+
+// Show cover change button on deceased page (creator only)
+function showDeceasedCoverBtn(deceasedId){
+  var btn=document.getElementById('dpCoverBtn');
+  if(!btn)return;
+  var d=CACHE.deceased.find(function(x){return x.id===deceasedId;});
+  if(d&&CU&&d.created_by===CU.id){
+    btn.style.display='flex';
+  }else{
+    btn.style.display='none';
+  }
+}
+
+// Show cover change button on user page (self only)
+function showUserCoverBtn(userId){
+  var btn=document.getElementById('upCoverBtn');
+  if(!btn)return;
+  btn.style.display=(CU&&CU.id===userId)?'block':'none';
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// BIO OVERLAY — text over wallpaper
+// ═══════════════════════════════════════════════════════════
+var _bioFont = 'font-serif';
+var _bioColour = '#FFFFFF';
+
+function selectBioFont(btn){
+  document.querySelectorAll('.font-opt').forEach(function(b){b.classList.remove('sel');});
+  btn.classList.add('sel');
+  _bioFont = btn.dataset.font;
+  previewBioOverlay();
+}
+
+function selectBioColour(el){
+  document.querySelectorAll('.colour-opt').forEach(function(c){c.classList.remove('sel');});
+  el.classList.add('sel');
+  _bioColour = el.dataset.colour;
+  previewBioOverlay();
+}
+
+function previewBioOverlay(){
+  var bioEl=document.getElementById('upCoverBio');
+  var bioText=document.getElementById('epBio');
+  if(!bioEl||!bioText)return;
+  renderBioOverlay(bioEl, bioText.value, _bioFont, _bioColour);
+}
+
+function renderBioOverlay(el, text, fontClass, colour){
+  if(!el)return;
+  if(!text||!text.trim()){el.innerHTML='';return;}
+  el.innerHTML='<div class="cover-bio-text '+fontClass+'" style="color:'+colour+'">'+sanitizeText(text)+'</div>';
+}
+
+// Render bio on deceased profile cover
+function renderDeceasedBio(d){
+  var el=document.getElementById('dpCoverBio');
+  if(!el||!d)return;
+  renderBioOverlay(el, d.bio||'', d.bio_font||'font-serif', d.bio_colour||'#FFFFFF');
+}
+
+// Render bio on user profile cover
+function renderUserBio(u){
+  var el=document.getElementById('upCoverBio');
+  if(!el||!u)return;
+  renderBioOverlay(el, u.bio||'', u.bio_font||'font-serif', u.bio_colour||'#FFFFFF');
+}
+
 console.log('Post + Friend functions loaded ✓');
 
 // ═══════════════════════════════════════════════════════════
@@ -4440,7 +4650,18 @@ function guestBrowse(){showPage('appPage');}
 <!-- ═══════════════ DECEASED PROFILE ═══════════════ -->
 <div id="deceasedPage" class="page">
   <div class="prof-hero" id="dpHero">
-    <button type="button" class="back-b" onclick="goBack()">← Back</button>
+    <button type="button" class="back-b" onclick="goBack()" style="position:absolute;top:.7rem;left:.7rem;z-index:10">← Back</button>
+    <!-- Cover photo -->
+    <div class="prof-cover" id="dpCover">
+      <div style="width:100%;height:100%;background:linear-gradient(160deg,#162233,#1a3045);" id="dpCoverBg"></div>
+      <div class="prof-cover-overlay"></div>
+      <div class="cover-bio" id="dpCoverBio"></div>
+      <div class="prof-cover-change" id="dpCoverBtn" style="display:none" onclick="document.getElementById('dpCoverInput').click()">
+        🖼️ Change Cover
+        <input type="file" id="dpCoverInput" accept="image/*" style="display:none" onchange="uploadDeceasedCover(this)">
+      </div>
+    </div>
+    <!-- Profile photo -->
     <div class="ph-photo" id="dpPhoto">👤</div>
     <h1 class="ph-name" id="dpName"></h1>
     <p class="ph-dates" id="dpDates"></p>
@@ -4463,16 +4684,28 @@ function guestBrowse(){showPage('appPage');}
 <!-- ═══════════════ USER PROFILE ═══════════════ -->
 <div id="userPage" class="page">
   <div class="upage">
-    <div class="u-hero">
-      <div id="upAvatarWrap" style="flex-shrink:0">
-        <div class="u-av-lg" id="upAvatar">👤</div>
+    <div class="u-hero u-hero-with-cover" id="upHeroCard">
+      <!-- Cover photo -->
+      <div class="u-cover" id="upCover">
+        <div style="width:100%;height:100%;background:linear-gradient(135deg,#162233,#1a3045)" id="upCoverBg"></div>
+        <div class="cover-bio" id="upCoverBio"></div>
+        <div class="u-cover-change" id="upCoverBtn" style="display:none" onclick="document.getElementById('upCoverInput').click()">
+          🖼️ Cover
+          <input type="file" id="upCoverInput" accept="image/*" style="display:none" onchange="uploadUserCover(this)">
+        </div>
       </div>
-      <div class="u-meta">
-        <h2 id="upName"></h2>
-        <p id="upMeta"></p>
-        <div class="u-tags" id="upTags"></div>
+      <!-- Inner row -->
+      <div class="u-hero-inner">
+        <div class="u-av-lg-wrap" id="upAvatarWrap">
+          <div class="u-av-lg" id="upAvatar" style="width:80px;height:80px;border:3px solid var(--gold);box-shadow:0 4px 12px rgba(0,0,0,.4)">👤</div>
+        </div>
+        <div class="u-meta" style="padding-bottom:.3rem">
+          <h2 id="upName" style="margin:0"></h2>
+          <p id="upMeta" style="margin:.2rem 0 0"></p>
+          <div class="u-tags" id="upTags"></div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:.5rem;flex-wrap:wrap;align-self:flex-end" id="upActions"></div>
       </div>
-      <div style="margin-left:auto;display:flex;gap:.5rem;flex-wrap:wrap" id="upActions"></div>
     </div>
     <div class="u-tabs">
       <button type="button" class="u-tab act" onclick="showUTab('memorials',this)">🌻 Memorials</button>
@@ -4782,6 +5015,36 @@ function guestBrowse(){showPage('appPage');}
           <option value="">Select country…</option>
           <option>Malaysia</option><option>Indonesia</option><option>Philippines</option><option>Singapore</option><option>Thailand</option><option>Vietnam</option><option>China</option><option>India</option><option>United States</option><option>United Kingdom</option><option>Australia</option><option>Canada</option><option>Japan</option><option>South Korea</option><option>Other</option>
         </select>
+      </div>
+    </div>
+      <div class="divider"></div>
+      <div class="fg">
+        <label style="font-size:.78rem;color:var(--muted)">✍️ Bio — shown over your cover photo</label>
+        <textarea id="epBio" placeholder="Write something about yourself… a quote, a note, your story." rows="3" style="width:100%;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:.6rem .8rem;color:var(--ivory);font-family:'Inter',sans-serif;font-size:.85rem;resize:none;outline:none;line-height:1.6"></textarea>
+        <div style="font-size:.72rem;color:var(--muted);margin-top:.25rem">Max 200 characters</div>
+      </div>
+      <div class="fg">
+        <label style="font-size:.78rem;color:var(--muted)">🔤 Font Style</label>
+        <div class="font-picker" id="epFontPicker">
+          <button type="button" class="font-opt font-serif sel" data-font="font-serif" onclick="selectBioFont(this)">Serif</button>
+          <button type="button" class="font-opt font-script" data-font="font-script" onclick="selectBioFont(this)"><em>Script</em></button>
+          <button type="button" class="font-opt font-modern" data-font="font-modern" onclick="selectBioFont(this)">Modern</button>
+          <button type="button" class="font-opt font-bold" data-font="font-bold" onclick="selectBioFont(this)"><strong>Bold</strong></button>
+          <button type="button" class="font-opt font-classic" data-font="font-classic" onclick="selectBioFont(this)">Classic</button>
+        </div>
+      </div>
+      <div class="fg">
+        <label style="font-size:.78rem;color:var(--muted)">🎨 Text Colour</label>
+        <div class="colour-picker" id="epColourPicker">
+          <div class="colour-opt sel" data-colour="#FFFFFF" onclick="selectBioColour(this)" style="background:#FFFFFF" title="White"></div>
+          <div class="colour-opt" data-colour="#C9A84C" onclick="selectBioColour(this)" style="background:#C9A84C" title="Gold"></div>
+          <div class="colour-opt" data-colour="#F8E4B0" onclick="selectBioColour(this)" style="background:#F8E4B0" title="Cream"></div>
+          <div class="colour-opt" data-colour="#A8D8EA" onclick="selectBioColour(this)" style="background:#A8D8EA" title="Sky Blue"></div>
+          <div class="colour-opt" data-colour="#FFB7B2" onclick="selectBioColour(this)" style="background:#FFB7B2" title="Rose"></div>
+          <div class="colour-opt" data-colour="#B5EAD7" onclick="selectBioColour(this)" style="background:#B5EAD7" title="Mint"></div>
+          <div class="colour-opt" data-colour="#FFDAC1" onclick="selectBioColour(this)" style="background:#FFDAC1" title="Peach"></div>
+          <div class="colour-opt" data-colour="#000000" onclick="selectBioColour(this)" style="background:#000000;border:1.5px solid #555" title="Black"></div>
+        </div>
       </div>
     </div>
     <div class="mftr">
