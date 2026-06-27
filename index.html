@@ -779,19 +779,43 @@ async function uploadFile(file,folder){
 }
 async function uploadBase64(dataUrl,folder){
   if(!dataUrl||!dataUrl.startsWith('data:'))return dataUrl;
-  const res=await fetch(dataUrl);
-  const blob=await res.blob();
-  const ext=blob.type.split('/')[1]||'jpg';
-  const path=`${folder}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
-  // Use the correct bucket for each folder type
-  var bucket='media'; // default
-  if(folder==='posts'||folder==='post-images')bucket='posts';
-  else if(folder==='post-videos')bucket='post-videos';
-  else if(folder==='photos')bucket='photos';
-  else bucket='media';
-  const {data,error}=await sb.storage.from(bucket).upload(path,blob,{cacheControl:'3600',upsert:false});
-  if(error){console.error('Upload err',error,bucket,path);return '';}
-  return sb.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+  try{
+    const res=await fetch(dataUrl);
+    const blob=await res.blob();
+    // Get proper extension
+    var mime=blob.type||'image/jpeg';
+    var ext=mime.split('/')[1]||'jpg';
+    if(ext==='jpeg')ext='jpg';
+    if(ext==='quicktime')ext='mov';
+    // Unique filename
+    var filename=Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.'+ext;
+    // Pick correct bucket - path is just filename (no folder prefix)
+    var bucket='media';
+    if(folder==='posts'||folder==='post-images')bucket='posts';
+    else if(folder==='post-videos')bucket='post-videos';
+    else if(folder==='photos')bucket='photos';
+    else if(folder==='covers')bucket='media';
+    else if(folder==='avatars')bucket='media';
+    else bucket='media';
+    // Upload to bucket
+    var res2=await sb.storage.from(bucket).upload(filename,blob,{
+      cacheControl:'3600',
+      upsert:false,
+      contentType:mime
+    });
+    if(res2.error){
+      console.error('Upload error:',res2.error.message,'bucket:',bucket);
+      toast('❌ Upload failed: '+res2.error.message);
+      return '';
+    }
+    var publicUrl=sb.storage.from(bucket).getPublicUrl(filename).data.publicUrl;
+    console.log('Uploaded to:',bucket,filename,'URL:',publicUrl);
+    return publicUrl;
+  }catch(e){
+    console.error('uploadBase64 exception:',e);
+    toast('❌ Upload error: '+e.message);
+    return '';
+  }
 }
 
 // Extract storage path from a public URL
