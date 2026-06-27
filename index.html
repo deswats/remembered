@@ -584,8 +584,9 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .friend-tag{display:inline-flex;align-items:center;gap:.3rem;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:.2rem .6rem;font-size:.72rem;color:var(--gold);}
 
 /* ── PWA INSTALL PROMPT ── */
-.install-banner{position:fixed;bottom:calc(70px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(120px);background:linear-gradient(135deg,#162233,#1E3048);border:1px solid rgba(201,168,76,.4);border-radius:16px;padding:.9rem 1.2rem;display:flex;align-items:center;gap:.9rem;z-index:8000;box-shadow:0 8px 32px rgba(0,0,0,.5);transition:transform .4s cubic-bezier(.34,1.56,.64,1);max-width:340px;width:90%;}
-.install-banner.show{transform:translateX(-50%) translateY(0);}
+.install-banner{position:fixed;top:70px;right:1rem;transform:translateY(-120px);background:linear-gradient(135deg,#162233,#1E3048);border:1px solid rgba(201,168,76,.4);border-radius:14px;padding:.7rem 1rem;display:flex;align-items:center;gap:.7rem;z-index:8000;box-shadow:0 4px 20px rgba(0,0,0,.5);transition:transform .35s cubic-bezier(.34,1.56,.64,1);max-width:280px;width:auto;}
+.install-banner.show{transform:translateY(0);}
+@media(max-width:480px){.install-banner{top:auto;bottom:80px;right:.7rem;max-width:260px;}}
 .install-icon{width:48px;height:48px;border-radius:12px;overflow:hidden;flex-shrink:0;}
 .install-icon img{width:100%;height:100%;}
 .install-text{flex:1}
@@ -594,8 +595,9 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .install-btn{padding:.4rem .9rem;border-radius:18px;background:var(--gold);color:var(--navy);border:none;font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap;font-family:'Inter',sans-serif;}
 .install-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem;padding:.2rem;line-height:1;flex-shrink:0;}
 /* iOS install hint */
-.ios-install-hint{position:fixed;bottom:calc(70px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(120px);background:linear-gradient(135deg,#162233,#1E3048);border:1px solid rgba(201,168,76,.4);border-radius:16px;padding:1rem 1.2rem;z-index:8000;box-shadow:0 8px 32px rgba(0,0,0,.5);transition:transform .4s cubic-bezier(.34,1.56,.64,1);max-width:300px;width:88%;text-align:center;}
-.ios-install-hint.show{transform:translateX(-50%) translateY(0);}
+.ios-install-hint{position:fixed;top:70px;right:1rem;transform:translateY(-120px);background:linear-gradient(135deg,#162233,#1E3048);border:1px solid rgba(201,168,76,.4);border-radius:14px;padding:.8rem 1rem;z-index:8000;box-shadow:0 4px 20px rgba(0,0,0,.5);transition:transform .35s cubic-bezier(.34,1.56,.64,1);max-width:260px;width:auto;text-align:center;}
+.ios-install-hint.show{transform:translateY(0);}
+@media(max-width:480px){.ios-install-hint{top:auto;bottom:80px;right:.7rem;}}
 .ios-hint-arrow{font-size:1.5rem;margin-bottom:.3rem;}
 .ios-hint-text{font-size:.8rem;color:var(--lavender);line-height:1.6;}
 .ios-hint-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;margin-top:.5rem;text-decoration:underline;font-family:'Inter',sans-serif;}
@@ -622,13 +624,7 @@ const PRAYER_TPLS = {
   j:`✨ I celebrate you today with a full heart. Though you are gone, the joy you gave me never left. Your laughter is still the soundtrack of my happiest memories.`,
   mem:`I still remember your laughter — the way it filled the whole room. Not a day goes by that I don't think of you and smile. Thank you for everything you were.`
 };
-const SACRED = [
-  {d:'Jan 1',n:"New Year's Day of Prayer",r:'All Faiths'},{d:'Feb 12',n:'Qingming / Tomb Sweeping Day',r:'Buddhist / Chinese'},
-  {d:'Apr 18',n:'Good Friday',r:'Christian'},{d:'Apr 20',n:'Easter Sunday',r:'Christian'},
-  {d:'May 12',n:'Vesak Day',r:'Buddhist'},{d:'Jul 28',n:"Eid al-Adha",r:'Muslim'},
-  {d:'Aug 5',n:'Hungry Ghost Festival',r:'Buddhist / Chinese'},{d:'Nov 1',n:"All Saints Day",r:'Christian'},
-  {d:'Nov 2',n:"All Souls Day",r:'Christian / Catholic'},{d:'Dec 25',n:"Christmas Memorial Mass",r:'Christian'},
-];
+// SACRED array removed — using memorial anniversaries instead
 
 // ═══════════════════════════════════════════════════════════
 // CACHE (in-memory, synced from Supabase)
@@ -689,12 +685,15 @@ async function loadAllData(){
       sb.from('connections').select('*').limit(500),
       sb.from('friends').select('*').limit(200),
       sb.from('prayers').select('*').order('created_at',{ascending:false}).limit(200),
-      sb.from('comments').select('*').order('created_at',{ascending:false}).limit(200),
+      sb.from('comments').select('*').order('created_at',{ascending:false}).limit(500),
       sb.from('profiles').select('*').limit(200),
       sb.from('media').select('*').limit(200),
       sb.from('posts').select('*').order('created_at',{ascending:false}).limit(100),
+      sb.from('post_reactions').select('*').limit(1000),
     ]);
-    const [dec,conns,fr,pr,cm,us,med,posts]=await Promise.race([fetchData,timeout]);
+    const [dec,conns,fr,pr,cm,us,med,posts,rxns]=await Promise.race([fetchData,timeout]);
+    CACHE.post_reactions=rxns?.data||[];
+    console.log('Loaded reactions:',CACHE.post_reactions.length);
     CACHE.posts=posts?.data||[];
     CACHE.deceased  = dec.data||[];
     CACHE.connections = conns.data||[];
@@ -730,10 +729,37 @@ async function uploadBase64(dataUrl,folder){
   const res=await fetch(dataUrl);
   const blob=await res.blob();
   const ext=blob.type.split('/')[1]||'jpg';
-  const path=`${folder}/${Date.now()}.${ext}`;
-  const {data,error}=await sb.storage.from('media').upload(path,blob,{cacheControl:'3600',upsert:false});
-  if(error){console.error('Upload err',error);return '';}
-  return sb.storage.from('media').getPublicUrl(path).data.publicUrl;
+  const path=`${folder}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+  // Use the correct bucket for each folder type
+  var bucket='media'; // default
+  if(folder==='posts'||folder==='post-images')bucket='posts';
+  else if(folder==='post-videos')bucket='post-videos';
+  else if(folder==='photos')bucket='photos';
+  else bucket='media';
+  const {data,error}=await sb.storage.from(bucket).upload(path,blob,{cacheControl:'3600',upsert:false});
+  if(error){console.error('Upload err',error,bucket,path);return '';}
+  return sb.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+}
+
+// Extract storage path from a public URL
+function extractStoragePath(url){
+  if(!url)return null;
+  // URL format: .../storage/v1/object/public/BUCKET/PATH
+  var match=url.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)/);
+  if(match)return{bucket:match[1],path:match[2]};
+  return null;
+}
+
+async function deleteStorageFile(url){
+  if(!url||!sb)return;
+  var parsed=extractStoragePath(url);
+  if(!parsed)return;
+  try{
+    await sb.storage.from(parsed.bucket).remove([parsed.path]);
+    console.log('Deleted storage file:',parsed.bucket,parsed.path);
+  }catch(e){
+    console.warn('Could not delete storage file:',e.message);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -915,7 +941,7 @@ async function afterAuth(user){
     showPageDirect('appPage');
     renderApp();
     toast('Welcome, '+CU.firstName+'! 🌻');
-    setTimeout(restoreLocalReactions, 1000);
+    setTimeout(refreshPostData, 2000);  // Refresh reactions after login
     setTimeout(restoreLocalRelationships, 1500);
     updateMnavProfileIcon();
 
@@ -1027,7 +1053,7 @@ function updateNav(){
 // ═══════════════════════════════════════════════════════════
 function renderApp(){
   updateNav(); renderFeed(); renderSidebarProfile(); renderMyFriends();
-  renderCalendar(); renderStats(); renderTopMemorials(); renderNotifications(); renderFriendSuggestions();
+  renderAnniversaries(); renderStats(); renderTopMemorials(); renderNotifications(); renderFriendSuggestions();
   if(CU){
     const feedAv=document.getElementById('feedAvatar');
     if(feedAv)feedAv.innerHTML=CU.avatar?`<img src="${CU.avatar}">`:(CU.firstName.charAt(0)+(CU.lastName?.charAt(0)||''));
@@ -1061,7 +1087,7 @@ function renderFeed(){
     var allIds=[].concat(connIds,crIds).filter(function(v,i,a){return a.indexOf(v)===i;});
     all=all.filter(function(d){return allIds.indexOf(d.id)>=0;});
   }
-  if(feedFilter!=='all')all=all.filter(function(d){return d.religion===feedFilter;});
+  // Religion filter removed
   const feed=document.getElementById('mainFeed');
   if(!feed)return;
   // Mix posts + memorials, sorted by date
@@ -2135,11 +2161,11 @@ function applyTranslations(){
   var gs=document.getElementById('globalSearch');if(gs)gs.placeholder='🔍 Search…';
   se('feedPlaceholder',L.celebratePlaceholder);se('feedAddBtn',L.addBtn);
   se('feedTabAll',L.allPosts);se('feedTabFriends',L.friendsPosts);
-  se('filterAll',L.allFilter);se('filterC',L.christianFilter);se('filterM',L.muslimFilter);se('filterB',L.buddhistFilter);
+  // Religion filter translation removed
   // Sidebar
   se('sidebarCommunityTitle',L.community);se('sidebarNotifTitle',L.notifications);
   se('sidebarConnectionsTitle',L.myConnections);se('sidebarInviteBtn',L.inviteFriends);
-  se('sidebarCalTitle',L.sacredDates);se('sidebarSuggestTitle',L.peopleMayKnow);
+  se('sidebarCalTitle','🌻 Memorial Anniversaries');se('sidebarSuggestTitle',L.peopleMayKnow);
   se('sidebarBrowseAll',L.browseAll);se('sidebarTopTitle',L.mostCelebrated);
   se('sidebarDonateTitle',L.keepAlive);se('sidebarDonateSub',L.keepAliveSub);
   se('donateQRBtn',L.donateQR);se('donateGrabBtn',L.donateGrab);se('donatePaypalBtn',L.donatePaypal);
@@ -2916,24 +2942,11 @@ async function setReaction(postId, reactionType){
     }
   }catch(e){
     console.error('Reaction error:',e);
-    // Fallback: use localStorage for persistence if table doesn't exist
-    var key='reactions_'+postId;
-    var localReactions=JSON.parse(localStorage.getItem(key)||'{}');
-    if(localReactions[CU.id]===reactionType){
-      delete localReactions[CU.id];
+    if(e.message&&e.message.includes('relation')){
+      toast('Please run the SQL to create post_reactions table in Supabase first.');
     } else {
-      localReactions[CU.id]=reactionType;
+      toast('Could not save reaction. Please try again.');
     }
-    localStorage.setItem(key, JSON.stringify(localReactions));
-    // Update cache
-    if(!CACHE.post_reactions)CACHE.post_reactions=[];
-    CACHE.post_reactions=CACHE.post_reactions.filter(function(r){
-      return !(r.post_id===postId&&r.user_id===CU.id);
-    });
-    if(localReactions[CU.id]){
-      CACHE.post_reactions.push({post_id:postId,user_id:CU.id,reaction_type:localReactions[CU.id]});
-    }
-    toast(REACTIONS[reactionType]+' reaction saved!');
   }
   renderFeed();
 }
@@ -2978,12 +2991,20 @@ async function deletePost(postId){
   if(!sb)return;
   showLoader(true);
   try{
+    // Get the post first to find image URL
+    var post=CACHE.posts.find(function(x){return x.id===postId;});
     // Delete reactions
     try{await sb.from('post_reactions').delete().eq('post_id',postId);}catch(e){}
     // Delete comments
     try{await sb.from('comments').delete().eq('post_id',postId);}catch(e){}
-    // Delete post
-    await sb.from('posts').delete().eq('id',postId);
+    // Delete post from DB
+    var res=await sb.from('posts').delete().eq('id',postId);
+    if(res.error)throw new Error(res.error.message);
+    // Delete image/video from Storage
+    if(post&&post.image_url){
+      await deleteStorageFile(post.image_url);
+    }
+    // Remove from cache
     CACHE.posts=CACHE.posts.filter(function(x){return x.id!==postId;});
     CACHE.post_reactions=(CACHE.post_reactions||[]).filter(function(x){return x.post_id!==postId;});
     CACHE.comments=CACHE.comments.filter(function(x){return x.post_id!==postId;});
@@ -2993,7 +3014,7 @@ async function deletePost(postId){
   }catch(e){
     showLoader(false);
     console.error('deletePost:',e);
-    toast('❌ '+e.message);
+    toast('❌ Could not delete: '+e.message);
   }
 }
 
@@ -3139,6 +3160,28 @@ function renderPeopleResults(q){
   }
   renderPendingRequests();
 }
+
+
+// Refresh reactions and comments without full reload
+async function refreshPostData(){
+  if(!sb)return;
+  try{
+    var rxnRes=await sb.from('post_reactions').select('*').limit(1000);
+    if(rxnRes.data)CACHE.post_reactions=rxnRes.data;
+    var cmRes=await sb.from('comments').select('*').order('created_at',{ascending:false}).limit(500);
+    if(cmRes.data)CACHE.comments=cmRes.data;
+    console.log('Refreshed: reactions='+CACHE.post_reactions.length+' comments='+CACHE.comments.length);
+    renderFeed();
+  }catch(e){console.warn('refreshPostData:',e);}
+}
+
+
+// Refresh post data when user comes back to the page
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'visible' && CU && sb){
+    setTimeout(refreshPostData, 500);
+  }
+});
 
 console.log('Post + Friend functions loaded ✓');
 
@@ -3530,14 +3573,20 @@ window.addEventListener('appinstalled', function(){
 });
 
 function showInstallBanner(){
-  // Don't show if already installed (standalone mode)
+  // Don't show if already installed
   if(window.matchMedia('(display-mode: standalone)').matches)return;
-  if(window.navigator.standalone===true)return; // iOS
+  if(window.navigator.standalone===true)return;
+  // Only show once ever
+  if(localStorage.getItem('rb_install_shown'))return;
   if(_installDismissed)return;
   var banner=document.getElementById('installBanner');
   if(banner){
     banner.style.display='flex';
     setTimeout(function(){banner.classList.add('show');}, 50);
+    // Mark as shown so it never appears again after this session
+    localStorage.setItem('rb_install_shown','1');
+    // Auto-dismiss after 8 seconds
+    setTimeout(function(){dismissInstall();}, 8000);
   }
 }
 
@@ -3578,8 +3627,8 @@ function showIosHint(){
   if(hint){
     hint.style.display='block';
     setTimeout(function(){hint.classList.add('show');}, 50);
-    // Auto hide after 8 seconds
-    setTimeout(dismissIosHint, 8000);
+    // Auto hide after 10 seconds
+    setTimeout(dismissIosHint, 10000);
   }
 }
 
@@ -3596,10 +3645,11 @@ function dismissIosHint(){
   var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
   var isStandalone=window.navigator.standalone===true;
   var isInBrowser=!window.matchMedia('(display-mode: standalone)').matches;
-  var dismissed=localStorage.getItem('rb_ios_hint_dismissed');
-  if(isIOS && isInBrowser && !isStandalone && !dismissed){
-    // Show iOS hint after 5 seconds
-    setTimeout(showIosHint, 5000);
+  // Only show once ever
+  var shown=localStorage.getItem('rb_ios_hint_shown');
+  if(isIOS && isInBrowser && !isStandalone && !shown){
+    localStorage.setItem('rb_ios_hint_shown','1');
+    setTimeout(showIosHint, 4000);
   }
 })();
 
@@ -3851,11 +3901,7 @@ function guestBrowse(){showPage('appPage');}
           <button type="button" class="feed-tab" id="feedTabFriends" onclick="setFeedTab('friends',this)">👥 Friends <span class="new-badge" id="friendsFeedBadge" style="display:none">New</span></button>
         </div>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap" id="feedFilters">
-          <button type="button" class="nb act" id="fAll" onclick="setFeedFilter('all',this)" id="filterAll">All</button>
-          <button type="button" class="nb" id="fC" onclick="setFeedFilter('Christian',this)" id="filterC">✝ Christian</button>
-          <button type="button" class="nb" id="fM" onclick="setFeedFilter('Muslim',this)" id="filterM">☪ Muslim</button>
-          <button type="button" class="nb" id="fB" onclick="setFeedFilter('Buddhist',this)" id="filterB">☸ Buddhist</button>
-          <button type="button" class="nb" id="fG" onclick="setFeedFilter('General',this)">🌟 General</button>
+<!-- Religion filters removed -->
         </div>
         <div id="mainFeed"></div>
       </div>
@@ -4368,16 +4414,16 @@ function guestBrowse(){showPage('appPage');}
 
 
 <!-- PWA INSTALL BANNER -->
-<div class="install-banner" id="installBanner">
-  <div class="install-icon">
-    <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTkyIj4KICA8cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjM4IiBmaWxsPSIjMEQxQjJBIi8+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoOTYsNzUpIj4KICAgIDxlbGxpcHNlIGN4PSIwIiBjeT0iLTM4IiByeD0iMTAiIHJ5PSIxOCIgZmlsbD0iI0M5QTg0QyIgdHJhbnNmb3JtPSJyb3RhdGUoMCkiLz4KICAgIDxlbGxpcHNlIGN4PSIwIiBjeT0iLTM4IiByeD0iMTAiIHJ5PSIxOCIgZmlsbD0iI0M5QTg0QyIgdHJhbnNmb3JtPSJyb3RhdGUoNDUpIi8+CiAgICA8ZWxsaXBzZSBjeD0iMCIgY3k9Ii0zOCIgcng9IjEwIiByeT0iMTgiIGZpbGw9IiNDOUE4NEMiIHRyYW5zZm9ybT0icm90YXRlKDkwKSIvPgogICAgPGVsbGlwc2UgY3g9IjAiIGN5PSItMzgiIHJ4PSIxMCIgcnk9IjE4IiBmaWxsPSIjQzlBODRDIiB0cmFuc2Zvcm09InJvdGF0ZSgxMzUpIi8+CiAgICA8ZWxsaXBzZSBjeD0iMCIgY3k9Ii0zOCIgcng9IjEwIiByeT0iMTgiIGZpbGw9IiNDOUE4NEMiIHRyYW5zZm9ybT0icm90YXRlKDE4MCkiLz4KICAgIDxlbGxpcHNlIGN4PSIwIiBjeT0iLTM4IiByeD0iMTAiIHJ5PSIxOCIgZmlsbD0iI0M5QTg0QyIgdHJhbnNmb3JtPSJyb3RhdGUoMjI1KSIvPgogICAgPGVsbGlwc2UgY3g9IjAiIGN5PSItMzgiIHJ4PSIxMCIgcnk9IjE4IiBmaWxsPSIjQzlBODRDIiB0cmFuc2Zvcm09InJvdGF0ZSgyNzApIi8+CiAgICA8ZWxsaXBzZSBjeD0iMCIgY3k9Ii0zOCIgcng9IjEwIiByeT0iMTgiIGZpbGw9IiNDOUE4NEMiIHRyYW5zZm9ybT0icm90YXRlKDMxNSkiLz4KICAgIDxjaXJjbGUgY3g9IjAiIGN5PSIwIiByPSIxOCIgZmlsbD0iIzNEMUYwMCIvPgogICAgPGNpcmNsZSBjeD0iMCIgY3k9IjAiIHI9IjE0IiBmaWxsPSIjNUMyRTAwIi8+CiAgICA8Y2lyY2xlIGN4PSIwIiBjeT0iLTciIHI9IjMiIGZpbGw9IiM4QjQ1MTMiIG9wYWNpdHk9IjAuOCIvPgogICAgPGNpcmNsZSBjeD0iNiIgY3k9Ii0zIiByPSIzIiBmaWxsPSIjOEI0NTEzIiBvcGFjaXR5PSIwLjgiLz4KICAgIDxjaXJjbGUgY3g9IjUiIGN5PSI1IiByPSIzIiBmaWxsPSIjOEI0NTEzIiBvcGFjaXR5PSIwLjgiLz4KICAgIDxjaXJjbGUgY3g9Ii01IiBjeT0iNSIgcj0iMyIgZmlsbD0iIzhCNDUxMyIgb3BhY2l0eT0iMC44Ii8+CiAgICA8Y2lyY2xlIGN4PSItNiIgY3k9Ii0zIiByPSIzIiBmaWxsPSIjOEI0NTEzIiBvcGFjaXR5PSIwLjgiLz4KICA8L2c+CiAgPHRleHQgeD0iOTYiIHk9IjEzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iMTUiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjQzlBODRDIj5SZW1lbWJlcmVkPC90ZXh0PgogIDx0ZXh0IHg9Ijk2IiB5PSIxNTAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJHZW9yZ2lhLHNlcmlmIiBmb250LXNpemU9IjkiIGZpbGw9IiM4ODk5QUEiIGxldHRlci1zcGFjaW5nPSIxIj5jZWxlYnJhdGUgdGhlaXIgc3Rvcnk8L3RleHQ+Cjwvc3ZnPg==" alt="Remembered">
+<div class="install-banner" id="installBanner" style="display:none">
+  <div class="install-icon" style="width:36px;height:36px;border-radius:9px;overflow:hidden;flex-shrink:0">
+    <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTkyIj4KICA8cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjM4IiBmaWxsPSIjMEQxQjJBIi8+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoOTYsNzUpIj4KICAgIDxlbGxpcHNlIGN4PSIwIiBjeT0iLTM4IiByeD0iMTAiIHJ5PSIxOCIgZmlsbD0iI0M5QTg0QyIgdHJhbnNmb3JtPSJyb3RhdGUoMCkiLz4KICAgIDxlbGxpcHNlIGN4PSIwIiBjeT0iLTM4IiByeD0iMTAiIHJ5PSIxOCIgZmlsbD0iI0M5QTg0QyIgdHJhbnNmb3JtPSJyb3RhdGUoNDUpIi8+CiAgICA8ZWxsaXBzZSBjeD0iMCIgY3k9Ii0zOCIgcng9IjEwIiByeT0iMTgiIGZpbGw9IiNDOUE4NEMiIHRyYW5zZm9ybT0icm90YXRlKDkwKSIvPgogICAgPGVsbGlwc2UgY3g9IjAiIGN5PSItMzgiIHJ4PSIxMCIgcnk9IjE4IiBmaWxsPSIjQzlBODRDIiB0cmFuc2Zvcm09InJvdGF0ZSgxMzUpIi8+CiAgICA8ZWxsaXBzZSBjeD0iMCIgY3k9Ii0zOCIgcng9IjEwIiByeT0iMTgiIGZpbGw9IiNDOUE4NEMiIHRyYW5zZm9ybT0icm90YXRlKDE4MCkiLz4KICAgIDxlbGxpcHNlIGN4PSIwIiBjeT0iLTM4IiByeD0iMTAiIHJ5PSIxOCIgZmlsbD0iI0M5QTg0QyIgdHJhbnNmb3JtPSJyb3RhdGUoMjI1KSIvPgogICAgPGVsbGlwc2UgY3g9IjAiIGN5PSItMzgiIHJ4PSIxMCIgcnk9IjE4IiBmaWxsPSIjQzlBODRDIiB0cmFuc2Zvcm09InJvdGF0ZSgyNzApIi8+CiAgICA8ZWxsaXBzZSBjeD0iMCIgY3k9Ii0zOCIgcng9IjEwIiByeT0iMTgiIGZpbGw9IiNDOUE4NEMiIHRyYW5zZm9ybT0icm90YXRlKDMxNSkiLz4KICAgIDxjaXJjbGUgY3g9IjAiIGN5PSIwIiByPSIxOCIgZmlsbD0iIzNEMUYwMCIvPgogICAgPGNpcmNsZSBjeD0iMCIgY3k9IjAiIHI9IjE0IiBmaWxsPSIjNUMyRTAwIi8+CiAgICA8Y2lyY2xlIGN4PSIwIiBjeT0iLTciIHI9IjMiIGZpbGw9IiM4QjQ1MTMiIG9wYWNpdHk9IjAuOCIvPgogICAgPGNpcmNsZSBjeD0iNiIgY3k9Ii0zIiByPSIzIiBmaWxsPSIjOEI0NTEzIiBvcGFjaXR5PSIwLjgiLz4KICAgIDxjaXJjbGUgY3g9IjUiIGN5PSI1IiByPSIzIiBmaWxsPSIjOEI0NTEzIiBvcGFjaXR5PSIwLjgiLz4KICAgIDxjaXJjbGUgY3g9Ii01IiBjeT0iNSIgcj0iMyIgZmlsbD0iIzhCNDUxMyIgb3BhY2l0eT0iMC44Ii8+CiAgICA8Y2lyY2xlIGN4PSItNiIgY3k9Ii0zIiByPSIzIiBmaWxsPSIjOEI0NTEzIiBvcGFjaXR5PSIwLjgiLz4KICA8L2c+CiAgPHRleHQgeD0iOTYiIHk9IjEzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iMTUiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjQzlBODRDIj5SZW1lbWJlcmVkPC90ZXh0PgogIDx0ZXh0IHg9Ijk2IiB5PSIxNTAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJHZW9yZ2lhLHNlcmlmIiBmb250LXNpemU9IjkiIGZpbGw9IiM4ODk5QUEiIGxldHRlci1zcGFjaW5nPSIxIj5jZWxlYnJhdGUgdGhlaXIgc3Rvcnk8L3RleHQ+Cjwvc3ZnPg==" alt="Remembered" style="width:100%;height:100%">
   </div>
-  <div class="install-text">
-    <div class="install-title">🌻 Add Remembered</div>
-    <div class="install-sub">Install for quick access — works offline too!</div>
+  <div class="install-text" style="flex:1;min-width:0">
+    <div class="install-title" style="font-size:.8rem;font-weight:600;color:var(--ivory)">🌻 Add to Home Screen</div>
+    <div class="install-sub" style="font-size:.68rem;color:var(--muted)">Quick access, works offline</div>
   </div>
-  <button class="install-btn" onclick="doInstall()">Install</button>
-  <button class="install-close" onclick="dismissInstall()">✕</button>
+  <button class="install-btn" onclick="doInstall()" style="font-size:.72rem;padding:.3rem .7rem;white-space:nowrap">Install</button>
+  <button class="install-close" onclick="dismissInstall()" style="font-size:1rem;background:none;border:none;color:var(--muted);cursor:pointer;padding:.2rem;line-height:1;margin-left:.2rem">✕</button>
 </div>
 
 <!-- iOS INSTALL HINT -->
