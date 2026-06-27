@@ -915,6 +915,7 @@ async function afterAuth(user){
     showPageDirect('appPage');
     renderApp();
     toast('Welcome, '+CU.firstName+'! 🌻');
+    setTimeout(restoreLocalReactions, 1000);
     updateMnavProfileIcon();
 
     // Step 3: Load data in background AFTER app is visible
@@ -1050,14 +1051,16 @@ function setFeedFilter(f,btn){
   renderFeed();
 }
 function renderFeed(){
-  let all=[...CACHE.deceased];
+  // Filter deceased by visibility
+  var all=CACHE.deceased.filter(function(d){return canSeeDeceased(d);});
   if(feedTab==='friends'&&CU){
-    const fids=getMyFriendIds();fids.push(CU.id);
-    const connIds=CACHE.connections.filter(c=>fids.includes(c.user_id)).map(c=>c.deceased_id);
-    const crIds=all.filter(d=>fids.includes(d.created_by)).map(d=>d.id);
-    all=all.filter(d=>[...new Set([...connIds,...crIds])].includes(d.id));
+    var fids=getMyFriendIds();fids.push(CU.id);
+    var connIds=CACHE.connections.filter(function(c){return fids.indexOf(c.user_id)>=0;}).map(function(c){return c.deceased_id;});
+    var crIds=all.filter(function(d){return fids.indexOf(d.created_by)>=0;}).map(function(d){return d.id;});
+    var allIds=[].concat(connIds,crIds).filter(function(v,i,a){return a.indexOf(v)===i;});
+    all=all.filter(function(d){return allIds.indexOf(d.id)>=0;});
   }
-  if(feedFilter!=='all')all=all.filter(d=>d.religion===feedFilter);
+  if(feedFilter!=='all')all=all.filter(function(d){return d.religion===feedFilter;});
   const feed=document.getElementById('mainFeed');
   if(!feed)return;
   // Mix posts + memorials, sorted by date
@@ -1256,6 +1259,8 @@ async function saveDeceased(){
       burial:v('dBurial')||null,
       country:v('dCountry')||null,
       religion:v('dRel')||'General',
+      visibility:v('dVis')||'public',
+      tagged_users:[],
       photo_url:photoUrl||null,
       created_by:CU.id
     };
@@ -1864,14 +1869,6 @@ function mnavGo(tab,btn){
   if(btn)btn.classList.add('act');
   if(tab==='home'){
     if(CU){showPageDirect('appPage');renderApp();}else{showPageDirect('heroPage');}
-  }else if(tab==='search'){
-    if(CU){showPageDirect('appPage');renderApp();}else{showPage('authPage');setAuthMode('login');return;}
-    setTimeout(()=>{
-      const sw=document.getElementById('navSearchWrap');
-      const s=document.getElementById('globalSearch');
-      if(sw)sw.style.display='flex';
-      if(s){s.focus();}
-    },300);
   }else if(tab==='people'){
     openPeoplePage();
   }else if(tab==='profile'){
@@ -2212,6 +2209,8 @@ async function submitPost(){
     var fi=document.getElementById('postImageFile');if(fi)fi.value='';
     if(btn){btn.disabled=false;btn.textContent='Share Post';}
     toast('✅ Post shared!');
+    // Process @mentions
+    processMentions(text, res.data.id, null);
     renderFeed();
     getMyFriendIds().forEach(function(fid){addNotif(fid,uName(CU)+' shared a post','📝');});
   }catch(e){
@@ -2381,8 +2380,25 @@ function renderPostCard(p){
   if(p.text)h+='<div class="post-body">'+p.text+'</div>';
   if(p.image_url)h+='<img src="'+p.image_url+'" style="width:100%;max-height:360px;object-fit:cover;display:block" loading="lazy">';
   h+='<div class="post-actions">';
-  h+='<button type="button" class="act-btn'+(isLiked?' on':'')+'" data-pid="'+pid+'" onclick="togglePostLike(this.dataset.pid)">❤️ '+likeCount+' Like'+(likeCount!==1?'s':'')+'</button>';
+  // Build reaction summary
+  var allReactions=getPostReactions(pid);
+  var myRxn=getMyReaction(pid);
+  var rxnCounts={};
+  allReactions.forEach(function(r){rxnCounts[r.reaction_type]=(rxnCounts[r.reaction_type]||0)+1;});
+  var rxnSummary='';
+  Object.keys(rxnCounts).forEach(function(type){
+    rxnSummary+=REACTIONS[type]+'<span style="font-size:.8rem">'+rxnCounts[type]+'</span> ';
+  });
+  var totalRxns=allReactions.length;
+  var rxnBtnLabel=myRxn?REACTIONS[myRxn]+' '+(REACTIONS[myRxn]):'👍 React';
+  h+='<div style="position:relative;display:inline-block">'
+    +'<button type="button" class="act-btn'+(myRxn?' on':'')+'" data-pid="'+pid+'" onclick="toggleReactionPicker(this.dataset.pid,this)" style="'+(myRxn?'border-color:var(--gold);':'')+'">'
+    +(rxnSummary||'👍')+' '+(totalRxns>0?totalRxns+' React'+(totalRxns!==1?'ions':'ion'):'React')
+    +'</button></div>';
   h+='<button type="button" class="act-btn" data-pid="'+pid+'" onclick="togglePostComments(this.dataset.pid)">💬 '+comments.length+' Comment'+(comments.length!==1?'s':'')+'</button>';
+  if(CU&&p.user_id===CU.id){
+    h+='<button type="button" class="act-btn" style="color:#ff5252;border-color:rgba(255,82,82,.3)" data-pid="'+pid+'" onclick="confirmDeletePost(this.dataset.pid)">🗑️ Delete</button>';
+  }
   h+='</div>';
   h+='<div class="comments-section" id="postcomments-'+pid+'" style="display:none">';
   h+='<div class="comments-list" id="postCommentsList-'+pid+'"></div>';
@@ -2394,23 +2410,7 @@ function renderPostCard(p){
   return h;
 }
 
-function togglePostLike(postId){
-  if(!CU){toast('Please sign in.');return;}
-  if(!sb){toast('Not connected.');return;}
-  var p=CACHE.posts.find(function(x){return x.id===postId;});
-  if(!p)return;
-  p.like_count=p.like_count||0;
-  p.liked_by=p.liked_by||[];
-  if(p.liked_by.indexOf(CU.id)>=0){
-    p.liked_by=p.liked_by.filter(function(id){return id!==CU.id;});
-    p.like_count=Math.max(0,p.like_count-1);
-  }else{
-    p.liked_by.push(CU.id);
-    p.like_count++;
-  }
-  sb.from('posts').update({like_count:p.like_count,liked_by:p.liked_by}).eq('id',postId).then(function(){}).catch(function(e){console.warn(e);});
-  renderFeed();
-}
+// togglePostLike replaced by setReaction system above
 
 function togglePostComments(postId){
   var el=document.getElementById('postcomments-'+postId);
@@ -2479,6 +2479,361 @@ async function submitPostComment(postId){
     btn.textContent='💬 '+c+' Comment'+(c!==1?'s':'');
   }
   toast('💬 Comment posted!');
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// PRIVACY & VISIBILITY SYSTEM
+// ═══════════════════════════════════════════════════════════
+
+// Relationships considered "family"
+var FAMILY_RELS = ['Mother','Father','Sibling','Brother','Sister',
+  'Cousin','Uncle','Aunt','Spouse','Child','Parent',
+  'Grandparent','Grandfather','Grandmother','Nephew','Niece',
+  'In-law','Stepparent','Stepchild','Godparent','Godchild',
+  'Relative','Family','Son','Daughter','Wife','Husband'];
+
+function isFamily(relationship){
+  if(!relationship)return false;
+  var r=relationship.toLowerCase();
+  return FAMILY_RELS.some(function(f){
+    return r.includes(f.toLowerCase());
+  });
+}
+
+function getMyFriendRelationship(userId){
+  if(!CU||!userId)return null;
+  var fr=CACHE.friends.find(function(f){
+    return ((f.from_id===CU.id&&f.to_id===userId)||(f.from_id===userId&&f.to_id===CU.id))
+      &&f.status==='accepted';
+  });
+  return fr?fr.relationship:null;
+}
+
+function amIFamilyOf(userId){
+  var rel=getMyFriendRelationship(userId);
+  return isFamily(rel);
+}
+
+// Can current user see a memorial?
+// Rules:
+// - 'public' = everyone
+// - 'connected' = people with "I Knew Them" connection + tagged + family
+// - 'family' = only family-relationship friends of creator
+function canSeeDeceased(d){
+  if(!d)return false;
+  var vis=d.visibility||'public';
+  if(vis==='public')return true;
+  if(!CU)return false;
+  if(d.created_by===CU.id)return true; // creator always sees own
+
+  // Check if tagged in this memorial
+  var isTagged=(d.tagged_users||[]).indexOf(CU.id)>=0;
+  if(isTagged)return true;
+
+  // Check connection to this memorial (I Knew Them)
+  var hasConnection=CACHE.connections.some(function(c){
+    return c.deceased_id===d.id&&c.user_id===CU.id;
+  });
+
+  if(vis==='connected'){
+    return hasConnection||amIFamilyOf(d.created_by);
+  }
+  if(vis==='family'){
+    return amIFamilyOf(d.created_by)||hasConnection;
+    // connected people can also see family memorials if they "I Knew Them"
+  }
+  return false;
+}
+
+// Can current user see a post?
+function canSeePost(p){
+  if(!p)return false;
+  var vis=p.visibility||'public';
+  if(vis==='public')return true;
+  if(!CU)return false;
+  if(p.user_id===CU.id)return true;
+  var fids=getMyFriendIds();
+  if(vis==='friends')return fids.indexOf(p.user_id)>=0;
+  if(vis==='family'){
+    return amIFamilyOf(p.user_id);
+  }
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════════
+// @ MENTION — TAG + NOTIFY + CONNECT TO MEMORIAL
+// ═══════════════════════════════════════════════════════════
+
+// Extract @mentions from text
+function extractMentions(text){
+  var mentions=[];
+  var regex=/@([\w\s]+?)(?=[@,\.!?\n]|$)/g;
+  var m;
+  while((m=regex.exec(text))!==null){
+    var name=m[1].trim();
+    if(name.length>1)mentions.push(name);
+  }
+  return mentions;
+}
+
+// Resolve mention names to user IDs
+function resolveMentions(mentions){
+  var users=[];
+  mentions.forEach(function(name){
+    var u=CACHE.users.find(function(x){
+      return uName(x).toLowerCase()===name.toLowerCase();
+    });
+    if(u)users.push(u);
+  });
+  return users;
+}
+
+// Process mentions in a post - notify tagged users
+async function processMentions(text, postId, deceasedId){
+  var mentions=extractMentions(text);
+  if(!mentions.length)return;
+  var taggedUsers=resolveMentions(mentions);
+  for(var i=0;i<taggedUsers.length;i++){
+    var u=taggedUsers[i];
+    if(u.id===CU.id)continue; // don't notify yourself
+    // Send notification
+    await addNotif(u.id,
+      uName(CU)+' mentioned you in a '+(deceasedId?'memorial':'post')+' 📣','📣');
+    // If it's a memorial, invite them to connect
+    if(deceasedId){
+      var d=CACHE.deceased.find(function(x){return x.id===deceasedId;});
+      var alreadyConnected=CACHE.connections.some(function(c){
+        return c.deceased_id===deceasedId&&c.user_id===u.id;
+      });
+      if(!alreadyConnected&&d){
+        // Send special invite notification
+        await addNotif(u.id,
+          uName(CU)+' mentioned you in '+d.name+"'s memorial. Click to view and connect 🤝",
+          '🌻');
+        // Add to tagged_users so they can see it even if private
+        try{
+          var currentTagged=d.tagged_users||[];
+          if(currentTagged.indexOf(u.id)<0){
+            currentTagged.push(u.id);
+            await sb.from('deceased').update({tagged_users:currentTagged}).eq('id',deceasedId);
+            d.tagged_users=currentTagged;
+          }
+        }catch(e){console.warn('Tag update:',e);}
+      }
+    }
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// POST REACTIONS SYSTEM (replaces simple likes)
+// ═══════════════════════════════════════════════════════════
+
+var REACTIONS = {
+  love: '❤️',
+  like: '👍',
+  haha: '😄',
+  wow:  '😮',
+  sad:  '😢',
+  angry:'😡'
+};
+
+// Load reactions from Supabase
+async function loadPostReactions(){
+  if(!sb)return;
+  try{
+    var res=await sb.from('post_reactions').select('*');
+    CACHE.post_reactions=res.data||[];
+  }catch(e){
+    // Table might not exist yet
+    CACHE.post_reactions=CACHE.post_reactions||[];
+    console.warn('post_reactions table may not exist yet:', e.message);
+  }
+}
+
+// Get all reactions for a post
+function getPostReactions(postId){
+  return (CACHE.post_reactions||[]).filter(function(r){return r.post_id===postId;});
+}
+
+// Get my reaction for a post
+function getMyReaction(postId){
+  if(!CU)return null;
+  var r=(CACHE.post_reactions||[]).find(function(r){
+    return r.post_id===postId&&r.user_id===CU.id;
+  });
+  return r?r.reaction_type:null;
+}
+
+// Toggle reaction picker
+function toggleReactionPicker(postId, btnEl){
+  // Remove any existing picker
+  var existing=document.getElementById('reactionPicker-'+postId);
+  if(existing){existing.remove();return;}
+  // Close all other pickers
+  document.querySelectorAll('.reaction-picker').forEach(function(p){p.remove();});
+  if(!CU){toast('Please sign in to react.');return;}
+  
+  // Create picker
+  var picker=document.createElement('div');
+  picker.id='reactionPicker-'+postId;
+  picker.className='reaction-picker';
+  picker.style.cssText='position:absolute;bottom:calc(100% + 8px);left:0;background:var(--navy-l);border:1px solid var(--border);border-radius:24px;padding:.4rem .6rem;display:flex;gap:.3rem;z-index:200;box-shadow:0 4px 20px rgba(0,0,0,.5);';
+  
+  Object.keys(REACTIONS).forEach(function(type){
+    var btn=document.createElement('button');
+    btn.type='button';
+    btn.title=type.charAt(0).toUpperCase()+type.slice(1);
+    btn.style.cssText='background:none;border:none;font-size:1.5rem;cursor:pointer;padding:.2rem .3rem;border-radius:8px;transition:.15s;line-height:1;';
+    btn.textContent=REACTIONS[type];
+    btn.onmouseover=function(){this.style.transform='scale(1.3)';this.style.background='rgba(255,255,255,.1)';};
+    btn.onmouseout=function(){this.style.transform='scale(1)';this.style.background='none';};
+    btn.onclick=function(e){
+      e.stopPropagation();
+      picker.remove();
+      setReaction(postId, type);
+    };
+    picker.appendChild(btn);
+  });
+  
+  // Position relative to button
+  var container=btnEl.closest('.post-actions');
+  if(container){
+    container.style.position='relative';
+    container.appendChild(picker);
+  }
+  
+  // Close on outside click
+  setTimeout(function(){
+    document.addEventListener('click', function closePicker(){
+      picker.remove();
+      document.removeEventListener('click', closePicker);
+    });
+  }, 100);
+}
+
+async function setReaction(postId, reactionType){
+  if(!CU||!sb)return;
+  var existing=getMyReaction(postId);
+  
+  try{
+    if(existing===reactionType){
+      // Remove reaction (toggle off)
+      await sb.from('post_reactions').delete()
+        .eq('post_id',postId).eq('user_id',CU.id);
+      CACHE.post_reactions=(CACHE.post_reactions||[]).filter(function(r){
+        return !(r.post_id===postId&&r.user_id===CU.id);
+      });
+      toast('Reaction removed');
+    } else if(existing){
+      // Change reaction
+      await sb.from('post_reactions').update({reaction_type:reactionType})
+        .eq('post_id',postId).eq('user_id',CU.id);
+      var r=(CACHE.post_reactions||[]).find(function(r){
+        return r.post_id===postId&&r.user_id===CU.id;
+      });
+      if(r)r.reaction_type=reactionType;
+      toast(REACTIONS[reactionType]+' reaction updated!');
+    } else {
+      // New reaction
+      var res=await sb.from('post_reactions').insert({
+        post_id:postId,
+        user_id:CU.id,
+        reaction_type:reactionType
+      }).select().single();
+      if(res.data){
+        if(!CACHE.post_reactions)CACHE.post_reactions=[];
+        CACHE.post_reactions.push(res.data);
+      }
+      toast(REACTIONS[reactionType]+' reaction added!');
+      // Notify post author
+      var p=CACHE.posts.find(function(x){return x.id===postId;});
+      if(p&&p.user_id!==CU.id){
+        addNotif(p.user_id, uName(CU)+' reacted '+REACTIONS[reactionType]+' to your post','📣');
+      }
+    }
+  }catch(e){
+    console.error('Reaction error:',e);
+    // Fallback: use localStorage for persistence if table doesn't exist
+    var key='reactions_'+postId;
+    var localReactions=JSON.parse(localStorage.getItem(key)||'{}');
+    if(localReactions[CU.id]===reactionType){
+      delete localReactions[CU.id];
+    } else {
+      localReactions[CU.id]=reactionType;
+    }
+    localStorage.setItem(key, JSON.stringify(localReactions));
+    // Update cache
+    if(!CACHE.post_reactions)CACHE.post_reactions=[];
+    CACHE.post_reactions=CACHE.post_reactions.filter(function(r){
+      return !(r.post_id===postId&&r.user_id===CU.id);
+    });
+    if(localReactions[CU.id]){
+      CACHE.post_reactions.push({post_id:postId,user_id:CU.id,reaction_type:localReactions[CU.id]});
+    }
+    toast(REACTIONS[reactionType]+' reaction saved!');
+  }
+  renderFeed();
+}
+
+// Restore reactions from localStorage (fallback)
+function restoreLocalReactions(){
+  if(!CU)return;
+  if(!CACHE.post_reactions)CACHE.post_reactions=[];
+  CACHE.posts.forEach(function(p){
+    var key='reactions_'+p.id;
+    var stored=localStorage.getItem(key);
+    if(stored){
+      try{
+        var localReactions=JSON.parse(stored);
+        Object.keys(localReactions).forEach(function(uid){
+          var exists=CACHE.post_reactions.some(function(r){
+            return r.post_id===p.id&&r.user_id===uid;
+          });
+          if(!exists){
+            CACHE.post_reactions.push({
+              post_id:p.id,
+              user_id:uid,
+              reaction_type:localReactions[uid]
+            });
+          }
+        });
+      }catch(e){}
+    }
+  });
+}
+
+// ── DELETE POST ──
+function confirmDeletePost(postId){
+  if(!CU)return;
+  var p=CACHE.posts.find(function(x){return x.id===postId;});
+  if(!p||p.user_id!==CU.id){toast('You can only delete your own posts.');return;}
+  var ok=confirm('Delete this post? This cannot be undone.');
+  if(ok)deletePost(postId);
+}
+
+async function deletePost(postId){
+  if(!sb)return;
+  showLoader(true);
+  try{
+    // Delete reactions
+    try{await sb.from('post_reactions').delete().eq('post_id',postId);}catch(e){}
+    // Delete comments
+    try{await sb.from('comments').delete().eq('post_id',postId);}catch(e){}
+    // Delete post
+    await sb.from('posts').delete().eq('id',postId);
+    CACHE.posts=CACHE.posts.filter(function(x){return x.id!==postId;});
+    CACHE.post_reactions=(CACHE.post_reactions||[]).filter(function(x){return x.post_id!==postId;});
+    CACHE.comments=CACHE.comments.filter(function(x){return x.post_id!==postId;});
+    showLoader(false);
+    toast('🗑️ Post deleted.');
+    renderFeed();
+  }catch(e){
+    showLoader(false);
+    console.error('deletePost:',e);
+    toast('❌ '+e.message);
+  }
 }
 
 console.log('Post + Friend functions loaded ✓');
@@ -3045,8 +3400,9 @@ function guestBrowse(){showPage('appPage');}
                   <input type="file" id="postImageFile" accept="image/*" style="display:none" onchange="previewPostImage(this)">
                 </label>
                 <select class="visibility-select" id="postVisibility" title="Who can see this?">
-                  <option value="friends">👥 Friends</option>
                   <option value="public">🌍 Everyone</option>
+                  <option value="friends">👥 Friends</option>
+                  <option value="family">🔒 Family Only</option>
                 </select>
               </div>
               <button type="button" class="btn btn-g btn-sm" onclick="submitPost()" id="postSubmitBtn" >Share Post</button>
@@ -3184,6 +3540,15 @@ function guestBrowse(){showPage('appPage');}
       <div class="fr">
         <div class="fg"><label id="regCountryLabel">Country</label>
           <select id="dCountry"><option value="">Country…</option><option>Malaysia</option><option>Indonesia</option><option>Philippines</option><option>Singapore</option><option>Thailand</option><option>Vietnam</option><option>China</option><option>India</option><option>United States</option><option>United Kingdom</option><option>Australia</option><option>Canada</option><option>Japan</option><option>Other</option></select>
+        </div>
+        <div class="fg">
+          <label style="font-size:.78rem;color:var(--muted)">🔒 Who Can See This Memorial?</label>
+          <select id="dVis" style="width:100%;margin-top:.3rem">
+            <option value="public">🌍 Public — Everyone can see</option>
+            <option value="connected">🤝 Connected — People who knew them + tagged</option>
+            <option value="family">🔒 Family Only — Family-relationship friends only</option>
+          </select>
+          <div style="font-size:.7rem;color:var(--muted);margin-top:.3rem;line-height:1.5">💡 People you @tag can always see this memorial</div>
         </div>
         <div class="fg"><label>Faith / Religion</label>
           <select id="dRel"><option value="General">General</option><option value="Christian">Christian</option><option value="Muslim">Muslim</option><option value="Buddhist">Buddhist</option></select>
@@ -3466,9 +3831,6 @@ function guestBrowse(){showPage('appPage');}
   <div class="mobile-nav-inner">
     <button type="button" class="mnav-btn act" id="mnav-home" onclick="mnavGo('home',this)" ontouchend="mnavGo('home',this);event.preventDefault()">
       <span class="mni">🏠</span><span style="font-size:.55rem">Home</span>
-    </button>
-    <button type="button" class="mnav-btn" id="mnav-search" onclick="mnavGo('search',this)" ontouchend="mnavGo('search',this);event.preventDefault()">
-      <span class="mni">🔍</span><span style="font-size:.55rem">Search</span>
     </button>
     <button type="button" class="mnav-btn" id="mnav-add" onclick="openDeceasedModal()" ontouchend="openDeceasedModal();event.preventDefault()" style="padding:.2rem .4rem">
       <span style="width:44px;height:44px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--navy);font-size:1.6rem;line-height:1">+</span>
