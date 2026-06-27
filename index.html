@@ -916,6 +916,7 @@ async function afterAuth(user){
     renderApp();
     toast('Welcome, '+CU.firstName+'! 🌻');
     setTimeout(restoreLocalReactions, 1000);
+    setTimeout(restoreLocalRelationships, 1500);
     updateMnavProfileIcon();
 
     // Step 3: Load data in background AFTER app is visible
@@ -1218,21 +1219,63 @@ function renderRelGrid(gridId,stateVar){
 }
 
 function prevDPhoto(input){
-  const f=input.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=e=>{dPhotoData=e.target.result;const img=document.getElementById('dPhotoP');if(img){img.src=e.target.result;img.style.display='block';}};
+  var f=input.files[0];if(!f)return;
+  // Only allow images for profile photo
+  if(!f.type.startsWith('image/')){toast('Profile photo must be an image.');input.value='';return;}
+  if(f.size>10*1024*1024){toast('Photo too large. Max 10MB.');input.value='';return;}
+  var r=new FileReader();
+  r.onload=function(e){
+    dPhotoData=e.target.result;
+    var img=document.getElementById('dPhotoP');
+    if(img){
+      img.src=e.target.result;
+      img.style.display='block';
+    }
+    // Also update the placeholder icon
+    var icon=document.getElementById('dPhotoIcon');
+    if(icon)icon.style.display='none';
+    toast('✓ Profile photo ready to upload');
+  };
   r.readAsDataURL(f);
 }
 function prevDMedia(input){
-  const grid=document.getElementById('dMediaGrid');if(grid)grid.innerHTML='';dMediaData=[];
-  Array.from(input.files).forEach(f=>{
-    const r=new FileReader();
-    r.onload=e=>{
+  var grid=document.getElementById('dMediaGrid');
+  if(grid)grid.innerHTML='';
+  dMediaData=[];
+  var files=Array.from(input.files);
+  var validTypes=['image/jpeg','image/png','image/gif','image/webp','video/mp4','video/webm','video/quicktime','video/mov'];
+  files.forEach(function(f){
+    if(!validTypes.includes(f.type)&&!f.type.startsWith('image/')&&!f.type.startsWith('video/')){
+      toast('Skipping '+f.name+' — unsupported format');
+      return;
+    }
+    if(f.size>50*1024*1024){toast('Skipping '+f.name+' — max file size is 50MB');return;}
+    var r=new FileReader();
+    r.onload=function(e){
       dMediaData.push({file:f,type:f.type,data:e.target.result,name:f.name});
-      const el=f.type.startsWith('video')?document.createElement('video'):document.createElement('img');
-      el.src=e.target.result;if(grid)grid.appendChild(el);
-    };r.readAsDataURL(f);
+      var wrapper=document.createElement('div');
+      wrapper.style.cssText='position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border);';
+      if(f.type.startsWith('video')){
+        var el=document.createElement('video');
+        el.src=e.target.result;
+        el.controls=true;
+        el.style.cssText='width:100%;max-height:120px;display:block;';
+        wrapper.appendChild(el);
+        var label=document.createElement('div');
+        label.style.cssText='font-size:.65rem;color:var(--muted);padding:.2rem .4rem;background:rgba(0,0,0,.5);position:absolute;bottom:0;left:0;right:0;';
+        label.textContent='🎬 '+f.name.slice(0,20);
+        wrapper.appendChild(label);
+      }else{
+        var el=document.createElement('img');
+        el.src=e.target.result;
+        el.style.cssText='width:100%;height:80px;object-fit:cover;display:block;';
+        wrapper.appendChild(el);
+      }
+      if(grid)grid.appendChild(wrapper);
+    };
+    r.readAsDataURL(f);
   });
+  if(files.length>0)toast('✓ '+files.length+' file'+(files.length>1?'s':'')+' ready to upload');
 }
 async function saveDeceased(){
   if(!CU){toast('Please sign in first.');return;}
@@ -1644,8 +1687,20 @@ function openUserProfile(uid){
     const ex=CACHE.friends.find(f=>(f.from_id===CU.id&&f.to_id===uid)||(f.from_id===uid&&f.to_id===CU.id));
     const st=ex?ex.status:null;
     const rel=ex?.relationship||'';
+    // Check localStorage for relationship
+    var storedRel='';
+    if(ex){
+      var lsRel=localStorage.getItem('rb_rel_'+ex.id);
+      if(lsRel){
+        try{
+          var lsData=JSON.parse(lsRel);
+          if(lsData.setBy===CU.id)storedRel=lsData.relationship;
+          else storedRel=lsData.reciprocal||lsData.relationship;
+        }catch(e){}
+      }
+    }
     if(st==='accepted'){
-      var relText=rel||'Friends';
+      var relText=rel&&rel!=='Friend'?rel:(storedRel||'Friends');
       var relBtn=document.createElement('button');
       relBtn.type='button';
       relBtn.className='btn btn-o btn-sm';
@@ -2155,29 +2210,53 @@ function switchPostType(type,btn){
   if(type==='memorial'){openDeceasedModal();}
 }
 
-function previewPostImage(input){
+// Store post media type
+var postMediaType = 'image'; // 'image' or 'video'
+var postVideoData = ''; // base64 video data
+
+function previewPostMedia(input, type){
   var f=input.files[0];if(!f)return;
+  if(f.size>50*1024*1024){toast('File too large. Max 50MB for videos.');input.value='';return;}
+  postMediaType=type;
   var r=new FileReader();
   r.onload=function(e){
-    postImageData=e.target.result;
     var prev=document.getElementById('postImagePreview');
     if(!prev)return;
     prev.style.display='block';
-    prev.innerHTML='<div style="position:relative">'
-      +'<img src="'+e.target.result+'" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">'
-      +'<button type="button" onclick="removePostImage()" style="position:absolute;top:.3rem;right:.3rem;background:rgba(0,0,0,.7);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:.9rem;line-height:1">✕</button>'
-      +'</div>';
+    if(type==='video'){
+      postImageData=''; // clear image
+      postVideoData=e.target.result;
+      prev.innerHTML='<div style="position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border)">'
+        +'<video src="'+e.target.result+'" controls style="width:100%;max-height:240px;display:block;background:#000"></video>'
+        +'<div style="position:absolute;top:.3rem;left:.4rem;background:rgba(0,0,0,.7);border-radius:6px;padding:.15rem .5rem;font-size:.7rem;color:#fff">🎬 Video</div>'
+        +'<button type="button" onclick="removePostMedia()" style="position:absolute;top:.3rem;right:.3rem;background:rgba(0,0,0,.7);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:.9rem;line-height:1">✕</button>'
+        +'</div>';
+    }else{
+      postVideoData=''; // clear video
+      postImageData=e.target.result;
+      prev.innerHTML='<div style="position:relative">'
+        +'<img src="'+e.target.result+'" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">'
+        +'<button type="button" onclick="removePostMedia()" style="position:absolute;top:.3rem;right:.3rem;background:rgba(0,0,0,.7);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:.9rem;line-height:1">✕</button>'
+        +'</div>';
+    }
   };
   r.readAsDataURL(f);
 }
 
-function removePostImage(){
+// Legacy alias
+function previewPostImage(input){previewPostMedia(input,'image');}
+
+function removePostMedia(){
   postImageData='';
+  postVideoData='';
+  postMediaType='image';
   var prev=document.getElementById('postImagePreview');
   if(prev){prev.style.display='none';prev.innerHTML='';}
-  var fi=document.getElementById('postImageFile');
-  if(fi)fi.value='';
+  var fi=document.getElementById('postImageFile');if(fi)fi.value='';
+  var fv=document.getElementById('postVideoFile');if(fv)fv.value='';
 }
+
+function removePostImage(){removePostMedia();}
 
 async function submitPost(){
   if(!CU){toast('Please sign in to post.');showPage('authPage');setAuthMode('login');return;}
@@ -2192,12 +2271,24 @@ async function submitPost(){
   hideMentionDropdown();
   try{
     var imageUrl='';
-    if(postImageData){
-      try{imageUrl=await uploadBase64(postImageData,'posts');}
-      catch(e){console.warn('Image upload:',e);}
+    var videoUrl='';
+    var mediaType='';
+    if(postVideoData){
+      try{
+        videoUrl=await uploadBase64(postVideoData,'post-videos');
+        mediaType='video';
+        toast('Uploading video… please wait');
+      }catch(e){console.warn('Video upload:',e);}
+    }else if(postImageData){
+      try{
+        imageUrl=await uploadBase64(postImageData,'posts');
+        mediaType='image';
+      }catch(e){console.warn('Image upload:',e);}
     }
     var res=await sb.from('posts').insert({
-      user_id:CU.id,text:text,image_url:imageUrl||null,
+      user_id:CU.id,text:text,
+      image_url:imageUrl||videoUrl||null,
+      media_type:mediaType||null,
       visibility:visibility,created_at:new Date().toISOString()
     }).select().single();
     if(res.error)throw new Error(res.error.message);
@@ -2378,7 +2469,14 @@ function renderPostCard(p){
   h+='<div class="post-time">'+timeSince(p.created_at)+' · '+vis+'</div>';
   h+='</div></div>';
   if(p.text)h+='<div class="post-body">'+p.text+'</div>';
-  if(p.image_url)h+='<img src="'+p.image_url+'" style="width:100%;max-height:360px;object-fit:cover;display:block" loading="lazy">';
+  if(p.image_url){
+    if(p.media_type==='video'||p.image_url.includes('post-videos')){
+      h+='<video src="'+p.image_url+'" controls style="width:100%;max-height:400px;display:block;background:#000" preload="metadata">'
+        +'<source src="'+p.image_url+'">Your browser does not support video.</video>';
+    }else{
+      h+='<img src="'+p.image_url+'" style="width:100%;max-height:360px;object-fit:cover;display:block" loading="lazy">';
+    }
+  }
   h+='<div class="post-actions">';
   // Build reaction summary
   var allReactions=getPostReactions(pid);
@@ -2507,7 +2605,20 @@ function getMyFriendRelationship(userId){
     return ((f.from_id===CU.id&&f.to_id===userId)||(f.from_id===userId&&f.to_id===CU.id))
       &&f.status==='accepted';
   });
-  return fr?fr.relationship:null;
+  if(!fr)return null;
+  var rel=fr.relationship||'Friend';
+  // Check localStorage backup if still default
+  if(rel==='Friend'){
+    var stored=localStorage.getItem('rb_rel_'+fr.id);
+    if(stored){
+      try{
+        var data=JSON.parse(stored);
+        if(data.setBy===CU.id)rel=data.relationship;
+        else if(data.reciprocal)rel=data.reciprocal;
+      }catch(e){}
+    }
+  }
+  return rel;
 }
 
 function amIFamilyOf(userId){
@@ -2836,6 +2947,32 @@ async function deletePost(postId){
   }
 }
 
+
+// ═══════════════════════════════════════════════════════════
+// SERVICE WORKER REGISTRATION
+// ═══════════════════════════════════════════════════════════
+(function(){
+  if(!('serviceWorker' in navigator))return;
+
+  // Register sw.js from the GitHub Pages path
+  var swPath = '/remembered/sw.js';
+
+  navigator.serviceWorker.register(swPath, {scope: '/remembered/'})
+    .then(function(reg){
+      console.log('[SW] Registered ✓ scope:', reg.scope);
+      reg.addEventListener('updatefound', function(){
+        console.log('[SW] Update found — new version available');
+      });
+    })
+    .catch(function(err){
+      console.log('[SW] Not registered (this is OK):', err.message);
+    });
+
+  // When SW controls the page - app is fully installable
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    console.log('[SW] Controller changed — app is now cached offline');
+  });
+})();
 console.log('Post + Friend functions loaded ✓');
 
 // ═══════════════════════════════════════════════════════════
@@ -2970,13 +3107,66 @@ function renderDpPrayers(id){
 async function completeFriendReq(frId, relationship){
   if(!frId){toast('Error: no request ID.');return;}
   if(!sb){toast('Not connected.');return;}
+  
+  // Map reciprocal relationships
+  var RECIPROCAL={
+    'Mother':'Child','Father':'Child','Son':'Parent','Daughter':'Parent',
+    'Parent':'Child','Child':'Parent',
+    'Brother':'Sibling','Sister':'Sibling','Sibling':'Sibling',
+    'Husband':'Wife','Wife':'Husband','Spouse':'Spouse',
+    'Grandfather':'Grandchild','Grandmother':'Grandchild',
+    'Grandchild':'Grandparent','Grandparent':'Grandchild',
+    'Uncle':'Nephew / Niece','Aunt':'Nephew / Niece',
+    'Nephew / Niece':'Uncle / Aunt',
+    'Stepparent':'Stepchild','Stepchild':'Stepparent',
+    'Godparent':'Godchild','Godchild':'Godparent',
+    'In-law':'In-law'
+  };
+  // Same-type relationships (both sides same)
+  var SYMMETRIC=['Cousin','Relative','Family','Friend','Close Friend',
+    'Colleague','Classmate','Neighbour','Other','Spouse'];
+  
+  var reciprocal = RECIPROCAL[relationship] || 
+    (SYMMETRIC.indexOf(relationship)>=0 ? relationship : relationship);
+
   try{
-    await sb.from('friends').update({status:'accepted', relationship:relationship}).eq('id',frId);
-    var fr=CACHE.friends.find(function(x){return x.id===frId;});
-    if(fr){fr.status='accepted'; fr.relationship=relationship;}
-    if(fr && fr.from_id!==CU.id){
-      addNotif(fr.from_id, uName(CU)+' connected with you as '+relationship+' 🤝','🤝');
+    // Save to Supabase
+    var res=await sb.from('friends').update({
+      status:'accepted',
+      relationship:relationship
+    }).eq('id',frId).select().single();
+    
+    if(res.error){
+      console.error('Supabase update error:', res.error);
+      throw new Error(res.error.message);
     }
+    
+    // Update local cache
+    var fr=CACHE.friends.find(function(x){return x.id===frId;});
+    if(fr){
+      fr.status='accepted';
+      fr.relationship=relationship;
+    }
+    
+    // Save to localStorage as persistent backup
+    var lsKey='rb_rel_'+frId;
+    localStorage.setItem(lsKey, JSON.stringify({
+      relationship:relationship,
+      reciprocal:reciprocal,
+      setBy:CU.id,
+      updatedAt:new Date().toISOString()
+    }));
+    
+    // Notify the other person with reciprocal relationship
+    if(fr){
+      var otherId=fr.from_id===CU.id?fr.to_id:fr.from_id;
+      if(otherId!==CU.id){
+        await addNotif(otherId,
+          uName(CU)+' set your connection as "'+reciprocal+'" 🤝 — you are their '+relationship,
+          '🤝');
+      }
+    }
+    
     toast('🤝 Connection saved as: '+relationship+'!');
     renderMyFriends();
     if(typeof renderNotifications==='function')renderNotifications();
@@ -2984,17 +3174,93 @@ async function completeFriendReq(frId, relationship){
     renderFeed();
     if(typeof renderFriendSuggestions==='function')renderFriendSuggestions();
     if(typeof renderSidebarProfile==='function')renderSidebarProfile();
-    // Refresh the profile page if open
-    if(viewingUserId){
-      setTimeout(function(){openUserProfile(viewingUserId);}, 300);
-    }
+    if(viewingUserId)setTimeout(function(){openUserProfile(viewingUserId);},300);
     var psi=document.getElementById('peopleSearchInput');
     if(typeof renderPeopleResults==='function')renderPeopleResults(psi?psi.value:'');
+    
   }catch(e){
-    console.error('completeFriendReq:', e);
-    toast('❌ Could not update: '+e.message);
+    console.error('completeFriendReq error:', e);
+    // Save to localStorage even if Supabase fails
+    var fr2=CACHE.friends.find(function(x){return x.id===frId;});
+    if(fr2){
+      fr2.status='accepted';
+      fr2.relationship=relationship;
+      localStorage.setItem('rb_rel_'+frId, JSON.stringify({
+        relationship:relationship,
+        reciprocal:reciprocal,
+        setBy:CU.id,
+        updatedAt:new Date().toISOString()
+      }));
+    }
+    toast('🤝 Saved locally — will sync when connection is restored.');
+    renderMyFriends();renderFeed();
+    if(viewingUserId)setTimeout(function(){openUserProfile(viewingUserId);},300);
   }
 }
+
+// Restore relationships from localStorage (called on every page load)
+function restoreLocalRelationships(){
+  if(!CACHE.friends||!CU)return;
+  var restored=0;
+  CACHE.friends.forEach(function(fr){
+    var key='rb_rel_'+fr.id;
+    var stored=localStorage.getItem(key);
+    if(stored){
+      try{
+        var data=JSON.parse(stored);
+        // Only apply if Supabase didn't save it (relationship is still default)
+        if(!fr.relationship||fr.relationship==='Friend'){
+          fr.relationship=data.relationship;
+          restored++;
+        }
+        // If I am the OTHER person (not the one who set it), show reciprocal
+        if(data.setBy&&data.setBy!==CU.id&&data.reciprocal){
+          // We are the recipient — show the reciprocal label
+          if(!fr.relationship||fr.relationship==='Friend'){
+            fr.relationship=data.reciprocal;
+            restored++;
+          }
+        }
+      }catch(e){}
+    }
+  });
+  if(restored>0){
+    console.log('Restored '+restored+' relationships from localStorage');
+    // Sync any local-only relationships back to Supabase
+    syncLocalRelationshipsToSupabase();
+  }
+}
+
+// Sync localStorage relationships back to Supabase (background task)
+async function syncLocalRelationshipsToSupabase(){
+  if(!sb||!CU)return;
+  for(var i=0;i<CACHE.friends.length;i++){
+    var fr=CACHE.friends[i];
+    var key='rb_rel_'+fr.id;
+    var stored=localStorage.getItem(key);
+    if(stored){
+      try{
+        var data=JSON.parse(stored);
+        // Check if Supabase has the right value
+        if(fr.relationship&&fr.relationship!=='Friend'){
+          // Already synced - clean up localStorage
+          // Don't delete - keep as backup
+        } else {
+          // Try to sync to Supabase
+          await sb.from('friends').update({
+            status:'accepted',
+            relationship:data.relationship
+          }).eq('id',fr.id);
+          fr.relationship=data.relationship;
+          console.log('Synced relationship for friend '+fr.id);
+        }
+      }catch(e){
+        console.warn('Sync failed for '+fr.id, e);
+      }
+    }
+  }
+}
+
 
 function openSetRelationship(uid){
   // Find the friend record
@@ -3397,7 +3663,11 @@ function guestBrowse(){showPage('appPage');}
               <div class="post-extras">
                 <label class="post-extra-btn" style="cursor:pointer">
                   📷 Photo
-                  <input type="file" id="postImageFile" accept="image/*" style="display:none" onchange="previewPostImage(this)">
+                  <input type="file" id="postImageFile" accept="image/*" style="display:none" onchange="previewPostMedia(this,'image')">
+                </label>
+                <label class="post-extra-btn" style="cursor:pointer">
+                  🎬 Video
+                  <input type="file" id="postVideoFile" accept="video/mp4,video/webm,video/quicktime,video/mov" style="display:none" onchange="previewPostMedia(this,'video')">
                 </label>
                 <select class="visibility-select" id="postVisibility" title="Who can see this?">
                   <option value="public">🌍 Everyone</option>
