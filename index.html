@@ -1130,6 +1130,7 @@ function renderCard(d){
       ${myConn?`<button type="button" class="act-btn on">🤝 ${myConn.relationship}</button>`:''}
       <button type="button" class="act-btn" onclick="openDeceased('${d.id}')">👁 View</button>
       <button type="button" class="act-btn" onclick="openShare('${d.id}')">↗ Share</button>
+      ${CU&&d.created_by===CU.id?`<button type="button" class="act-btn" style="color:#ff5252;border-color:rgba(255,82,82,.3)" onclick="confirmDeleteDeceased('${d.id}','${d.name.replace(/'/g,'')}')">🗑️ Delete</button>`:''}
     </div>
     ${previewHtml}
     ${moreCount>0?`<div style="padding:0 1rem .3rem"><span class="comment-count-btn" onclick="openDeceased('${d.id}')">View ${moreCount} more comment${moreCount>1?'s':''}…</span></div>`:''}
@@ -2461,6 +2462,241 @@ async function submitPostComment(postId){
 }
 
 console.log('Post + Friend functions loaded ✓');
+
+// ═══════════════════════════════════════════════════════════
+// DECEASED PROFILE PAGE FUNCTIONS
+// ═══════════════════════════════════════════════════════════
+
+function renderDpActions(id){
+  var d=CACHE.deceased.find(function(x){return x.id===id;});
+  if(!d)return;
+  var el=document.getElementById('dpActions');
+  if(!el)return;
+  var conns=CACHE.connections.filter(function(c){return c.deceased_id===id;});
+  var myConn=CU?conns.find(function(c){return c.user_id===CU.id;}):null;
+  var smiles=conns.filter(function(c){return c.smiled;}).length;
+  var prayers=CACHE.prayers.filter(function(p){return p.deceased_id===id;}).length;
+  var isCreator=CU&&d.created_by===CU.id;
+  
+  el.innerHTML='';
+  
+  // Smiles button
+  var smileBtn=document.createElement('button');
+  smileBtn.type='button';
+  smileBtn.className='btn '+(myConn&&myConn.smiled?'btn-g':'btn-o');
+  smileBtn.textContent='😊 '+smiles+' Smiles';
+  smileBtn.onclick=function(){toggleSmile(id);renderDpActions(id);};
+  el.appendChild(smileBtn);
+  
+  // Prayers button
+  var prayBtn=document.createElement('button');
+  prayBtn.type='button';
+  prayBtn.className='btn btn-o';
+  prayBtn.textContent='🙏 '+prayers+' Prayers';
+  prayBtn.dataset.id=id;
+  prayBtn.dataset.name=d.name;
+  prayBtn.onclick=function(){quickPrayer(this.dataset.id,this.dataset.name);};
+  el.appendChild(prayBtn);
+  
+  // Connect button
+  if(CU&&!myConn){
+    var connBtn=document.createElement('button');
+    connBtn.type='button';
+    connBtn.className='btn btn-o';
+    connBtn.textContent='🤝 I Knew Them';
+    connBtn.dataset.id=id;
+    connBtn.dataset.name=d.name;
+    connBtn.onclick=function(){openConnect(this.dataset.id,this.dataset.name);};
+    el.appendChild(connBtn);
+  } else if(myConn){
+    var connedBtn=document.createElement('button');
+    connedBtn.type='button';
+    connedBtn.className='btn btn-o';
+    connedBtn.textContent='🤝 '+myConn.relationship;
+    el.appendChild(connedBtn);
+  }
+  
+  // Share button
+  var shareBtn=document.createElement('button');
+  shareBtn.type='button';
+  shareBtn.className='btn btn-o';
+  shareBtn.style.cssText='background:rgba(201,168,76,.1);border-color:var(--gold);color:var(--gold)';
+  shareBtn.textContent='↗ Share';
+  shareBtn.dataset.id=id;
+  shareBtn.onclick=function(){openShare(this.dataset.id);};
+  el.appendChild(shareBtn);
+  
+  // Delete button - only for creator
+  if(isCreator){
+    var delBtn=document.createElement('button');
+    delBtn.type='button';
+    delBtn.className='btn btn-o';
+    delBtn.style.cssText='color:#ff5252;border-color:rgba(255,82,82,.3);';
+    delBtn.textContent='🗑️ Delete Memorial';
+    delBtn.dataset.id=id;
+    delBtn.dataset.name=d.name;
+    delBtn.onclick=function(){confirmDeleteDeceased(this.dataset.id,this.dataset.name);};
+    el.appendChild(delBtn);
+  }
+}
+
+function renderDpConnections(id){
+  var el=document.getElementById('dpConnList');
+  if(!el)return;
+  var conns=CACHE.connections.filter(function(c){return c.deceased_id===id;});
+  if(!conns.length){
+    el.innerHTML='<div class="txt-m txt-sm">No connections yet. Be the first to connect. 🤝</div>';
+    return;
+  }
+  el.innerHTML='<div class="connected-list">'+conns.map(function(c){
+    var u=CACHE.users.find(function(x){return x.id===c.user_id;});
+    if(!u)return'';
+    return '<div class="conn-person" data-uid="'+u.id+'" onclick="openUserProfile(this.dataset.uid)">'
+      +'<div class="cp-av">'+uAvHtml(u,32)+'</div>'
+      +'<div class="cp-info"><div class="cp-name">'+uName(u)+'</div><div class="cp-rel">'+c.relationship+'</div></div>'
+      +'</div>';
+  }).join('')+'</div>';
+}
+
+function renderDpPrayers(id){
+  var prayers=CACHE.prayers.filter(function(p){return p.deceased_id===id;});
+  var addEl=document.getElementById('dpPrayerAdd');
+  var wallEl=document.getElementById('dpPrayerWall');
+  if(addEl){
+    addEl.innerHTML='<div class="tpl-row">'
+      +'<button type="button" class="tpl-b" onclick="setTpl(&quot;c&quot;)">✝ Christian</button>'
+      +'<button type="button" class="tpl-b" onclick="setTpl(&quot;m&quot;)">☪ Islamic</button>'
+      +'<button type="button" class="tpl-b" onclick="setTpl(&quot;b&quot;)">☸ Buddhist</button>'
+      +'<button type="button" class="tpl-b" onclick="setTpl(&quot;j&quot;)">✨ Joy</button>'
+      +'<button type="button" class="tpl-b" onclick="setTpl(&quot;mem&quot;)">💭 Memory</button>'
+      +'</div>'
+      +'<textarea id="inlinePT" placeholder="Write a prayer or happy memory…" style="min-height:80px"></textarea>'
+      +'<input type="text" id="inlinePA" placeholder="Your name" value="'+(CU?uName(CU):'')+'"><br>'
+      +'<button type="button" class="btn btn-g btn-sm" style="margin-top:.5rem" data-id="'+id+'" onclick="submitInlinePrayer(this.dataset.id)">🙏 Post</button>';
+  }
+  if(wallEl){
+    wallEl.innerHTML=prayers.length
+      ?prayers.map(function(p){
+        return '<div class="pw-item">'
+          +'<div class="pw-auth">🙏 '+p.author+'</div>'
+          +'<div class="pw-text">'+p.text+'</div>'
+          +'<div class="pw-time">'+timeSince(p.created_at)+'</div>'
+          +'</div>';
+      }).join('')
+      :'<div class="txt-m txt-sm">No prayers yet. Be the first to leave one. 🙏</div>';
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// RELATIONSHIP MANAGEMENT
+// ═══════════════════════════════════════════════════════════
+
+async function completeFriendReq(frId, relationship){
+  if(!frId){toast('Error: no request ID.');return;}
+  if(!sb){toast('Not connected.');return;}
+  try{
+    await sb.from('friends').update({status:'accepted', relationship:relationship}).eq('id',frId);
+    var fr=CACHE.friends.find(function(x){return x.id===frId;});
+    if(fr){fr.status='accepted'; fr.relationship=relationship;}
+    if(fr && fr.from_id!==CU.id){
+      addNotif(fr.from_id, uName(CU)+' connected with you as '+relationship+' 🤝','🤝');
+    }
+    toast('🤝 Connection saved as: '+relationship+'!');
+    renderMyFriends();
+    if(typeof renderNotifications==='function')renderNotifications();
+    updateNotifBadge();
+    renderFeed();
+    if(typeof renderFriendSuggestions==='function')renderFriendSuggestions();
+    if(typeof renderSidebarProfile==='function')renderSidebarProfile();
+    // Refresh the profile page if open
+    if(viewingUserId){
+      setTimeout(function(){openUserProfile(viewingUserId);}, 300);
+    }
+    var psi=document.getElementById('peopleSearchInput');
+    if(typeof renderPeopleResults==='function')renderPeopleResults(psi?psi.value:'');
+  }catch(e){
+    console.error('completeFriendReq:', e);
+    toast('❌ Could not update: '+e.message);
+  }
+}
+
+function openSetRelationship(uid){
+  // Find the friend record
+  var fr=CACHE.friends.find(function(f){
+    return (f.from_id===CU.id&&f.to_id===uid)||(f.from_id===uid&&f.to_id===CU.id);
+  });
+  if(!fr){toast('You are not connected with this person yet.');return;}
+  pendingFriendReqId=fr.id;
+  selectedFriendRel=fr.relationship||'Friend';
+  // Set the name in the modal
+  var u=CACHE.users.find(function(x){return x.id===uid;});
+  var nameEl=document.getElementById('friendRelName');
+  if(nameEl)nameEl.textContent=u?uName(u):'your friend';
+  // Pre-select current relationship
+  document.querySelectorAll('.friend-rel-opt').forEach(function(b){
+    b.classList.remove('sel');
+    if(b.textContent.trim()===selectedFriendRel)b.classList.add('sel');
+  });
+  var custEl=document.getElementById('friendRelCustom');
+  if(custEl)custEl.value='';
+  openModal('friendRelModal');
+}
+
+// ═══════════════════════════════════════════════════════════
+// MEMORIAL DELETE
+// ═══════════════════════════════════════════════════════════
+
+function confirmDeleteDeceased(id, name){
+  if(!CU){toast('Please sign in.');return;}
+  // Check if user is the creator
+  var d=CACHE.deceased.find(function(x){return x.id===id;});
+  if(!d){toast('Memorial not found.');return;}
+  if(d.created_by!==CU.id){toast('You can only delete memorials you created.');return;}
+  // Show confirmation
+  var msg2='Delete memorial for '+name+'? This cannot be undone.';
+  var confirmed=confirm(msg2);
+  if(confirmed)deleteDeceased(id, name);
+}
+
+async function deleteDeceased(id, name){
+  if(!sb){toast('Not connected.');return;}
+  showLoader(true);
+  try{
+    // Delete connections first
+    await sb.from('connections').delete().eq('deceased_id', id);
+    // Delete prayers
+    await sb.from('prayers').delete().eq('deceased_id', id);
+    // Delete comments
+    await sb.from('comments').delete().eq('deceased_id', id);
+    // Delete media
+    await sb.from('media').delete().eq('deceased_id', id);
+    // Delete the memorial
+    var res=await sb.from('deceased').delete().eq('id', id);
+    // Remove from cache
+    CACHE.deceased=CACHE.deceased.filter(function(x){return x.id!==id;});
+    CACHE.connections=CACHE.connections.filter(function(x){return x.deceased_id!==id;});
+    CACHE.prayers=CACHE.prayers.filter(function(x){return x.deceased_id!==id;});
+    CACHE.comments=CACHE.comments.filter(function(x){return x.deceased_id!==id;});
+    CACHE.media=CACHE.media.filter(function(x){return x.deceased_id!==id;});
+    showLoader(false);
+    toast('🗑️ Memorial for '+name+' has been deleted.');
+    // If on deceased page, go back to feed
+    var ap=document.querySelector('.page.active');
+    if(ap&&ap.id==='deceasedPage'){
+      showPageDirect('appPage');
+    }
+    renderFeed();
+    renderStats();
+    renderTopMemorials();
+  }catch(e){
+    showLoader(false);
+    console.error('deleteDeceased:', e);
+    toast('❌ Could not delete: '+e.message);
+  }
+}
+
+
 </script>
 </head>
 <body>
