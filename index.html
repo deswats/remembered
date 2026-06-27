@@ -2754,8 +2754,8 @@ function renderPostCard(p){
   h+='<div class="comments-list" id="postCommentsList-'+pid+'"></div>';
   h+='<div class="comment-input-row">';
   h+=(CU?uAvHtml(CU,28):'<div style="width:28px;height:28px;border-radius:50%;background:var(--navy-m);display:flex;align-items:center;justify-content:center">👤</div>');
-  h+='<input type="text" id="postCommentInput-'+pid+'" placeholder="Write a comment…">';
-  h+='<button type="button" data-pid="'+pid+'" onclick="submitPostComment(this.dataset.pid)">Post</button>';
+  h+='<input type="text" id="postCommentInput-'+pid+'" placeholder="Write a comment…" style="flex:1">';
+  h+='<button type="button" id="postCommentBtn-'+pid+'" data-pid="'+pid+'" onclick="submitPostComment(this.dataset.pid)" style="padding:.4rem .8rem;border-radius:8px;background:var(--gold);border:none;color:var(--navy);font-weight:600;font-size:.78rem;cursor:pointer">Post</button>';
   h+='</div></div></div>';
   return h;
 }
@@ -2807,28 +2807,52 @@ async function submitPostComment(postId){
   if(!input)return;
   var txt=input.value.trim();
   if(!txt)return;
-  var comment={
-    id:'pc'+Date.now(),
-    post_id:postId,
-    deceased_id:null,
-    user_id:CU.id,
-    author:uName(CU),
-    text:txt,
-    created_at:new Date().toISOString()
-  };
+
+  // Disable input while saving
+  input.disabled=true;
+  var btn=document.getElementById('postCommentBtn-'+postId);
+  if(btn){btn.disabled=true;btn.textContent='...';}
+
   try{
-    var res=await sb.from('comments').insert(comment).select().single();
-    if(res.data)comment=res.data;
-  }catch(e){console.warn('Comment save:',e);}
-  CACHE.comments.unshift(comment);
-  input.value='';
-  renderPostComments(postId);
-  var btn=document.querySelector('#post-'+postId+' [onclick^="togglePostComments"]');
-  if(btn){
-    var c=CACHE.comments.filter(function(x){return x.post_id===postId;}).length;
-    btn.textContent='💬 '+c+' Comment'+(c!==1?'s':'');
+    // Save directly to Supabase — no fake ID
+    var res=await sb.from('comments').insert({
+      post_id:postId,
+      deceased_id:null,
+      user_id:CU.id,
+      author:uName(CU),
+      text:sanitize(txt),
+      created_at:new Date().toISOString()
+    }).select().single();
+
+    if(res.error){
+      throw new Error(res.error.message);
+    }
+
+    // Add the real saved comment to cache
+    var saved=res.data;
+    CACHE.comments.unshift(saved);
+    input.value='';
+    renderPostComments(postId);
+
+    // Update comment count button
+    var countBtn=document.querySelector('[data-pid="'+postId+'"][onclick*="togglePostComments"]');
+    if(countBtn){
+      var c=CACHE.comments.filter(function(x){return x.post_id===postId;}).length;
+      countBtn.textContent='💬 '+c+' Comment'+(c!==1?'s':'');
+    }
+    // Notify post author
+    var p=CACHE.posts.find(function(x){return x.id===postId;});
+    if(p&&p.user_id!==CU.id){
+      addNotif(p.user_id,uName(CU)+' commented on your post 💬','💬');
+    }
+  }catch(e){
+    console.error('Comment save error:',e);
+    toast('❌ Comment not saved: '+e.message);
+  }finally{
+    input.disabled=false;
+    if(btn){btn.disabled=false;btn.textContent='Post';}
+    input.focus();
   }
-  toast('💬 Comment posted!');
 }
 
 
