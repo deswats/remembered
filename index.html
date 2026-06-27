@@ -697,12 +697,12 @@ async function loadAllData(){
   const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),15000));
   try{
     const fetchData=Promise.all([
-      sb.from('deceased').select('*').order('created_at',{ascending:false}).limit(50),
+      sb.from('deceased').select('*').order('created_at',{ascending:false}).limit(200),
       sb.from('connections').select('*').limit(500),
       sb.from('friends').select('*').limit(200),
       sb.from('prayers').select('*').order('created_at',{ascending:false}).limit(200),
       sb.from('comments').select('*').order('created_at',{ascending:false}).limit(500),
-      sb.from('profiles').select('*').limit(200),
+      sb.from('profiles').select('id,first_name,last_name,country,avatar_url,invite_code,created_at').limit(500),
       sb.from('media').select('*').limit(200),
       sb.from('posts').select('*').order('created_at',{ascending:false}).limit(100),
       sb.from('post_reactions').select('*').limit(1000),
@@ -958,6 +958,7 @@ async function afterAuth(user){
     renderApp();
     toast('Welcome, '+CU.firstName+'! 🌻');
     setTimeout(refreshPostData, 2000);  // Refresh reactions after login
+    setTimeout(renderStats, 500);  // Re-render stats with admin panel now CU is set
     setTimeout(restoreLocalRelationships, 1500);
     updateMnavProfileIcon();
 
@@ -1923,36 +1924,88 @@ function renderStats(){
 }
 
 function renderAdminBadge(total, today, week){
-  // Only show to admin (Des)
   var adminEl=document.getElementById('adminPanel');
   if(!adminEl)return;
-  var isAdmin=CU&&(CU.email==='desmond@cttsb.com.my'||CU.email==='deswatson.semarak@gmail.com');
-  if(!isAdmin){adminEl.style.display='none';return;}
+
+  // Check admin - use both CU.email and stored session email
+  var userEmail = CU ? (CU.email || '') : '';
+  // Also check Supabase session email directly
+  if(!userEmail && sb){
+    try{
+      var stored = localStorage.getItem('sb-bemukaghdzqqjszwtfrk-auth-token');
+      if(stored){var parsed=JSON.parse(stored);userEmail=parsed?.user?.email||'';}
+    }catch(e){}
+  }
+  var isAdmin = userEmail==='desmond@cttsb.com.my' || userEmail==='deswatson.semarak@gmail.com';
+
+  if(!isAdmin){
+    // Also check CU id against known admin IDs as backup
+    adminEl.style.display='none';
+    return;
+  }
+
   adminEl.style.display='block';
+
+  // Country breakdown
+  var countryMap={};
+  CACHE.users.forEach(function(u){
+    var c=u.country||'Unknown';
+    countryMap[c]=(countryMap[c]||0)+1;
+  });
+  var countryList=Object.keys(countryMap).sort(function(a,b){return countryMap[b]-countryMap[a];}).slice(0,8);
+  var countryHTML=countryList.map(function(c){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:.25rem 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+      +'<span style="font-size:.73rem;color:var(--lavender)">'+c+'</span>'
+      +'<span style="font-size:.73rem;font-weight:600;color:var(--gold)">'+countryMap[c]+'</span>'
+      +'</div>';
+  }).join('');
+
+  // Recent members list
+  var recent=[...CACHE.users].sort(function(a,b){
+    return new Date(b.created_at||0)-new Date(a.created_at||0);
+  }).slice(0,5);
+  var recentHTML=recent.map(function(u){
+    var joinDate=u.created_at?new Date(u.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'-';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:.25rem 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+      +'<span style="font-size:.73rem;color:var(--lavender);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px">'+(u.first_name||'')+(u.last_name?' '+u.last_name:'')+'</span>'
+      +'<span style="font-size:.68rem;color:var(--muted)">'+joinDate+(u.country?' · '+u.country:'')+'</span>'
+      +'</div>';
+  }).join('');
+
   adminEl.innerHTML=
-    '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">'
-    +'<span style="font-size:1rem">📊</span>'
-    +'<span style="font-size:.82rem;font-weight:600;color:var(--gold)">Admin — DW Labs</span>'
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.7rem">'
+    +'<span style="font-size:.82rem;font-weight:700;color:var(--gold)">📊 Admin — DW Labs</span>'
+    +'<span style="font-size:.68rem;color:var(--muted)">'+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+'</span>'
     +'</div>'
-    +'<div class="grid2" style="gap:.4rem">'
-    +'<div class="stat-box" style="background:rgba(201,168,76,.08)">'
-    +'<div class="stat-n" style="font-size:1.5rem">'+total+'</div>'
-    +'<div class="stat-l">Total Members</div>'
+    // Stats grid
+    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin-bottom:.7rem">'
+    +'<div class="stat-box" style="background:rgba(201,168,76,.1);border-color:rgba(201,168,76,.2)">'
+    +'<div class="stat-n" style="font-size:1.6rem;color:var(--gold)">'+total+'</div>'
+    +'<div class="stat-l">Total</div>'
     +'</div>'
-    +'<div class="stat-box" style="background:rgba(76,175,123,.08)">'
-    +'<div class="stat-n" style="font-size:1.5rem;color:#4caf7b">+'+today+'</div>'
-    +'<div class="stat-l">Joined Today</div>'
+    +'<div class="stat-box" style="background:rgba(76,175,123,.1);border-color:rgba(76,175,123,.2)">'
+    +'<div class="stat-n" style="font-size:1.6rem;color:#4caf7b">+'+(today||0)+'</div>'
+    +'<div class="stat-l">Today</div>'
     +'</div>'
-    +'<div class="stat-box" style="background:rgba(76,175,123,.06)">'
-    +'<div class="stat-n" style="font-size:1.5rem;color:#4caf7b">+'+week+'</div>'
+    +'<div class="stat-box" style="background:rgba(76,175,123,.07)">'
+    +'<div class="stat-n" style="font-size:1.6rem;color:#4caf7b">+'+(week||0)+'</div>'
     +'<div class="stat-l">This Week</div>'
     +'</div>'
-    +'<div class="stat-box" style="cursor:pointer;background:rgba(201,168,76,.06)" onclick="openAllMembersPage()">'
-    +'<div class="stat-n" style="font-size:1.5rem">👥</div>'
-    +'<div class="stat-l">View All</div>'
     +'</div>'
-    +'</div>'
-    +'<button type="button" class="btn btn-o btn-sm" style="width:100%;margin-top:.6rem;font-size:.75rem" onclick="openAllMembersPage()">📋 View All Members →</button>';
+    // Country breakdown
+    +(countryList.length?
+    '<div style="margin-bottom:.6rem">'
+    +'<div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.3rem">🌍 Members by Country</div>'
+    +countryHTML
+    +'</div>':'')
+    // Recent members
+    +(recentHTML?
+    '<div style="margin-bottom:.6rem">'
+    +'<div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.3rem">🆕 Recent Members</div>'
+    +recentHTML
+    +'</div>':'')
+    // View all button
+    +'<button type="button" class="btn btn-o btn-sm" style="width:100%;margin-top:.3rem;font-size:.75rem;border-color:rgba(201,168,76,.3)" onclick="openAllMembersPage()">📋 View All '+total+' Members →</button>';
 }
 function renderTopMemorials(){
   const el=document.getElementById('topMemorials');if(!el)return;
