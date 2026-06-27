@@ -2327,6 +2327,139 @@ function openDeceased(id){
     showPageDirect('deceasedPage');
   }
 }
+
+// ═══════════════════════════════════════════════════════════
+// POST RENDERING FUNCTIONS
+// ═══════════════════════════════════════════════════════════
+function renderPostCard(p){
+  var u=CACHE.users.find(function(x){return x.id===p.user_id;});
+  if(!u&&CU&&p.user_id===CU.id){
+    u={id:CU.id,first_name:CU.firstName,last_name:CU.lastName,avatar_url:CU.avatar};
+  }
+  var name=u?uName(u):'Someone';
+  var avUrl=u?(u.avatar_url||u.avatar||''):'';
+  var avHtml=avUrl?'<img src="'+avUrl+'" style="width:100%;height:100%;object-fit:cover">':((u?(u.first_name||'?').charAt(0):'')||'👤');
+  var fr=CU?CACHE.friends.find(function(f){return (f.from_id===CU.id&&f.to_id===p.user_id)||(f.to_id===CU.id&&f.from_id===p.user_id);}):null;
+  var relTag=fr&&fr.relationship&&fr.relationship!=='Friend'?'<span class="friend-tag">'+fr.relationship+'</span>':'';
+  var comments=CACHE.comments.filter(function(c){return c.post_id===p.id;});
+  var likeCount=p.like_count||0;
+  var isLiked=!!(CU&&p.liked_by&&p.liked_by.indexOf(CU.id)>=0);
+  var vis=p.visibility==='public'?'🌍':'👥';
+  var pid=p.id;
+  var uid=u?u.id:'';
+  // Build card HTML safely
+  var h='<div class="post-card mcard" id="post-'+pid+'">';
+  h+='<div class="post-header">';
+  h+='<div class="post-av" data-uid="'+uid+'" onclick="if(this.dataset.uid)openUserProfile(this.dataset.uid)">'+avHtml+'</div>';
+  h+='<div style="flex:1;min-width:0">';
+  h+='<div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">';
+  h+='<span class="post-author" data-uid="'+uid+'" onclick="if(this.dataset.uid)openUserProfile(this.dataset.uid)">'+name+'</span>'+relTag;
+  h+='</div>';
+  h+='<div class="post-time">'+timeSince(p.created_at)+' · '+vis+'</div>';
+  h+='</div></div>';
+  if(p.text)h+='<div class="post-body">'+p.text+'</div>';
+  if(p.image_url)h+='<img src="'+p.image_url+'" style="width:100%;max-height:360px;object-fit:cover;display:block" loading="lazy">';
+  h+='<div class="post-actions">';
+  h+='<button type="button" class="act-btn'+(isLiked?' on':'')+'" data-pid="'+pid+'" onclick="togglePostLike(this.dataset.pid)">❤️ '+likeCount+' Like'+(likeCount!==1?'s':'')+'</button>';
+  h+='<button type="button" class="act-btn" data-pid="'+pid+'" onclick="togglePostComments(this.dataset.pid)">💬 '+comments.length+' Comment'+(comments.length!==1?'s':'')+'</button>';
+  h+='</div>';
+  h+='<div class="comments-section" id="postcomments-'+pid+'" style="display:none">';
+  h+='<div class="comments-list" id="postCommentsList-'+pid+'"></div>';
+  h+='<div class="comment-input-row">';
+  h+=(CU?uAvHtml(CU,28):'<div style="width:28px;height:28px;border-radius:50%;background:var(--navy-m);display:flex;align-items:center;justify-content:center">👤</div>');
+  h+='<input type="text" id="postCommentInput-'+pid+'" placeholder="Write a comment…">';
+  h+='<button type="button" data-pid="'+pid+'" onclick="submitPostComment(this.dataset.pid)">Post</button>';
+  h+='</div></div></div>';
+  return h;
+}
+
+function togglePostLike(postId){
+  if(!CU){toast('Please sign in.');return;}
+  if(!sb){toast('Not connected.');return;}
+  var p=CACHE.posts.find(function(x){return x.id===postId;});
+  if(!p)return;
+  p.like_count=p.like_count||0;
+  p.liked_by=p.liked_by||[];
+  if(p.liked_by.indexOf(CU.id)>=0){
+    p.liked_by=p.liked_by.filter(function(id){return id!==CU.id;});
+    p.like_count=Math.max(0,p.like_count-1);
+  }else{
+    p.liked_by.push(CU.id);
+    p.like_count++;
+  }
+  sb.from('posts').update({like_count:p.like_count,liked_by:p.liked_by}).eq('id',postId).then(function(){}).catch(function(e){console.warn(e);});
+  renderFeed();
+}
+
+function togglePostComments(postId){
+  var el=document.getElementById('postcomments-'+postId);
+  if(!el)return;
+  var isOpen=el.style.display!=='none';
+  el.style.display=isOpen?'none':'block';
+  if(!isOpen){
+    renderPostComments(postId);
+    // Wire up Enter key and button after render
+    setTimeout(function(){
+      var inp=document.getElementById('postCommentInput-'+postId);
+      var btn=document.getElementById('postCommentBtn-'+postId);
+      if(inp)inp.onkeydown=function(e){if(e.key==='Enter')submitPostComment(postId);};
+      if(btn)btn.onclick=function(){submitPostComment(postId);};
+    },50);
+  }
+}
+
+function renderPostComments(postId){
+  var list=document.getElementById('postCommentsList-'+postId);
+  if(!list)return;
+  var comments=CACHE.comments.filter(function(c){return c.post_id===postId;});
+  if(!comments.length){
+    list.innerHTML='<div class="txt-m txt-sm" style="padding:.3rem">No comments yet.</div>';
+    return;
+  }
+  list.innerHTML=comments.map(function(c){
+    var cu=CACHE.users.find(function(x){return x.id===c.user_id;});
+    var uid=cu?cu.id:'';
+    return '<div class="comment-item">'
+      +'<div data-uid="'+uid+'" onclick="if(this.dataset.uid)openUserProfile(this.dataset.uid)">'+uAvHtml(cu,24)+'</div>'
+      +'<div class="comment-bubble">'
+      +'<div class="comment-author">'+c.author+'</div>'
+      +'<div class="comment-text">'+c.text+'</div>'
+      +'<div class="comment-time">'+timeSince(c.created_at)+'</div>'
+      +'</div></div>';
+  }).join('');
+}
+
+async function submitPostComment(postId){
+  if(!CU){toast('Please sign in.');return;}
+  if(!sb){toast('Not connected.');return;}
+  var input=document.getElementById('postCommentInput-'+postId);
+  if(!input)return;
+  var txt=input.value.trim();
+  if(!txt)return;
+  var comment={
+    id:'pc'+Date.now(),
+    post_id:postId,
+    deceased_id:null,
+    user_id:CU.id,
+    author:uName(CU),
+    text:txt,
+    created_at:new Date().toISOString()
+  };
+  try{
+    var res=await sb.from('comments').insert(comment).select().single();
+    if(res.data)comment=res.data;
+  }catch(e){console.warn('Comment save:',e);}
+  CACHE.comments.unshift(comment);
+  input.value='';
+  renderPostComments(postId);
+  var btn=document.querySelector('#post-'+postId+' [onclick^="togglePostComments"]');
+  if(btn){
+    var c=CACHE.comments.filter(function(x){return x.post_id===postId;}).length;
+    btn.textContent='💬 '+c+' Comment'+(c!==1?'s':'');
+  }
+  toast('💬 Comment posted!');
+}
+
 console.log('Post + Friend functions loaded ✓');
 </script>
 </head>
