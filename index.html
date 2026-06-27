@@ -1470,6 +1470,7 @@ function handleSearch(q){
   if(!q.trim()){dd.classList.remove('open');return;}
   const ql=q.toLowerCase();
   const deceased=CACHE.deceased.filter(d=>d.name.toLowerCase().includes(ql));
+  // Search ALL users (not just friends) — anyone can be found by name
   const people=CACHE.users.filter(u=>uName(u).toLowerCase().includes(ql)&&(!CU||u.id!==CU.id));
   if(!deceased.length&&!people.length){dd.innerHTML='<div class="search-item"><div class="txt-m txt-sm">No results for "'+q+'"</div></div>';dd.classList.add('open');return;}
   let html='';
@@ -1855,12 +1856,61 @@ function renderCalendar(){
   el.innerHTML=SACRED.map(s=>`<div class="cal-item"><div class="cal-dt">${s.d}</div><div class="cal-n">${s.n}</div><div class="cal-r">${s.r}</div></div>`).join('');
 }
 function renderStats(){
-  const el=document.getElementById('statsGrid');if(!el)return;
-  el.innerHTML=`
-    <div class="stat-box"><div class="stat-n">${CACHE.deceased.length}</div><div class="stat-l">Memorials</div></div>
-    <div class="stat-box"><div class="stat-n">${CACHE.connections.filter(c=>c.smiled).length}</div><div class="stat-l">Smiles</div></div>
-    <div class="stat-box"><div class="stat-n">${CACHE.prayers.length}</div><div class="stat-l">Prayers</div></div>
-    <div class="stat-box"><div class="stat-n">${CACHE.users.length}</div><div class="stat-l">Members</div></div>`;
+  var el=document.getElementById('statsGrid');if(!el)return;
+  var memberCount=CACHE.users.length;
+  var memCount=CACHE.deceased.length;
+  var smileCount=CACHE.connections.filter(function(c){return c.smiled;}).length;
+  var prayerCount=CACHE.prayers.length;
+  // New members this week
+  var weekAgo=Date.now()-7*24*60*60*1000;
+  var newThisWeek=CACHE.users.filter(function(u){
+    return u.created_at&&new Date(u.created_at).getTime()>weekAgo;
+  }).length;
+  // New today
+  var dayAgo=Date.now()-24*60*60*1000;
+  var newToday=CACHE.users.filter(function(u){
+    return u.created_at&&new Date(u.created_at).getTime()>dayAgo;
+  }).length;
+  el.innerHTML=
+    '<div class="stat-box"><div class="stat-n">'+memCount+'</div><div class="stat-l">Memorials</div></div>'+
+    '<div class="stat-box"><div class="stat-n">'+smileCount+'</div><div class="stat-l">Smiles</div></div>'+
+    '<div class="stat-box"><div class="stat-n">'+prayerCount+'</div><div class="stat-l">Prayers</div></div>'+
+    '<div class="stat-box" style="cursor:pointer" onclick="openAllMembersPage()"><div class="stat-n" style="color:var(--gold)">'+memberCount+'</div><div class="stat-l">Members</div></div>';
+  // Show admin panel if Des is logged in
+  renderAdminBadge(memberCount, newToday, newThisWeek);
+}
+
+function renderAdminBadge(total, today, week){
+  // Only show to admin (Des)
+  var adminEl=document.getElementById('adminPanel');
+  if(!adminEl)return;
+  var isAdmin=CU&&(CU.email==='desmond@cttsb.com.my'||CU.email==='deswatson.semarak@gmail.com');
+  if(!isAdmin){adminEl.style.display='none';return;}
+  adminEl.style.display='block';
+  adminEl.innerHTML=
+    '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">'
+    +'<span style="font-size:1rem">📊</span>'
+    +'<span style="font-size:.82rem;font-weight:600;color:var(--gold)">Admin — DW Labs</span>'
+    +'</div>'
+    +'<div class="grid2" style="gap:.4rem">'
+    +'<div class="stat-box" style="background:rgba(201,168,76,.08)">'
+    +'<div class="stat-n" style="font-size:1.5rem">'+total+'</div>'
+    +'<div class="stat-l">Total Members</div>'
+    +'</div>'
+    +'<div class="stat-box" style="background:rgba(76,175,123,.08)">'
+    +'<div class="stat-n" style="font-size:1.5rem;color:#4caf7b">+'+today+'</div>'
+    +'<div class="stat-l">Joined Today</div>'
+    +'</div>'
+    +'<div class="stat-box" style="background:rgba(76,175,123,.06)">'
+    +'<div class="stat-n" style="font-size:1.5rem;color:#4caf7b">+'+week+'</div>'
+    +'<div class="stat-l">This Week</div>'
+    +'</div>'
+    +'<div class="stat-box" style="cursor:pointer;background:rgba(201,168,76,.06)" onclick="openAllMembersPage()">'
+    +'<div class="stat-n" style="font-size:1.5rem">👥</div>'
+    +'<div class="stat-l">View All</div>'
+    +'</div>'
+    +'</div>'
+    +'<button type="button" class="btn btn-o btn-sm" style="width:100%;margin-top:.6rem;font-size:.75rem" onclick="openAllMembersPage()">📋 View All Members →</button>';
 }
 function renderTopMemorials(){
   const el=document.getElementById('topMemorials');if(!el)return;
@@ -2973,6 +3023,123 @@ async function deletePost(postId){
     console.log('[SW] Controller changed — app is now cached offline');
   });
 })();
+
+// ═══════════════════════════════════════════════════════════
+// ALL MEMBERS / MEMBER DIRECTORY
+// ═══════════════════════════════════════════════════════════
+
+function openAllMembersPage(){
+  // Show people page with all members
+  prevPage=document.querySelector('.page.active')?document.querySelector('.page.active').id:'appPage';
+  showPageDirect('peoplePage');
+  var label=document.getElementById('peopleResultsLabel');
+  if(label)label.textContent='👥 All Members ('+CACHE.users.length+')';
+  var si=document.getElementById('peopleSearchInput');
+  if(si)si.value='';
+  renderAllMembers('');
+}
+
+function renderAllMembers(q){
+  var grid=document.getElementById('peopleGrid');
+  if(!grid)return;
+  var fids=CU?getMyFriendIds():[];
+  var pendingIds=CU?CACHE.friends.filter(function(f){
+    return f.from_id===CU.id&&f.status==='pending';
+  }).map(function(f){return f.to_id;}):[];
+
+  var users=CACHE.users.filter(function(u){
+    if(CU&&u.id===CU.id)return false; // skip self
+    if(!q.trim())return true;
+    var search=uName(u).toLowerCase()+' '+(u.country||'').toLowerCase();
+    return search.includes(q.toLowerCase());
+  });
+
+  // Sort: friends first, then by join date (newest first)
+  users.sort(function(a,b){
+    var aFriend=fids.indexOf(a.id)>=0?1:0;
+    var bFriend=fids.indexOf(b.id)>=0?1:0;
+    if(aFriend!==bFriend)return bFriend-aFriend;
+    return new Date(b.created_at||0)-new Date(a.created_at||0);
+  });
+
+  if(!users.length){
+    grid.innerHTML='<div class="empty" style="grid-column:1/-1">No members found'+(q?' for "'+q+'"':'')+'.</div>';
+    return;
+  }
+
+  // Group by: New this week, Friends, Others
+  var weekAgo=Date.now()-7*24*60*60*1000;
+  var newMembers=users.filter(function(u){return u.created_at&&new Date(u.created_at).getTime()>weekAgo;});
+  var friends=users.filter(function(u){return fids.indexOf(u.id)>=0&&!(u.created_at&&new Date(u.created_at).getTime()>weekAgo);});
+  var others=users.filter(function(u){return fids.indexOf(u.id)<0&&!(u.created_at&&new Date(u.created_at).getTime()>weekAgo);});
+
+  var html='';
+  if(newMembers.length&&!q){
+    html+='<div style="grid-column:1/-1;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);padding:.3rem 0">🆕 New This Week ('+newMembers.length+')</div>';
+    html+=newMembers.map(function(u){return renderMemberCard(u,fids,pendingIds);}).join('');
+  }
+  if(friends.length&&!q){
+    html+='<div style="grid-column:1/-1;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:.5rem 0 .2rem">🤝 Friends ('+friends.length+')</div>';
+    html+=friends.map(function(u){return renderMemberCard(u,fids,pendingIds);}).join('');
+  }
+  var label=others.length+(q?'':'');
+  if(others.length){
+    html+='<div style="grid-column:1/-1;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:.5rem 0 .2rem">👤 Members ('+others.length+')</div>';
+    html+=others.map(function(u){return renderMemberCard(u,fids,pendingIds);}).join('');
+  }
+  if(q){
+    html=users.map(function(u){return renderMemberCard(u,fids,pendingIds);}).join('');
+  }
+  grid.innerHTML=html;
+}
+
+function renderMemberCard(u, fids, pendingIds){
+  var isFriend=fids.indexOf(u.id)>=0;
+  var isPending=pendingIds.indexOf(u.id)>=0;
+  var memCount=CACHE.deceased.filter(function(d){return d.created_by===u.id;}).length;
+  var joinDate=u.created_at?new Date(u.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
+  var avUrl=u.avatar_url||u.avatar||'';
+  var avHtml=avUrl?'<img src="'+avUrl+'" style="width:100%;height:100%;object-fit:cover">':((u.first_name||'?').charAt(0)+(u.last_name||'').charAt(0)||'👤');
+  var weekAgo=Date.now()-7*24*60*60*1000;
+  var isNew=u.created_at&&new Date(u.created_at).getTime()>weekAgo;
+  return '<div class="pcard">'
+    +'<div class="pcard-av" data-uid="'+u.id+'" onclick="openUserProfile(this.dataset.uid)">'
+    +'<div style="width:72px;height:72px;border-radius:50%;background:var(--navy-m);border:2px solid '+(isFriend?'var(--gold)':'var(--border)')+';overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1.3rem;position:relative">'
+    +avHtml
+    +(isNew?'<div style="position:absolute;top:0;right:0;background:#4caf7b;border-radius:50%;width:14px;height:14px;border:2px solid var(--navy)"></div>':'')
+    +'</div></div>'
+    +'<div class="pcard-name" data-uid="'+u.id+'" onclick="openUserProfile(this.dataset.uid)">'+uName(u)+'</div>'
+    +'<div class="pcard-meta">'+(u.country||'Member')+(isNew?' 🆕':'')+'</div>'
+    +'<div class="pcard-mems">'+(memCount>0?'🌻 '+memCount+' memorial'+(memCount!==1?'s':''):'')+'</div>'
+    +'<div style="font-size:.65rem;color:var(--muted);margin:.1rem 0">Joined '+joinDate+'</div>'
+    +'<div class="pcard-acts">'
+    +(isFriend
+      ?'<button type="button" class="btn btn-o btn-sm" data-uid="'+u.id+'" onclick="openUserProfile(this.dataset.uid)">👤 View</button>'
+      :isPending
+      ?'<button type="button" class="btn btn-o btn-sm" disabled style="opacity:.5">Sent ✓</button>'
+      :'<button type="button" class="btn btn-g btn-sm" data-uid="'+u.id+'" onclick="sendFriendReq(this.dataset.uid);this.disabled=true;">+ Add Friend</button>'
+    )
+    +'</div>'
+    +'</div>';
+}
+
+// Override renderPeopleResults to use renderAllMembers when showing all
+function renderPeopleResults(q){
+  var label=document.getElementById('peopleResultsLabel');
+  var fids=CU?getMyFriendIds():[];
+  var allPending=CU?CACHE.friends.filter(function(f){return (f.from_id===CU.id||f.to_id===CU.id)&&f.status==='pending';}):[];
+  var pendingIds=allPending.filter(function(f){return f.from_id===CU.id;}).map(function(f){return f.to_id;});
+
+  if(q&&q.trim()){
+    if(label)label.textContent='🔍 Search Results for "'+q+'"';
+    renderAllMembers(q);
+  } else {
+    if(label)label.textContent='👥 All Members ('+CACHE.users.length+')';
+    renderAllMembers('');
+  }
+  renderPendingRequests();
+}
+
 console.log('Post + Friend functions loaded ✓');
 
 // ═══════════════════════════════════════════════════════════
@@ -3699,6 +3866,7 @@ function guestBrowse(){showPage('appPage');}
       <div class="w">
         <p class="wt" id="sidebarCommunityTitle">📊 Community</p>
         <div class="grid2" id="statsGrid"></div>
+    <div id="adminPanel" style="display:none;margin-top:.6rem;padding:.7rem;background:rgba(13,27,42,.6);border:1px solid rgba(201,168,76,.2);border-radius:10px;"></div>
       </div>
       <div class="w">
         <p class="wt" id="sidebarNotifTitle">🔔 Notifications</p>
@@ -3734,7 +3902,7 @@ function guestBrowse(){showPage('appPage');}
       <button type="button" class="btn btn-o btn-sm" onclick="showPage('appPage');renderApp()">← Back to Feed</button>
     </div>
     <div class="people-search-bar">
-      <input type="text" id="peopleSearchInput" placeholder="Search members by name or country…" oninput="renderPeopleResults(this.value)">
+      <input type="text" id="peopleSearchInput" oninput="renderPeopleResults(this.value)" placeholder="Search members by name or country…" oninput="renderPeopleResults(this.value)">
     </div>
 
     <!-- Pending requests -->
