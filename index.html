@@ -601,6 +601,22 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .ios-hint-arrow{font-size:1.5rem;margin-bottom:.3rem;}
 .ios-hint-text{font-size:.8rem;color:var(--lavender);line-height:1.6;}
 .ios-hint-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;margin-top:.5rem;text-decoration:underline;font-family:'Inter',sans-serif;}
+
+/* ── MEMORY WALL ── */
+.wall-post{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:.9rem;margin-bottom:.6rem;}
+.wall-post-header{display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem;}
+.wall-post-av{width:36px;height:36px;border-radius:50%;background:var(--navy-m);border:1.5px solid var(--border);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.85rem;}
+.wall-post-av img{width:100%;height:100%;object-fit:cover;}
+.wall-post-author{font-size:.82rem;font-weight:600;color:var(--ivory);}
+.wall-post-time{font-size:.68rem;color:var(--muted);}
+.wall-post-text{font-size:.85rem;color:var(--lavender);line-height:1.6;margin-bottom:.5rem;white-space:pre-wrap;}
+.wall-post-media{width:100%;max-height:300px;object-fit:cover;border-radius:8px;display:block;margin-bottom:.5rem;}
+.wall-post-video{width:100%;max-height:300px;border-radius:8px;display:block;background:#000;margin-bottom:.5rem;}
+.wall-add-box{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:.9rem;margin-bottom:.8rem;}
+.wall-add-box textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:.6rem .8rem;color:var(--ivory);font-family:'Inter',sans-serif;font-size:.85rem;resize:none;outline:none;min-height:70px;line-height:1.6;}
+.wall-add-box textarea:focus{border-color:var(--gold);}
+.wall-add-row{display:flex;align-items:center;gap:.5rem;margin-top:.5rem;flex-wrap:wrap;}
+.wall-media-preview{border-radius:8px;overflow:hidden;margin-top:.4rem;position:relative;}
 </style>
 
 <script defer>
@@ -2511,6 +2527,8 @@ function openDeceased(id){
     var dpLoc=document.getElementById('dpLoc');
     if(dpLoc)dpLoc.textContent=[d.place_of_birth&&'Born in '+d.place_of_birth,d.burial&&'Resting at '+d.burial,d.country].filter(Boolean).join(' · ');
     renderDpActions(id);renderDpConnections(id);renderDpPrayers(id);
+    renderDpWall(id);
+    loadWallPosts(id);
     showPageDirect('deceasedPage');
   }
 }
@@ -3183,6 +3201,269 @@ document.addEventListener('visibilitychange', function(){
   }
 });
 
+
+// ═══════════════════════════════════════════════════════════
+// EDIT MEMORIAL
+// ═══════════════════════════════════════════════════════════
+var editDPhotoData = '';
+
+function openEditDeceased(id){
+  var d=CACHE.deceased.find(function(x){return x.id===id;});
+  if(!d){toast('Memorial not found.');return;}
+  if(!CU||d.created_by!==CU.id){toast('Only the creator can edit this memorial.');return;}
+  // Populate fields
+  document.getElementById('editDId').value=id;
+  document.getElementById('editDName').value=d.name||'';
+  document.getElementById('editDNick').value=d.nickname||'';
+  document.getElementById('editDDob').value=d.dob||'';
+  document.getElementById('editDDod').value=d.dod||'';
+  document.getElementById('editDPob').value=d.place_of_birth||'';
+  document.getElementById('editDBurial').value=d.burial||'';
+  document.getElementById('editDRel').value=d.religion||'General';
+  document.getElementById('editDVis').value=d.visibility||'public';
+  // Photo preview
+  editDPhotoData='';
+  var img=document.getElementById('editDPhotoImg');
+  var icon=document.getElementById('editDPhotoIcon');
+  if(d.photo_url){
+    img.src=d.photo_url;img.style.display='block';icon.style.display='none';
+  }else{
+    img.style.display='none';icon.style.display='block';
+  }
+  openModal('editDeceasedModal');
+}
+
+function previewEditPhoto(input){
+  var f=input.files[0];if(!f)return;
+  if(!f.type.startsWith('image/')){toast('Please select an image.');return;}
+  var r=new FileReader();
+  r.onload=function(e){
+    editDPhotoData=e.target.result;
+    var img=document.getElementById('editDPhotoImg');
+    var icon=document.getElementById('editDPhotoIcon');
+    if(img){img.src=e.target.result;img.style.display='block';}
+    if(icon)icon.style.display='none';
+    toast('✓ New photo selected');
+  };
+  r.readAsDataURL(f);
+}
+
+async function saveEditDeceased(){
+  if(!sb){toast('Not connected.');return;}
+  var id=document.getElementById('editDId').value;
+  var name=document.getElementById('editDName').value.trim();
+  if(!name){toast('Name is required.');return;}
+  var btn=document.querySelector('#editDeceasedModal .btn-g');
+  if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  showLoader(true);
+  try{
+    var updates={
+      name:name,
+      nickname:document.getElementById('editDNick').value.trim()||null,
+      dob:document.getElementById('editDDob').value||null,
+      dod:document.getElementById('editDDod').value||null,
+      place_of_birth:document.getElementById('editDPob').value.trim()||null,
+      burial:document.getElementById('editDBurial').value.trim()||null,
+      religion:document.getElementById('editDRel').value||'General',
+      visibility:document.getElementById('editDVis').value||'public'
+    };
+    // Upload new photo if selected
+    if(editDPhotoData){
+      try{
+        var photoUrl=await uploadBase64(editDPhotoData,'photos');
+        if(photoUrl)updates.photo_url=photoUrl;
+      }catch(e){console.warn('Photo upload:',e);}
+    }
+    var res=await sb.from('deceased').update(updates).eq('id',id).select().single();
+    if(res.error)throw new Error(res.error.message);
+    // Update cache
+    var idx=CACHE.deceased.findIndex(function(x){return x.id===id;});
+    if(idx>=0)CACHE.deceased[idx]=Object.assign(CACHE.deceased[idx],updates);
+    if(btn){btn.disabled=false;btn.textContent='💾 Save Changes';}
+    showLoader(false);
+    closeModal('editDeceasedModal');
+    toast('✅ Memorial updated!');
+    // Refresh the deceased profile page
+    if(viewingDeceasedId===id)openDeceasedProfile(id);
+    renderFeed();
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='💾 Save Changes';}
+    showLoader(false);
+    toast('❌ '+e.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// MEMORY WALL - photos/videos/messages from all connected users
+// ═══════════════════════════════════════════════════════════
+var wallMediaData='';
+var wallMediaType='';
+
+function renderDpWall(deceasedId){
+  var d=CACHE.deceased.find(function(x){return x.id===deceasedId;});
+  if(!d)return;
+  var addEl=document.getElementById('dpWallAdd');
+  var postsEl=document.getElementById('dpWallPosts');
+
+  // ── Add box (visible to all logged in users) ──
+  if(addEl){
+    if(!CU){
+      addEl.innerHTML='<p style="font-size:.78rem;color:var(--muted);text-align:center">Sign in to leave a memory</p>';
+    }else{
+      addEl.innerHTML='<div class="wall-add-box">'
+        +'<div style="display:flex;gap:.6rem;align-items:flex-start">'
+        +(CU?'<div class="wall-post-av">'+uAvHtml(CACHE.users.find(function(x){return x.id===CU.id;})||{id:CU.id,first_name:CU.firstName,last_name:CU.lastName,avatar_url:CU.avatar},32)+'</div>':'')
+        +'<div style="flex:1">'
+        +'<textarea id="wallMsgInput" placeholder="Share a memory, story or message…" rows="3"></textarea>'
+        +'<div id="wallMediaPreview"></div>'
+        +'</div></div>'
+        +'<div class="wall-add-row">'
+        +'<label class="post-extra-btn" style="cursor:pointer">📷 Photo<input type="file" accept="image/*" style="display:none" onchange="previewWallMedia(this,&quot;image&quot;)"></label>'
+        +'<label class="post-extra-btn" style="cursor:pointer">🎬 Video<input type="file" accept="video/mp4,video/webm,video/quicktime" style="display:none" onchange="previewWallMedia(this,&quot;video&quot;)"></label>'
+        +'<button type="button" class="btn btn-g btn-sm" style="margin-left:auto" data-did="'+deceasedId+'" onclick="submitWallPost(this.dataset.did)">Post Memory</button>'
+        +'</div></div>';
+    }
+  }
+
+  // ── Wall posts ──
+  if(postsEl){
+    var wallPosts=CACHE.wall_posts?CACHE.wall_posts.filter(function(p){return p.deceased_id===deceasedId;}):[];
+    wallPosts.sort(function(a,b){return new Date(b.created_at)-new Date(a.created_at);});
+    if(!wallPosts.length){
+      postsEl.innerHTML='<div style="text-align:center;padding:1rem;font-size:.8rem;color:var(--muted)">No memories shared yet. Be the first to leave one 🌻</div>';
+      return;
+    }
+    postsEl.innerHTML=wallPosts.map(function(p){
+      var u=CACHE.users.find(function(x){return x.id===p.user_id;});
+      var avHtml=uAvHtml(u,36);
+      var name=u?uName(u):'Someone';
+      var mediaHtml='';
+      if(p.media_url){
+        if(p.media_type==='video'){
+          mediaHtml='<video class="wall-post-video" controls preload="metadata"><source src="'+p.media_url+'">Your browser does not support video.</video>';
+        }else{
+          mediaHtml='<img class="wall-post-media" src="'+p.media_url+'" alt="memory photo" loading="lazy">';
+        }
+      }
+      var canDelete=CU&&(p.user_id===CU.id||(CACHE.deceased.find(function(x){return x.id===deceasedId;})?.created_by===CU.id));
+      return '<div class="wall-post" id="wall-'+p.id+'">'
+        +'<div class="wall-post-header">'
+        +'<div class="wall-post-av" data-uid="'+(u?u.id:'')+'" onclick="if(this.dataset.uid)openUserProfile(this.dataset.uid)">'+avHtml+'</div>'
+        +'<div style="flex:1">'
+        +'<div class="wall-post-author">'+name+'</div>'
+        +'<div class="wall-post-time">'+timeSince(p.created_at)+'</div>'
+        +'</div>'
+        +(canDelete?'<button type="button" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.8rem" data-wid="'+p.id+'" data-did="'+deceasedId+'" onclick="deleteWallPost(this.dataset.wid,this.dataset.did)">🗑️</button>':'')
+        +'</div>'
+        +(p.message?'<div class="wall-post-text">'+p.message+'</div>':'')
+        +mediaHtml
+        +'</div>';
+    }).join('');
+  }
+}
+
+function previewWallMedia(input,type){
+  var f=input.files[0];if(!f)return;
+  if(f.size>50*1024*1024){toast('Max 50MB.');input.value='';return;}
+  var r=new FileReader();
+  r.onload=function(e){
+    wallMediaData=e.target.result;
+    wallMediaType=type;
+    var prev=document.getElementById('wallMediaPreview');
+    if(!prev)return;
+    if(type==='video'){
+      prev.innerHTML='<div class="wall-media-preview"><video src="'+e.target.result+'" controls style="width:100%;max-height:160px;border-radius:8px;background:#000"></video><button type="button" onclick="clearWallMedia()" style="position:absolute;top:.3rem;right:.3rem;background:rgba(0,0,0,.7);border:none;color:#fff;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.75rem">✕</button></div>';
+    }else{
+      prev.innerHTML='<div class="wall-media-preview" style="position:relative"><img src="'+e.target.result+'" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px"><button type="button" onclick="clearWallMedia()" style="position:absolute;top:.3rem;right:.3rem;background:rgba(0,0,0,.7);border:none;color:#fff;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.75rem">✕</button></div>';
+    }
+  };
+  r.readAsDataURL(f);
+}
+
+function clearWallMedia(){
+  wallMediaData='';wallMediaType='';
+  var prev=document.getElementById('wallMediaPreview');
+  if(prev)prev.innerHTML='';
+}
+
+async function submitWallPost(deceasedId){
+  if(!CU||!sb){toast('Please sign in first.');return;}
+  var msgEl=document.getElementById('wallMsgInput');
+  var msg=msgEl?msgEl.value.trim():'';
+  if(!msg&&!wallMediaData){toast('Please write something or add a photo/video.');return;}
+  var btn=document.querySelector('[onclick*="submitWallPost"]');
+  if(btn){btn.disabled=true;btn.textContent='Posting…';}
+  try{
+    var mediaUrl='';
+    var mediaType='';
+    if(wallMediaData){
+      try{
+        mediaUrl=await uploadBase64(wallMediaData,wallMediaType==='video'?'post-videos':'media');
+        mediaType=wallMediaType;
+      }catch(e){console.warn('Media upload:',e);}
+    }
+    var row={
+      deceased_id:deceasedId,
+      user_id:CU.id,
+      message:msg||null,
+      media_url:mediaUrl||null,
+      media_type:mediaType||null,
+      created_at:new Date().toISOString()
+    };
+    var res=await sb.from('wall_posts').insert(row).select().single();
+    if(res.error)throw new Error(res.error.message);
+    if(!CACHE.wall_posts)CACHE.wall_posts=[];
+    CACHE.wall_posts.unshift(res.data);
+    // Clear form
+    if(msgEl)msgEl.value='';
+    clearWallMedia();
+    if(btn){btn.disabled=false;btn.textContent='Post Memory';}
+    toast('🌻 Memory shared!');
+    // Notify memorial creator
+    var d=CACHE.deceased.find(function(x){return x.id===deceasedId;});
+    if(d&&d.created_by!==CU.id){
+      addNotif(d.created_by,uName(CU)+' shared a memory on '+d.name+"'s wall 🌻",'🌻');
+    }
+    renderDpWall(deceasedId);
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Post Memory';}
+    console.error('submitWallPost:',e);
+    toast('❌ '+e.message);
+  }
+}
+
+async function deleteWallPost(wallPostId,deceasedId){
+  if(!sb)return;
+  var ok=confirm('Remove this memory from the wall?');
+  if(!ok)return;
+  try{
+    var wp=CACHE.wall_posts?CACHE.wall_posts.find(function(x){return x.id===wallPostId;}):null;
+    await sb.from('wall_posts').delete().eq('id',wallPostId);
+    if(wp&&wp.media_url)await deleteStorageFile(wp.media_url);
+    if(CACHE.wall_posts)CACHE.wall_posts=CACHE.wall_posts.filter(function(x){return x.id!==wallPostId;});
+    toast('Memory removed.');
+    renderDpWall(deceasedId);
+  }catch(e){
+    toast('❌ '+e.message);
+  }
+}
+
+// Load wall posts for a deceased profile
+async function loadWallPosts(deceasedId){
+  if(!sb)return;
+  try{
+    var res=await sb.from('wall_posts').select('*').eq('deceased_id',deceasedId).order('created_at',{ascending:false}).limit(100);
+    if(!CACHE.wall_posts)CACHE.wall_posts=[];
+    // Replace posts for this deceased
+    CACHE.wall_posts=CACHE.wall_posts.filter(function(x){return x.deceased_id!==deceasedId;});
+    if(res.data)CACHE.wall_posts=CACHE.wall_posts.concat(res.data);
+    renderDpWall(deceasedId);
+  }catch(e){
+    console.warn('loadWallPosts:',e);
+    renderDpWall(deceasedId);
+  }
+}
+
 console.log('Post + Friend functions loaded ✓');
 
 // ═══════════════════════════════════════════════════════════
@@ -3248,6 +3529,17 @@ function renderDpActions(id){
   shareBtn.onclick=function(){openShare(this.dataset.id);};
   el.appendChild(shareBtn);
   
+  // Edit button - only for creator
+  if(isCreator){
+    var editBtn=document.createElement('button');
+    editBtn.type='button';
+    editBtn.className='btn btn-o';
+    editBtn.style.cssText='border-color:rgba(201,168,76,.4);color:var(--gold);';
+    editBtn.textContent='✏️ Edit Memorial';
+    editBtn.dataset.id=id;
+    editBtn.onclick=function(){openEditDeceased(this.dataset.id);};
+    el.appendChild(editBtn);
+  }
   // Delete button - only for creator
   if(isCreator){
     var delBtn=document.createElement('button');
@@ -3975,7 +4267,13 @@ function guestBrowse(){showPage('appPage');}
   <div class="prof-body">
     <div class="ps" id="dpConnections"><h3>🤝 Connected Loved Ones</h3><div id="dpConnList"></div></div>
     <div class="ps" id="dpGallery"><h3>📸 Photos & Memories</h3><div class="mgal" id="dpGalleryGrid"></div></div>
-    <div class="ps"><h3>🙏 Prayer & Memory Wall</h3><div class="pw-add" id="dpPrayerAdd"></div><div class="divider"></div><div class="prayer-wall" id="dpPrayerWall"></div></div>
+    <div class="ps">
+      <h3>🕊️ Memory Wall</h3>
+      <p style="font-size:.75rem;color:var(--muted);margin-bottom:.7rem">Share a message, photo or short video in their memory</p>
+      <div id="dpWallAdd"></div>
+      <div id="dpWallPosts"></div>
+    </div>
+    <div class="ps"><h3>🙏 Prayers</h3><div class="pw-add" id="dpPrayerAdd"></div><div class="divider"></div><div class="prayer-wall" id="dpPrayerWall"></div></div>
   </div>
 </div>
 
@@ -4342,6 +4640,64 @@ function guestBrowse(){showPage('appPage');}
   </div>
   <div style="margin-top:.8rem;font-size:.68rem;color:var(--muted)" id="footerRights">© 2025 DW Labs · All rights reserved</div>
 </footer>
+
+
+<!-- EDIT MEMORIAL MODAL -->
+<div class="ov" id="editDeceasedModal">
+  <div class="modal">
+    <div class="mhdr">
+      <p class="mhdr-title">✏️ Edit Memorial</p>
+      <button type="button" class="mclose" onclick="closeModal('editDeceasedModal')">×</button>
+    </div>
+    <div class="mbody">
+      <input type="hidden" id="editDId">
+      <!-- Profile Photo -->
+      <div class="fg" style="text-align:center;margin-bottom:.8rem">
+        <div id="editDPhotoWrap" style="width:90px;height:90px;border-radius:50%;background:var(--navy-m);border:2px dashed var(--border);margin:0 auto .5rem;display:flex;align-items:center;justify-content:center;font-size:2rem;overflow:hidden;cursor:pointer" onclick="document.getElementById('editDPhotoInput').click()">
+          <img id="editDPhotoImg" style="width:100%;height:100%;object-fit:cover;display:none">
+          <span id="editDPhotoIcon">📷</span>
+        </div>
+        <label style="font-size:.75rem;color:var(--gold);cursor:pointer" onclick="document.getElementById('editDPhotoInput').click()">Change Profile Photo</label>
+        <input type="file" id="editDPhotoInput" accept="image/*" style="display:none" onchange="previewEditPhoto(this)">
+      </div>
+      <div class="grid2">
+        <div class="fg"><label>Full Name *</label><input type="text" id="editDName" placeholder="Full name"></div>
+        <div class="fg"><label>Nickname</label><input type="text" id="editDNick" placeholder="Nickname"></div>
+      </div>
+      <div class="grid2">
+        <div class="fg"><label>Date of Birth *</label><input type="date" id="editDDob"></div>
+        <div class="fg"><label>Date of Passing *</label><input type="date" id="editDDod"></div>
+      </div>
+      <div class="grid2">
+        <div class="fg"><label>Place of Birth</label><input type="text" id="editDPob" placeholder="City, Country"></div>
+        <div class="fg"><label>Resting Place</label><input type="text" id="editDBurial" placeholder="Cemetery or location"></div>
+      </div>
+      <div class="fg">
+        <label>Faith / Religion</label>
+        <select id="editDRel" style="width:100%">
+          <option value="General">General</option>
+          <option value="Christian">Christian</option>
+          <option value="Muslim">Muslim</option>
+          <option value="Buddhist">Buddhist</option>
+          <option value="Hindu">Hindu</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Visibility</label>
+        <select id="editDVis" style="width:100%">
+          <option value="public">🌍 Public — Everyone</option>
+          <option value="connected">🤝 Connected — People who knew them</option>
+          <option value="family">🔒 Family Only</option>
+        </select>
+      </div>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-o" onclick="closeModal('editDeceasedModal')">Cancel</button>
+      <button type="button" class="btn btn-g" onclick="saveEditDeceased()">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
 
 <!-- FRIEND RELATIONSHIP MODAL -->
 <div class="ov" id="friendRelModal">
