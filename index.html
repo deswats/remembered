@@ -1052,12 +1052,14 @@ function updateNav(){
   const na=document.getElementById('navActions');
   if(CU){
     const av=CU.avatar?`<img src="${CU.avatar}">`:(CU.firstName.charAt(0)+(CU.lastName?.charAt(0)||''));
+    var isAdminUser=(CU.email==='desmond@cttsb.com.my'||CU.email==='deswatson.semarak@gmail.com');
     na.innerHTML=`<div class="avatar-upload-wrap" title="My Profile" style="cursor:pointer" onclick="openMyProfile()">
       <div class="ua" style="width:36px;height:36px;font-size:.88rem;overflow:hidden">${av}</div>
       <div class="avatar-edit-badge" style="width:18px;height:18px;font-size:.55rem;bottom:0;right:0;opacity:.85">📷</div>
     </div>
     <button type="button" class="nb notif-btn" onclick="showPageDirect('appPage');renderApp();showNotifs()">🔔<span class="notif-badge" id="notifCount" style="display:none">0</span></button>
     <button type="button" class="nb" onclick="openPeoplePage()">👥 People</button>
+    ${isAdminUser?`<button type="button" class="nb" style="background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.5);color:var(--gold);font-weight:600" onclick="openAdminDashboard()">📊 Admin</button>`:''}
     <button type="button" class="nb" onclick="doLogout()">Sign Out</button>`;
   }else{
     na.innerHTML=`<button type="button" class="nb" onclick="showPageDirect('authPage');setAuthMode('login')">Sign In</button><button type="button" class="nb prim" onclick="showPageDirect('authPage');setAuthMode('register')">Join Free</button>`;
@@ -1726,7 +1728,10 @@ function openUserProfile(uid){
   document.getElementById('upTags').innerHTML=`<div class="u-tag">🌻 ${memCount} Memorial${memCount!==1?'s':''}</div><div class="u-tag">🤝 ${friendCount} Friend${friendCount!==1?'s':''}</div>`;
   const acts=document.getElementById('upActions');
   if(isMe){
-    acts.innerHTML='<button type="button" class="btn btn-o btn-sm" onclick="openEditProfile()">✏️ Edit Profile</button><button type="button" class="btn btn-o btn-sm" onclick="doLogout()">Sign Out</button>';
+    var isAdm=(CU.email==='desmond@cttsb.com.my'||CU.email==='deswatson.semarak@gmail.com');
+    acts.innerHTML='<button type="button" class="btn btn-o btn-sm" onclick="openEditProfile()">✏️ Edit Profile</button>'
+      +(isAdm?'<button type="button" class="btn btn-g btn-sm" onclick="openAdminDashboard()">📊 Admin</button>':'')
+      +'<button type="button" class="btn btn-o btn-sm" onclick="doLogout()">Sign Out</button>';
   }else if(CU){
     const ex=CACHE.friends.find(f=>(f.from_id===CU.id&&f.to_id===uid)||(f.from_id===uid&&f.to_id===CU.id));
     const st=ex?ex.status:null;
@@ -1927,22 +1932,33 @@ function renderAdminBadge(total, today, week){
   var adminEl=document.getElementById('adminPanel');
   if(!adminEl)return;
 
-  // Check admin - use both CU.email and stored session email
-  var userEmail = CU ? (CU.email || '') : '';
-  // Also check Supabase session email directly
-  if(!userEmail && sb){
+  // Check admin email - try multiple sources
+  var userEmail = '';
+  if(CU && CU.email) userEmail = CU.email;
+  // Check localStorage session
+  if(!userEmail){
     try{
-      var stored = localStorage.getItem('sb-bemukaghdzqqjszwtfrk-auth-token');
-      if(stored){var parsed=JSON.parse(stored);userEmail=parsed?.user?.email||'';}
+      var keys = Object.keys(localStorage);
+      for(var k=0;k<keys.length;k++){
+        if(keys[k].includes('auth-token')||keys[k].includes('supabase')){
+          var val=localStorage.getItem(keys[k]);
+          if(val&&val.includes('desmond')){
+            var p=JSON.parse(val);
+            userEmail=p?.user?.email||p?.email||'';
+            if(userEmail)break;
+          }
+        }
+      }
     }catch(e){}
   }
-  var isAdmin = userEmail==='desmond@cttsb.com.my' || userEmail==='deswatson.semarak@gmail.com';
-
-  if(!isAdmin){
-    // Also check CU id against known admin IDs as backup
-    adminEl.style.display='none';
-    return;
+  // Check rb_cu backup
+  if(!userEmail){
+    try{var cu2=JSON.parse(localStorage.getItem('rb_cu')||'{}');userEmail=cu2.email||'';}catch(e){}
   }
+  var ADMIN_EMAILS=['desmond@cttsb.com.my','deswatson.semarak@gmail.com'];
+  var isAdmin = ADMIN_EMAILS.indexOf(userEmail) >= 0;
+  console.log('Admin check: email='+userEmail+' isAdmin='+isAdmin);
+  if(!isAdmin){adminEl.style.display='none';return;}
 
   adminEl.style.display='block';
 
@@ -3536,6 +3552,99 @@ function sanitize(str){
 function sanitizeText(str){
   if(!str)return '';
   return sanitize(str).replace(/\n/g,'<br>');
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// ADMIN DASHBOARD - opens a full modal for Des
+// ═══════════════════════════════════════════════════════════
+function openAdminDashboard(){
+  var ADMIN_EMAILS=['desmond@cttsb.com.my','deswatson.semarak@gmail.com'];
+  if(!CU||ADMIN_EMAILS.indexOf(CU.email)<0){toast('Access denied.');return;}
+
+  var total=CACHE.users.length;
+  var weekAgo=Date.now()-7*24*60*60*1000;
+  var dayAgo=Date.now()-24*60*60*1000;
+  var newToday=CACHE.users.filter(function(u){return u.created_at&&new Date(u.created_at).getTime()>dayAgo;}).length;
+  var newWeek=CACHE.users.filter(function(u){return u.created_at&&new Date(u.created_at).getTime()>weekAgo;}).length;
+
+  // Country breakdown
+  var countryMap={};
+  CACHE.users.forEach(function(u){var c=u.country||'Not specified';countryMap[c]=(countryMap[c]||0)+1;});
+  var countries=Object.keys(countryMap).sort(function(a,b){return countryMap[b]-countryMap[a];});
+  var countryHTML=countries.map(function(c){
+    var pct=Math.round((countryMap[c]/total)*100);
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid rgba(255,255,255,.06)">'
+      +'<span style="font-size:.8rem;color:var(--lavender)">🌍 '+c+'</span>'
+      +'<span style="font-size:.8rem;font-weight:600;color:var(--gold)">'+countryMap[c]+' ('+pct+'%)</span>'
+      +'</div>';
+  }).join('');
+
+  // All members sorted by join date
+  var allMembers=[...CACHE.users].sort(function(a,b){return new Date(b.created_at||0)-new Date(a.created_at||0);});
+  var membersHTML=allMembers.map(function(u,i){
+    var joinDate=u.created_at?new Date(u.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'-';
+    var memCount=CACHE.deceased.filter(function(d){return d.created_by===u.id;}).length;
+    var isNew=u.created_at&&new Date(u.created_at).getTime()>dayAgo;
+    return '<div style="display:flex;align-items:center;gap:.6rem;padding:.4rem 0;border-bottom:1px solid rgba(255,255,255,.04)">'
+      +'<span style="font-size:.7rem;color:var(--muted);width:20px">'+(i+1)+'</span>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:.8rem;color:var(--ivory);font-weight:500">'+(u.first_name||'')+(u.last_name?' '+u.last_name:'')+(isNew?' <span style="color:#4caf7b;font-size:.65rem">NEW</span>':'')+'</div>'
+      +'<div style="font-size:.68rem;color:var(--muted)">'+(u.country||'-')+' · '+joinDate+(memCount?' · 🌻'+memCount:'')+'</div>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+
+  // Show in modal
+  var modal=document.getElementById('adminDashModal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='adminDashModal';
+    modal.className='ov';
+    modal.style.cssText='z-index:9500';
+    // Build modal with DOM to avoid quote issues
+    var mDiv=document.createElement('div');
+    mDiv.className='modal';mDiv.style.maxWidth='500px';
+    var mHdr=document.createElement('div');mHdr.className='mhdr';
+    var mTitle=document.createElement('p');mTitle.className='mhdr-title';mTitle.textContent='📊 Admin Dashboard — DW Labs';
+    var mClose=document.createElement('button');mClose.type='button';mClose.className='mclose';mClose.textContent='×';
+    mClose.onclick=function(){closeModal('adminDashModal');};
+    mHdr.appendChild(mTitle);mHdr.appendChild(mClose);
+    var mBody=document.createElement('div');mBody.className='mbody';mBody.id='adminDashBody';mBody.style.cssText='max-height:70vh;overflow-y:auto';
+    mDiv.appendChild(mHdr);mDiv.appendChild(mBody);
+    modal.appendChild(mDiv);
+    document.body.appendChild(modal);
+  }
+
+  var body=document.getElementById('adminDashBody');
+  if(body){
+    body.innerHTML=
+      // Stats
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:1rem">'
+      +'<div class="stat-box" style="background:rgba(201,168,76,.1);border-color:rgba(201,168,76,.3);text-align:center">'
+      +'<div style="font-size:2rem;font-weight:700;color:var(--gold)">'+total+'</div>'
+      +'<div style="font-size:.72rem;color:var(--muted)">Total Members</div></div>'
+      +'<div class="stat-box" style="background:rgba(76,175,123,.1);border-color:rgba(76,175,123,.3);text-align:center">'
+      +'<div style="font-size:2rem;font-weight:700;color:#4caf7b">+'+newToday+'</div>'
+      +'<div style="font-size:.72rem;color:var(--muted)">Joined Today</div></div>'
+      +'<div class="stat-box" style="background:rgba(76,175,123,.07);text-align:center">'
+      +'<div style="font-size:2rem;font-weight:700;color:#4caf7b">+'+newWeek+'</div>'
+      +'<div style="font-size:.72rem;color:var(--muted)">This Week</div></div>'
+      +'</div>'
+      // Memorials & posts count
+      +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:1rem">'
+      +'<div class="stat-box" style="text-align:center"><div style="font-size:1.5rem;color:var(--gold)">'+CACHE.deceased.length+'</div><div style="font-size:.72rem;color:var(--muted)">Memorials</div></div>'
+      +'<div class="stat-box" style="text-align:center"><div style="font-size:1.5rem;color:var(--gold)">'+(CACHE.posts?CACHE.posts.length:0)+'</div><div style="font-size:.72rem;color:var(--muted)">Posts</div></div>'
+      +'<div class="stat-box" style="text-align:center"><div style="font-size:1.5rem;color:var(--gold)">'+CACHE.prayers.length+'</div><div style="font-size:.72rem;color:var(--muted)">Prayers</div></div>'
+      +'</div>'
+      // Countries
+      +'<div style="font-size:.72rem;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">🌍 Members by Country</div>'
+      +countryHTML
+      // Members list
+      +'<div style="font-size:.72rem;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;margin:1rem 0 .4rem">👥 All Members ('+total+')</div>'
+      +membersHTML;
+  }
+  openModal('adminDashModal');
 }
 
 console.log('Post + Friend functions loaded ✓');
