@@ -580,792 +580,8 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .friend-rel-opt:hover,.friend-rel-opt.sel{border-color:var(--gold);color:var(--gold);background:rgba(201,168,76,.1);}
 .friend-tag{display:inline-flex;align-items:center;gap:.3rem;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:.2rem .6rem;font-size:.72rem;color:var(--gold);}
 </style>
-</head>
-<body>
 
-<canvas id="bgCanvas"></canvas>
-<div id="iosTouch" style="display:none" ontouchstart=""></div>
-
-<script>
-
-// ═══════════════════════════════════════════════════════════
-// iOS SAFARI CLICK FIX
-// Prevents 300ms delay and fixes elements that don't respond
-// ═══════════════════════════════════════════════════════════
-(function(){
-  // Only apply on iOS
-  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  if(!isIOS) return;
-  
-  // Add touchend handler to document to fire click on any element with onclick
-  document.addEventListener('touchend', function(e){
-    var el = e.target;
-    // SKIP lang elements - they handle their own touch events
-    if(el.closest('#langWrap'))return;
-    // Walk up DOM to find clickable element
-    for(var i=0; i<5; i++){
-      if(!el) break;
-      // If element has onclick or is a button/a tag
-      if(el.onclick || el.tagName==='BUTTON' || el.tagName==='A' || 
-         el.getAttribute('onclick') || el.role==='button'){
-        // Don't fire if user is scrolling
-        if(e.changedTouches && e.changedTouches.length > 0){
-          var touch = e.changedTouches[0];
-          if(Math.abs(touch.clientX - (el._touchStartX||touch.clientX)) < 10 &&
-             Math.abs(touch.clientY - (el._touchStartY||touch.clientY)) < 10){
-            // It's a tap, not a scroll — fire click
-            if(el.getAttribute('onclick') && el.tagName !== 'BUTTON' && el.tagName !== 'A'){
-              e.preventDefault();
-              // Execute the onclick
-              try{ el.click(); }catch(err){ 
-                var fn = new Function(el.getAttribute('onclick'));
-                fn.call(el);
-              }
-            }
-          }
-        }
-        break;
-      }
-      el = el.parentElement;
-    }
-  }, {passive:false});
-  
-  // Track touch start position to distinguish tap from scroll
-  document.addEventListener('touchstart', function(e){
-    if(e.touches && e.touches.length > 0){
-      var el = e.target;
-      el._touchStartX = e.touches[0].clientX;
-      el._touchStartY = e.touches[0].clientY;
-    }
-  }, {passive:true});
-  
-  console.log('iOS touch fix applied');
-})();
-
-// Early page switcher — works immediately, before Supabase loads
-function showPage(id){
-  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');p.style.display='none';});
-  var el=document.getElementById(id);
-  if(el){el.classList.add('active');el.style.display=(['authPage','heroPage'].includes(id)?'flex':'block');}
-  var sw=document.getElementById('navSearchWrap');
-  if(sw)sw.style.display=(['appPage','deceasedPage','userPage','peoplePage'].includes(id))?'flex':'none';
-}
-function setAuthMode(m){
-  var lf=document.getElementById('loginF');
-  var rf=document.getElementById('regF');
-  if(!lf||!rf)return;
-  if(m==='login'){lf.classList.remove('hidden');rf.classList.add('hidden');}
-  else{lf.classList.add('hidden');rf.classList.remove('hidden');}
-}
-function guestBrowse(){showPage('appPage');}
-
-// ── STUB FUNCTIONS ──
-// These allow HTML elements to call functions before Script 3 loads
-// They delegate to the real implementations
-function handlePostInput(){if(typeof window._handlePostInput==='function')window._handlePostInput();}
-function submitPost(){if(typeof window._submitPost==='function')window._submitPost();else setTimeout(submitPost,200);}
-function saveDeceased(){if(typeof window._saveDeceased==='function')window._saveDeceased();else setTimeout(saveDeceased,200);}
-function openDeceasedModal(){if(typeof window._openDeceasedModal==='function')window._openDeceasedModal();else setTimeout(openDeceasedModal,200);}
-function switchPostType(t,b){if(typeof window._switchPostType==='function')window._switchPostType(t,b);}
-function previewPostImage(i){if(typeof window._previewPostImage==='function')window._previewPostImage(i);}
-function prevDPhoto(i){if(typeof window._prevDPhoto==='function')window._prevDPhoto(i);}
-function prevDMedia(i){if(typeof window._prevDMedia==='function')window._prevDMedia(i);}
-function selectFriendRel(r,b){if(typeof window._selectFriendRel==='function')window._selectFriendRel(r,b);}
-function saveFriendRel(){if(typeof window._saveFriendRel==='function')window._saveFriendRel();}
-function skipFriendRel(){if(typeof window._skipFriendRel==='function')window._skipFriendRel();}
-function openSetRelationship(u){if(typeof window._openSetRelationship==='function')window._openSetRelationship(u);}
-function acceptFriendById(i){if(typeof window._acceptFriendById==='function')window._acceptFriendById(i);}
-function declineFriend(i){if(typeof window._declineFriend==='function')window._declineFriend(i);}
-function sendFriendReq(i){if(typeof window._sendFriendReq==='function')window._sendFriendReq(i);}
-function doLogin(){if(typeof window._doLogin==='function')window._doLogin();else setTimeout(doLogin,200);}
-function doRegister(){if(typeof window._doRegister==='function')window._doRegister();else setTimeout(doRegister,200);}
-function openConnect(d,n){if(typeof window._openConnect==='function')window._openConnect(d,n);}
-function saveConnection(){if(typeof window._saveConnection==='function')window._saveConnection();}
-function quickPrayer(i,n){if(typeof window._quickPrayer==='function')window._quickPrayer(i,n);}
-function submitPrayer(){if(typeof window._submitPrayer==='function')window._submitPrayer();}
-function setTpl(k){if(typeof window._setTpl==='function')window._setTpl(k);}
-function toggleSmile(i){if(typeof window._toggleSmile==='function')window._toggleSmile(i);}
-function openDeceased(i){if(typeof window._openDeceased==='function')window._openDeceased(i);}
-function toggleComments(i){if(typeof window._toggleComments==='function')window._toggleComments(i);}
-function postComment(i){if(typeof window._postComment==='function')window._postComment(i);}
-function replyToComment(d,c,a){if(typeof window._replyToComment==='function')window._replyToComment(d,c,a);}
-function openShare(i){if(typeof window._openShare==='function')window._openShare(i);}
-function openInviteModal(){if(typeof window._openInviteModal==='function')window._openInviteModal();}
-function openPeoplePage(){if(typeof window._openPeoplePage==='function')window._openPeoplePage();}
-function openUserProfile(i){if(typeof window._openUserProfile==='function')window._openUserProfile(i);}
-function openMyProfile(){if(typeof window._openMyProfile==='function')window._openMyProfile();}
-function doLogout(){if(typeof window._doLogout==='function')window._doLogout();}
-function showUTab(t,b,u){if(typeof window._showUTab==='function')window._showUTab(t,b,u);}
-function openEditProfile(){if(typeof window._openEditProfile==='function')window._openEditProfile();}
-function saveProfile(){if(typeof window._saveProfile==='function')window._saveProfile();}
-function copyInvite(){if(typeof window._copyInvite==='function')window._copyInvite();}
-function sendInvite(){if(typeof window._sendInvite==='function')window._sendInvite();}
-function searchFriends(q){if(typeof window._searchFriends==='function')window._searchFriendss(q);}
-function openDonationModal(){if(typeof window._openDonationModal==='function')window._openDonationModal();}
-function switchPayTab(t){if(typeof window._switchPayTab==='function')window._switchPayTab(t);}
-function doDonate(){if(typeof window._doDonate==='function')window._doDonate();}
-function pickDon(b,v){if(typeof window._pickDon==='function')window._pickDon(b,v);}
-function copyDuitNow(){if(typeof window._copyDuitNow==='function')window._copyDuitNow();}
-function copyGrabPay(){if(typeof window._copyGrabPay==='function')window._copyGrabPay();}
-function setFeedTab(t,b){if(typeof window._setFeedTab==='function')window._setFeedTab(t,b);}
-function setFeedFilter(f,b){if(typeof window._setFeedFilter==='function')window._setFeedFilter(f,b);}
-function renderPeopleResults(q){if(typeof window._renderPeopleResults==='function')window._renderPeopleResults(q);}
-function acceptFriend(i){if(typeof window._acceptFriend==='function')window._acceptFriend(i);}
-function acceptFriendById2(i){if(typeof window._acceptFriendById2==='function')window._acceptFriendById2(i);}
-function mnavGo(t,b){if(typeof window._mnavGo==='function')window._mnavGo(t,b);}
-function toggleLangMenu(){if(typeof window._toggleLangMenu==='function')window._toggleLangMenu();}
-function setLang(l,b){if(typeof window._setLang==='function')window._setLang(l,b);}
-function togglePostLike(i){if(typeof window._togglePostLike==='function')window._togglePostLike(i);}
-function togglePostComments(i){if(typeof window._togglePostComments==='function')window._togglePostComments(i);}
-function submitPostComment(i){if(typeof window._submitPostComment==='function')window._submitPostComment(i);}
-function previewEpPhoto(i){if(typeof window._previewEpPhoto==='function')window._previewEpPhoto(i);}
-function quickAvatarUpload(i){if(typeof window._quickAvatarUpload==='function')window._quickAvatarUpload(i);}
-function handleResend(){if(typeof window._handleResend==='function')window._handleResend();}
-function resendConfirmation(e){if(typeof window._resendConfirmation==='function')window._resendConfirmation(e);}
-function submitInlinePrayer(i){if(typeof window._submitInlinePrayer==='function')window._submitInlinePrayer(i);}
-function showNotifs(){if(typeof window._showNotifs==='function')window._showNotifs();}
-</script>
-
-
-<!-- NAV -->
-<nav>
-  <div class="brand" onclick="goHome()" ontouchend="goHome();event.preventDefault()" role="button" tabindex="0">🌻 Remembered</div>
-  <div class="nav-search" id="navSearchWrap" style="display:none">
-    <span class="si">🔍</span>
-    <input type="text" id="globalSearch" placeholder="Search deceased by name…" oninput="handleSearch(this.value)" autocomplete="off">
-    <div id="searchDropdown"></div>
-  </div>
-  <div class="lang-wrap" id="langWrap">
-    <button type="button" class="lang-btn" onclick="toggleLangMenu()" id="langBtn">
-      <span class="lang-flag" id="currentFlag">🇬🇧</span>
-      <span id="currentLangLabel">EN</span> ▾
-    </button>
-    <div class="lang-dropdown" id="langDropdown">
-      <button type="button" class="lang-option active" onclick="setLang('en',this)"><span class="lf">🇬🇧</span> English</button>
-      <button type="button" class="lang-option" onclick="setLang('ms',this)"><span class="lf">🇲🇾</span> Bahasa Malaysia</button>
-      <button type="button" class="lang-option" onclick="setLang('fil',this)"><span class="lf">🇵🇭</span> Filipino</button>
-      <button type="button" class="lang-option" onclick="setLang('zh',this)"><span class="lf">🇨🇳</span> 中文</button>
-    </div>
-  </div>
-  <div class="nav-actions" id="navActions">
-    <button type="button" class="nb" onclick="showPage('authPage');setAuthMode('login')">Sign In</button>
-    <button type="button" class="nb prim" onclick="showPage('authPage');setAuthMode('register')">Join Free</button>
-  </div>
-</div>
-</nav>
-
-<!-- ═══════════════ HERO ═══════════════ -->
-<div id="heroPage" class="page active">
-  <p class="h-eye" id="heroEyebrow">A celebration of lives lived</p>
-  <h1 class="h-title" id="heroTitle">Laugh. <em>Celebrate.</em><br>Always Remember.</h1>
-  <p class="h-sub" id="heroSub">Remembered is where families and friends come together to honour those who have passed — sharing photos, stories, prayers, and the connections that keep them alive in our hearts.</p>
-  <div class="h-acts">
-    <button type="button" class="btn btn-g" onclick="showPage('authPage');setAuthMode('register')" id="heroCelebBtn">🌻 Celebrate Someone</button>
-    <button type="button" class="btn btn-o" onclick="guestBrowse()" id="heroBrowseBtn">Browse Memorials</button>
-  </div>
-  <div id="loadingHint" style="margin-top:1rem;font-size:.75rem;color:var(--muted);display:none">⏳ Connecting to server…</div>
-</div>
-
-<!-- ═══════════════ AUTH ═══════════════ -->
-<div id="authPage" class="page">
-  <div class="auth-card">
-    <div id="loginF">
-      <p class="auth-t" id="loginTitle">Welcome back</p>
-      <p class="auth-s" id="loginSub">Sign in to celebrate someone you love</p>
-      <div style="display:flex;flex-direction:column;gap:.7rem">
-        <div class="fg"><label id="loginEmailLabel">Email</label><input type="email" id="liEmail" placeholder="you@email.com"></div>
-        <div class="fg"><label id="loginPassLabel">Password</label><input type="password" id="liPass" placeholder="••••••••"></div>
-        <button type="button" class="btn btn-g" style="width:100%;margin-top:.2rem" onclick="doLogin()" id="loginBtn">Sign In</button>
-      </div>
-      <div class="auth-sw"><span id="loginNoAccount">New here?</span> <a onclick="setAuthMode('register')" id="loginCreateLink">Create an account →</a></div>
-    </div>
-    <div id="regF" class="hidden">
-      <p class="auth-t" id="regTitle">Join Remembered</p>
-      <p class="auth-s" id="regSub">Create a free account to honour those you love</p>
-      <div style="display:flex;flex-direction:column;gap:.7rem">
-        <div class="fr">
-          <div class="fg"><label id="regFirstLabel">First Name</label><input type="text" id="rgFirst" placeholder="First"></div>
-          <div class="fg"><label id="regLastLabel">Last Name</label><input type="text" id="rgLast" placeholder="Last"></div>
-        </div>
-        <div class="fg"><label>Email</label><input type="email" id="rgEmail" placeholder="you@email.com"></div>
-        <div class="fg"><label>Password</label><input type="password" id="rgPass" placeholder="min. 6 characters"></div>
-        <div class="fg"><label id="regCountryLabel">Country</label>
-          <select id="rgCountry">
-            <option value="">Select country…</option>
-            <option>Malaysia</option><option>Indonesia</option><option>Philippines</option><option>Singapore</option><option>Thailand</option><option>Vietnam</option><option>China</option><option>India</option><option>United States</option><option>United Kingdom</option><option>Australia</option><option>Canada</option><option>Japan</option><option>South Korea</option><option>Other</option>
-          </select>
-        </div>
-        <button type="button" class="btn btn-g" style="width:100%;margin-top:.2rem" onclick="doRegister()" id="regCreateBtn">Create Account</button>
-      </div>
-      <div class="auth-sw"><span id="regAlreadyMember">Already a member?</span> <a onclick="setAuthMode('login')" id="regSignInLink">Sign in →</a></div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════════ MAIN APP ═══════════════ -->
-<div id="appPage" class="page">
-  <div class="three-col">
-    <!-- LEFT -->
-    <aside class="side-l">
-      <div class="w" id="myProfileCard"></div>
-      <div class="w">
-        <p class="wt" id="sidebarConnectionsTitle">👥 My Connections</p>
-        <div id="myFriendsList" style="display:flex;flex-direction:column;gap:.5rem"></div>
-        <button type="button" class="btn btn-o btn-sm" style="width:100%;margin-top:.6rem" onclick="openInviteModal()" id="sidebarInviteBtn">+ Invite Friends</button>
-      </div>
-      <div class="w">
-        <p class="wt" id="sidebarCalTitle">📅 Sacred Observances</p>
-        <div id="calList"></div>
-        <div class="divider"></div>
-        <div style="font-size:.72rem;color:var(--muted)">All dates are indicative. Actual observances may vary by year and region.</div>
-      </div>
-    </aside>
-
-    <!-- FEED -->
-    <main>
-      <div class="feed">
-        <div class="create-post-box" id="createPostBox">
-          <div class="post-type-tabs">
-            <button type="button" class="post-type-tab act" id="ptPost" onclick="switchPostType('post',this)">📝 Post</button>
-            <button type="button" class="post-type-tab" id="ptMemorial" onclick="switchPostType('memorial',this)">🌻 Memorial</button>
-          </div>
-          <div id="postCreateArea">
-            <div style="display:flex;gap:.7rem;align-items:flex-start">
-              <div class="ua" id="feedAvatar" onclick="openMyProfile()">🌻</div>
-              <div style="flex:1">
-                <textarea id="postTextInput" oninput="handlePostInput()" placeholder="What's on your mind? Share a memory, thought or message with your friends…" rows="3" onclick="if(!CU){showPage('authPage');setAuthMode('login');}"></textarea>
-                <div id="postImagePreview" style="display:none;margin-top:.4rem"></div>
-              </div>
-            </div>
-            <div class="post-actions-row">
-              <div class="post-extras">
-                <label class="post-extra-btn" style="cursor:pointer">
-                  📷 Photo
-                  <input type="file" id="postImageFile" accept="image/*" style="display:none" onchange="previewPostImage(this)">
-                </label>
-                <select class="visibility-select" id="postVisibility" title="Who can see this?">
-                  <option value="friends">👥 Friends</option>
-                  <option value="public">🌍 Everyone</option>
-                </select>
-              </div>
-              <button type="button" class="btn btn-g btn-sm" onclick="submitPost()" id="postSubmitBtn" >Share Post</button>
-            </div>
-          </div>
-        </div>
-        <div class="feed-tab-row">
-          <button type="button" class="feed-tab act" id="feedTabAll" onclick="setFeedTab('all',this)">🌍 All Posts</button>
-          <button type="button" class="feed-tab" id="feedTabFriends" onclick="setFeedTab('friends',this)">👥 Friends <span class="new-badge" id="friendsFeedBadge" style="display:none">New</span></button>
-        </div>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap" id="feedFilters">
-          <button type="button" class="nb act" id="fAll" onclick="setFeedFilter('all',this)" id="filterAll">All</button>
-          <button type="button" class="nb" id="fC" onclick="setFeedFilter('Christian',this)" id="filterC">✝ Christian</button>
-          <button type="button" class="nb" id="fM" onclick="setFeedFilter('Muslim',this)" id="filterM">☪ Muslim</button>
-          <button type="button" class="nb" id="fB" onclick="setFeedFilter('Buddhist',this)" id="filterB">☸ Buddhist</button>
-          <button type="button" class="nb" id="fG" onclick="setFeedFilter('General',this)">🌟 General</button>
-        </div>
-        <div id="mainFeed"></div>
-      </div>
-    </main>
-
-    <!-- RIGHT -->
-    <aside class="side-r">
-      <div class="w">
-        <p class="wt" id="sidebarCommunityTitle">📊 Community</p>
-        <div class="grid2" id="statsGrid"></div>
-      </div>
-      <div class="w">
-        <p class="wt" id="sidebarNotifTitle">🔔 Notifications</p>
-        <div id="notifList" style="display:flex;flex-direction:column;gap:.5rem;max-height:200px;overflow-y:auto"></div>
-      </div>
-      <div class="w">
-        <p class="wt" id="sidebarSuggestTitle">💡 People You May Know</p>
-        <div class="suggest-row" id="suggestList"></div>
-        <button type="button" class="btn btn-o btn-sm" style="width:100%;margin-top:.6rem" onclick="openPeoplePage()" id="sidebarBrowseAll">Browse All Members →</button>
-      </div>
-      <div class="w">
-        <p class="wt" id="sidebarTopTitle">😊 Most Celebrated</p>
-        <div id="topMemorials" style="display:flex;flex-direction:column;gap:.5rem"></div>
-      </div>
-      <div class="w" style="background:linear-gradient(135deg,rgba(201,168,76,.1),rgba(201,168,76,.02));border-color:rgba(201,168,76,.25)">
-        <p class="wt" id="sidebarDonateTitle">☀️ Keep Their Story Alive</p>
-        <p style="font-size:.74rem;color:var(--muted);margin-bottom:.5rem;line-height:1.55" id="sidebarDonateSub">Help us keep this celebration of lives alive — ad-free, always here.</p>
-        <div style="display:flex;flex-direction:column;gap:.4rem">
-          <button type="button" class="btn btn-sm" style="width:100%;background:rgba(220,30,30,.15);border:1px solid rgba(220,30,30,.35);color:#ff5252;font-weight:600" onclick="openDonationModal();switchPayTab('duitnow')" id="donateQRBtn">📱 Scan QR to Donate (DuitNow)</button>
-          <button type="button" class="btn btn-sm" style="width:100%;background:rgba(0,177,79,.1);border:1px solid rgba(0,177,79,.3);color:#00b14f" onclick="openDonationModal();switchPayTab('grab')" id="donateGrabBtn">🟢 GrabPay</button>
-          <button type="button" class="btn btn-sm" style="width:100%;background:rgba(0,112,186,.1);border:1px solid rgba(0,112,186,.3);color:#009CDE" onclick="openDonationModal();switchPayTab('paypal')" id="donatePaypalBtn">💙 PayPal (International)</button>
-        </div>
-      </div>
-    </aside>
-  </div>
-</div>
-
-<!-- ═══════════════ PEOPLE / DISCOVER ═══════════════ -->
-<div id="peoplePage" class="page">
-  <div class="people-page">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
-      <h2 style="font-family:'Cormorant Garant',serif;font-size:1.6rem;font-weight:300;color:var(--gold)">👥 Find Friends</h2>
-      <button type="button" class="btn btn-o btn-sm" onclick="showPage('appPage');renderApp()">← Back to Feed</button>
-    </div>
-    <div class="people-search-bar">
-      <input type="text" id="peopleSearchInput" placeholder="Search members by name or country…" oninput="renderPeopleResults(this.value)">
-    </div>
-
-    <!-- Pending requests -->
-    <div id="pendingRequestsSection" style="margin-bottom:1.2rem"></div>
-
-    <!-- Search results or suggestions -->
-    <div>
-      <p class="section-title" id="peopleResultsLabel">✨ Suggested People</p>
-      <div class="people-grid" id="peopleGrid"></div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════════ DECEASED PROFILE ═══════════════ -->
-<div id="deceasedPage" class="page">
-  <div class="prof-hero" id="dpHero">
-    <button type="button" class="back-b" onclick="goBack()">← Back</button>
-    <div class="ph-photo" id="dpPhoto">👤</div>
-    <h1 class="ph-name" id="dpName"></h1>
-    <p class="ph-dates" id="dpDates"></p>
-    <p class="ph-dates" id="dpLoc" style="color:var(--lavender)"></p>
-    <div class="ph-actions" id="dpActions"></div>
-  </div>
-  <div class="prof-body">
-    <div class="ps" id="dpConnections"><h3>🤝 Connected Loved Ones</h3><div id="dpConnList"></div></div>
-    <div class="ps" id="dpGallery"><h3>📸 Photos & Memories</h3><div class="mgal" id="dpGalleryGrid"></div></div>
-    <div class="ps"><h3>🙏 Prayer & Memory Wall</h3><div class="pw-add" id="dpPrayerAdd"></div><div class="divider"></div><div class="prayer-wall" id="dpPrayerWall"></div></div>
-  </div>
-</div>
-
-<!-- ═══════════════ USER PROFILE ═══════════════ -->
-<div id="userPage" class="page">
-  <div class="upage">
-    <div class="u-hero">
-      <div id="upAvatarWrap" style="flex-shrink:0">
-        <div class="u-av-lg" id="upAvatar">👤</div>
-      </div>
-      <div class="u-meta">
-        <h2 id="upName"></h2>
-        <p id="upMeta"></p>
-        <div class="u-tags" id="upTags"></div>
-      </div>
-      <div style="margin-left:auto;display:flex;gap:.5rem;flex-wrap:wrap" id="upActions"></div>
-    </div>
-    <div class="u-tabs">
-      <button type="button" class="u-tab act" onclick="showUTab('memorials',this)">🌻 Memorials</button>
-      <button type="button" class="u-tab" onclick="showUTab('connections',this)">👥 Connections</button>
-      <button type="button" class="u-tab" onclick="showUTab('friends',this)">🤝 Friends</button>
-    </div>
-    <div id="uTabContent"></div>
-  </div>
-</div>
-
-<!-- ═══════════════ MODALS ═══════════════ -->
-
-<!-- CREATE DECEASED -->
-<div class="ov" id="deceasedModal">
-  <div class="modal">
-    <div class="mhdr"><p class="mhdr-title">🌻 Add a Memorial</p><button type="button" class="mclose" onclick="closeModal('deceasedModal')">×</button></div>
-    <div class="mbody">
-      <div class="fr">
-        <div class="fg"><label>Full Name *</label><input id="dName" placeholder="e.g. Maria Santos"></div>
-        <div class="fg"><label>Nickname <span class="opt">optional</span></label><input id="dNick" placeholder="e.g. Mama"></div>
-      </div>
-      <div class="fr">
-        <div class="fg"><label>Date of Birth *</label><input type="date" id="dDob"></div>
-        <div class="fg"><label>Date of Passing *</label><input type="date" id="dDod"></div>
-      </div>
-      <div class="fr">
-        <div class="fg"><label>Place of Birth</label><input id="dPob" placeholder="e.g. Kota Kinabalu, Sabah"></div>
-        <div class="fg"><label>Place of Rest <span class="opt">optional</span></label><input id="dBurial" placeholder="e.g. Nirvana Memorial Park"></div>
-      </div>
-      <div class="fr">
-        <div class="fg"><label id="regCountryLabel">Country</label>
-          <select id="dCountry"><option value="">Country…</option><option>Malaysia</option><option>Indonesia</option><option>Philippines</option><option>Singapore</option><option>Thailand</option><option>Vietnam</option><option>China</option><option>India</option><option>United States</option><option>United Kingdom</option><option>Australia</option><option>Canada</option><option>Japan</option><option>Other</option></select>
-        </div>
-        <div class="fg"><label>Faith / Religion</label>
-          <select id="dRel"><option value="General">General</option><option value="Christian">Christian</option><option value="Muslim">Muslim</option><option value="Buddhist">Buddhist</option></select>
-        </div>
-      </div>
-      <div class="fg"><label>Your relationship to them *</label>
-        <div class="rel-grid" id="relGrid"></div>
-      </div>
-      <div class="fg">
-        <label>Profile Photo</label>
-        <div class="upload-z"><input type="file" id="dPhoto" accept="image/*" onchange="prevDPhoto(this)"><div class="ui">📷</div><div class="ut"><strong>Upload a photo</strong> of them</div></div>
-        <img id="dPhotoP" style="display:none;width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--gold);margin-top:.5rem">
-      </div>
-      <div class="fg">
-        <label>Photos & Videos <span class="opt">memories — multiple allowed</span></label>
-        <div class="upload-z"><input type="file" id="dMedia" accept="image/*,video/*" multiple onchange="prevDMedia(this)"><div class="ui">🖼️</div><div class="ut"><strong>Upload photos or videos</strong> from their life</div></div>
-        <div class="pgrid" id="dMediaGrid"></div>
-      </div>
-    </div>
-    <div class="mftr">
-      <button type="button" class="btn btn-o" onclick="closeModal('deceasedModal')">Cancel</button>
-      <button type="button" class="btn btn-g" onclick="saveDeceased()">🌻 Publish Memorial</button>
-    </div>
-  </div>
-</div>
-
-<!-- CONNECT TO DECEASED (for other users) -->
-<div class="ov" id="connectModal">
-  <div class="modal sm">
-    <div class="mhdr"><p class="mhdr-title">🤝 Connect to this Memorial</p><button type="button" class="mclose" onclick="closeModal('connectModal')">×</button></div>
-    <div class="mbody">
-      <p style="font-size:.85rem;color:var(--lavender)">How were you connected to <strong id="connectName" style="color:var(--gold)"></strong>?</p>
-      <div class="fg"><label>Your relationship</label><div class="rel-grid" id="connectRelGrid"></div></div>
-    </div>
-    <div class="mftr">
-      <button type="button" class="btn btn-o" onclick="closeModal('connectModal')">Cancel</button>
-      <button type="button" class="btn btn-g" onclick="saveConnection()">Save Connection</button>
-    </div>
-  </div>
-</div>
-
-<!-- PRAYER MODAL -->
-<div class="ov" id="prayerModal">
-  <div class="modal sm">
-    <div class="mhdr"><p class="mhdr-title">🙏 Leave a Prayer</p><button type="button" class="mclose" onclick="closeModal('prayerModal')">×</button></div>
-    <div class="mbody">
-      <p style="font-size:.83rem;color:var(--lavender)">For <strong id="pmName" style="color:var(--gold)"></strong></p>
-      <div class="tpl-row">
-        <button type="button" class="tpl-b" onclick="setTpl('c')">✝ Christian</button>
-        <button type="button" class="tpl-b" onclick="setTpl('m')">☪ Islamic</button>
-        <button type="button" class="tpl-b" onclick="setTpl('b')">☸ Buddhist</button>
-        <button type="button" class="tpl-b" onclick="setTpl('j')">✨ Joy</button>
-        <button type="button" class="tpl-b" onclick="setTpl('mem')">💭 Memory</button>
-      </div>
-      <div class="fg"><textarea id="pmText" placeholder="Write your prayer, memory, or kind words…" style="min-height:110px"></textarea></div>
-      <div class="fg"><label>Your name</label><input id="pmAuthor" placeholder="e.g. A loving friend"></div>
-    </div>
-    <div class="mftr">
-      <button type="button" class="btn btn-o" onclick="closeModal('prayerModal')">Cancel</button>
-      <button type="button" class="btn btn-g" onclick="submitPrayer()">🙏 Post Prayer</button>
-    </div>
-  </div>
-</div>
-
-<!-- INVITE FRIENDS -->
-<div class="ov" id="inviteModal">
-  <div class="modal sm">
-    <div class="mhdr"><p class="mhdr-title">👥 Invite Friends</p><button type="button" class="mclose" onclick="closeModal('inviteModal')">×</button></div>
-    <div class="mbody">
-      <div class="fg"><label>Invite by email</label><input type="email" id="inviteEmail" placeholder="friend@email.com"></div>
-      <button type="button" class="btn btn-g btn-sm" onclick="sendInvite()">Send Invite</button>
-      <div class="divider"></div>
-      <p style="font-size:.78rem;color:var(--lavender)">Or share your personal invite link:</p>
-      <div class="invite-link-box">
-        <span id="inviteLink">deswats.github.io/remembered?ref=…</span>
-        <button type="button" class="btn btn-o btn-sm" onclick="copyInvite()">Copy</button>
-      </div>
-      <div class="divider"></div>
-      <p class="wt" style="margin-bottom:.5rem">Find existing members</p>
-      <input type="text" id="friendSearch" placeholder="Search by name…" oninput="searchFriends(this.value)">
-      <div id="friendSearchResults" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.5rem;max-height:200px;overflow-y:auto"></div>
-    </div>
-    <div class="mftr"><button type="button" class="btn btn-o" onclick="closeModal('inviteModal')">Close</button></div>
-  </div>
-</div>
-
-<!-- DONATION -->
-<div class="ov" id="donationModal">
-  <div class="modal sm">
-    <div class="mhdr"><p class="mhdr-title">🌻 Support Remembered</p><button type="button" class="mclose" onclick="closeModal('donationModal')">×</button></div>
-    <div class="mbody">
-      <p style="font-size:.85rem;color:var(--lavender);line-height:1.6">Your contribution keeps this platform alive — ad-free, always here so their stories are never lost. Every ringgit helps. 💛</p>
-
-      <!-- Amount selector (RM) -->
-      <div class="fg"><label>Select Amount (RM)</label>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem">
-          <button type="button" class="nb" onclick="pickDon(this,'5')">RM5</button>
-          <button type="button" class="nb act" onclick="pickDon(this,'10')">RM10</button>
-          <button type="button" class="nb" onclick="pickDon(this,'20')">RM20</button>
-          <button type="button" class="nb" onclick="pickDon(this,'50')">RM50</button>
-        </div>
-      </div>
-      <div class="fg"><label>Or enter custom amount (RM)</label><input type="number" id="donCustom" placeholder="e.g. 15" min="1"></div>
-
-      <!-- TAB selector -->
-      <div style="display:flex;gap:.4rem;margin:.2rem 0">
-        <button type="button" class="nb act" id="tabDuitNow" onclick="switchPayTab('duitnow')">🏦 DuitNow</button>
-        <button type="button" class="nb" id="tabGrab" onclick="switchPayTab('grab')">🟢 GrabPay</button>
-        <button type="button" class="nb" id="tabPayPal" onclick="switchPayTab('paypal')">💙 PayPal</button>
-      </div>
-
-      <!-- DUITNOW PANEL -->
-      <div id="panelDuitNow">
-        <div style="background:rgba(220,30,30,.08);border:1px solid rgba(220,30,30,.3);border-radius:14px;padding:1rem;display:flex;flex-direction:column;align-items:center;gap:.7rem;text-align:center">
-          <!-- Header -->
-          <div style="display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:1.3rem">🏦</span>
-            <div>
-              <div style="font-size:.9rem;font-weight:700;color:#e53935">Malaysia National QR</div>
-              <div style="font-size:.7rem;color:var(--muted)">Scan with any Malaysian bank app or e-wallet</div>
-            </div>
-          </div>
-          <!-- QR CODE -->
-          <div style="background:#fff;border-radius:12px;padding:10px;display:inline-block;box-shadow:0 4px 20px rgba(0,0,0,.3)">
-            <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" alt="Malaysia National QR — DuitNow" style="width:180px;height:180px;display:block">
-          </div>
-          <!-- Instruction -->
-          <div style="font-size:.76rem;color:var(--lavender);line-height:1.65;text-align:left;width:100%">
-            <strong style="color:var(--ivory)">How to scan & pay:</strong><br>
-            1. Open your <strong>bank app</strong> or <strong>e-wallet</strong><br>
-            2. Tap <strong>Scan QR</strong> or <strong>Pay</strong><br>
-            3. Point camera at the QR code above<br>
-            4. Enter your amount → confirm ✓
-          </div>
-          <!-- Supported apps -->
-          <div style="width:100%;display:flex;flex-wrap:wrap;gap:.3rem;justify-content:center">
-            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">Maybank</span>
-            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">CIMB</span>
-            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">RHB</span>
-            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">Public Bank</span>
-            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">Hong Leong</span>
-            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">AmBank</span>
-            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">Touch 'n Go</span>
-            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">Boost</span>
-            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">ShopeePay</span>
-            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">& all banks</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- GRABPAY PANEL -->
-      <div id="panelGrab" style="display:none">
-        <div style="background:rgba(0,177,79,.1);border:1px solid rgba(0,177,79,.25);border-radius:12px;padding:1rem;display:flex;flex-direction:column;align-items:center;gap:.7rem;text-align:center">
-          <div style="display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:1.4rem">🟢</span>
-            <div>
-              <div style="font-size:.9rem;font-weight:700;color:#00b14f">GrabPay</div>
-              <div style="font-size:.7rem;color:var(--muted)">Use the Malaysia National QR above — it works with GrabPay too!</div>
-            </div>
-          </div>
-          <div style="background:rgba(0,177,79,.08);border:1px solid rgba(0,177,79,.2);border-radius:10px;padding:.8rem 1rem;width:100%;font-size:.78rem;color:var(--lavender);line-height:1.65;text-align:left">
-            <strong style="color:var(--ivory)">Pay with GrabPay:</strong><br>
-            1. Open your <strong>Grab app</strong><br>
-            2. Tap <strong>Pay</strong> → <strong>Scan QR</strong><br>
-            3. Scan the <strong>Malaysia National QR</strong> on the DuitNow tab<br>
-            4. Enter your amount → Pay ✓<br><br>
-            <span style="color:var(--muted)">💡 The Malaysia National QR is universally accepted by GrabPay, Touch 'n Go, Boost, ShopeePay and all Malaysian bank apps.</span>
-          </div>
-          <button type="button" class="btn btn-o btn-sm" onclick="switchPayTab('duitnow')" style="width:100%">← Back to QR Code</button>
-        </div>
-      </div>
-
-      <!-- PAYPAL PANEL -->
-      <div id="panelPayPal" style="display:none">
-        <div style="background:rgba(0,112,186,.12);border:1px solid rgba(0,112,186,.3);border-radius:12px;padding:1rem;display:flex;flex-direction:column;gap:.6rem">
-          <div style="display:flex;align-items:center;gap:.6rem">
-            <svg viewBox="0 0 24 24" style="width:28px;height:28px;flex-shrink:0" fill="none"><path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 0 1 .923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z" fill="#009CDE"/></svg>
-            <div>
-              <div style="font-size:.82rem;font-weight:600;color:#009CDE">Pay via PayPal</div>
-              <div style="font-size:.72rem;color:var(--muted)">For international donors — USD accepted</div>
-            </div>
-          </div>
-          <div style="background:rgba(255,255,255,.06);border-radius:8px;padding:.5rem .75rem;font-size:.78rem;display:flex;justify-content:space-between;align-items:center">
-            <span style="color:var(--lavender)">PayPal address</span>
-            <span style="color:var(--ivory);font-weight:600">quartno74@yahoo.com</span>
-          </div>
-          <div style="font-size:.76rem;color:var(--lavender);line-height:1.6">
-            <strong style="color:var(--ivory)">How to pay:</strong><br>
-            1. Log in to PayPal → <strong>Send Money</strong><br>
-            2. Enter <strong>quartno74@yahoo.com</strong><br>
-            3. Enter amount in USD → Send ✓
-          </div>
-        </div>
-      </div>
-
-      <p style="font-size:.72rem;color:var(--muted);text-align:center;line-height:1.5;margin-top:.2rem">100% goes toward keeping Remembered running. No ads. No selling your data. Ever. 🌻</p>
-    </div>
-    <div class="mftr">
-      <button type="button" class="btn btn-o" onclick="closeModal('donationModal')">Maybe Later</button>
-      <button type="button" class="btn btn-g" id="donateActionBtn" onclick="doDonate()">✓ I've Sent My Contribution</button>
-    </div>
-  </div>
-</div>
-
-<!-- SHARE MODAL -->
-<div class="ov" id="shareModal">
-  <div class="modal sm">
-    <div class="mhdr"><p class="mhdr-title">↗ Share This Memorial</p><button type="button" class="mclose" onclick="closeModal('shareModal')">×</button></div>
-    <div class="mbody">
-      <p style="font-size:.84rem;color:var(--lavender);line-height:1.55">Help others find and connect with <strong id="shareMemName" style="color:var(--gold)"></strong>'s memorial. Every share brings more love and prayers.</p>
-
-      <!-- Copy link row -->
-      <div class="share-link-row">
-        <span id="shareLink">deswats.github.io/remembered#…</span>
-        <button type="button" class="btn btn-o btn-sm" onclick="copyShareLink()" style="white-space:nowrap">📋 Copy</button>
-      </div>
-
-      <!-- Social buttons grid -->
-      <div class="soc-grid">
-        <button type="button" class="soc-btn soc-fb" onclick="doShareFB()">
-          <svg class="soc-icon" viewBox="0 0 24 24"><path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.235 2.686.235v2.97h-1.514c-1.491 0-1.956.93-1.956 1.874v2.25h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
-          Facebook
-        </button>
-        <button type="button" class="soc-btn soc-tw" onclick="doShareTwitter()">
-          <svg class="soc-icon" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-          X / Twitter
-        </button>
-        <button type="button" class="soc-btn soc-wa" onclick="doShareWhatsApp()">
-          <svg class="soc-icon" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-          WhatsApp
-        </button>
-        <button type="button" class="soc-btn soc-tg" onclick="doShareTelegram()">
-          <svg class="soc-icon" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-          Telegram
-        </button>
-      </div>
-
-      <div style="text-align:center;font-size:.72rem;color:var(--muted);margin-top:.4rem">Sharing brings more people to celebrate their memory 🌻</div>
-    </div>
-    <div class="mftr"><button type="button" class="btn btn-o" onclick="closeModal('shareModal')">Close</button></div>
-  </div>
-</div>
-
-<!-- EDIT PROFILE / PHOTO UPLOAD MODAL -->
-<div class="ov" id="editProfileModal">
-  <div class="modal sm">
-    <div class="mhdr"><p class="mhdr-title">✏️ Edit Your Profile</p><button type="button" class="mclose" onclick="closeModal('editProfileModal')">×</button></div>
-    <div class="mbody">
-      <!-- Avatar upload with live preview -->
-      <div class="fg" style="align-items:center">
-        <label style="text-align:center;width:100%">Profile Photo</label>
-        <div class="avatar-upload-wrap" style="margin:0 auto">
-          <div id="epAvatarPreview" style="width:90px;height:90px;border-radius:50%;background:var(--navy-m);border:3px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:2.2rem;overflow:hidden;"></div>
-          <div class="avatar-edit-badge">📷</div>
-          <input type="file" id="epPhotoFile" accept="image/*" onchange="previewEpPhoto(this)">
-        </div>
-        <div style="font-size:.73rem;color:var(--muted);text-align:center;margin-top:.3rem">Click the photo to change it</div>
-      </div>
-      <div class="divider"></div>
-      <div class="fr">
-        <div class="fg"><label id="regFirstLabel">First Name</label><input id="epFirst" placeholder="First name"></div>
-        <div class="fg"><label id="regLastLabel">Last Name</label><input id="epLast" placeholder="Last name"></div>
-      </div>
-      <div class="fg"><label id="regCountryLabel">Country</label>
-        <select id="epCountry">
-          <option value="">Select country…</option>
-          <option>Malaysia</option><option>Indonesia</option><option>Philippines</option><option>Singapore</option><option>Thailand</option><option>Vietnam</option><option>China</option><option>India</option><option>United States</option><option>United Kingdom</option><option>Australia</option><option>Canada</option><option>Japan</option><option>South Korea</option><option>Other</option>
-        </select>
-      </div>
-    </div>
-    <div class="mftr">
-      <button type="button" class="btn btn-o" onclick="closeModal('editProfileModal')">Cancel</button>
-      <button type="button" class="btn btn-g" onclick="saveProfile()">Save Changes</button>
-    </div>
-  </div>
-</div>
-
-<!-- MOBILE BOTTOM NAV -->
-<nav class="mobile-nav">
-  <div class="mobile-nav-inner">
-    <button type="button" class="mnav-btn act" id="mnav-home" onclick="mnavGo('home',this)" ontouchend="mnavGo('home',this);event.preventDefault()">
-      <span class="mni">🏠</span><span style="font-size:.55rem">Home</span>
-    </button>
-    <button type="button" class="mnav-btn" id="mnav-search" onclick="mnavGo('search',this)" ontouchend="mnavGo('search',this);event.preventDefault()">
-      <span class="mni">🔍</span><span style="font-size:.55rem">Search</span>
-    </button>
-    <button type="button" class="mnav-btn" id="mnav-add" onclick="openDeceasedModal()" ontouchend="openDeceasedModal();event.preventDefault()" style="padding:.2rem .4rem">
-      <span style="width:44px;height:44px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--navy);font-size:1.6rem;line-height:1">+</span>
-    </button>
-    <button type="button" class="mnav-btn" id="mnav-people" onclick="mnavGo('people',this)" ontouchend="mnavGo('people',this);event.preventDefault()">
-      <span class="mni">👥</span><span style="font-size:.55rem">People</span>
-      <span class="mnav-badge" id="mnavFriendBadge">0</span>
-    </button>
-    <button type="button" class="mnav-btn" id="mnav-profile" onclick="mnavGo('profile',this)" ontouchend="mnavGo('profile',this);event.preventDefault()">
-      <span class="mni" id="mnavProfileIcon">👤</span><span style="font-size:.55rem">Me</span>
-      <span class="mnav-badge" id="mnavNotifBadge">0</span>
-    </button>
-  </div>
-</nav>
-
-<!-- FOOTER -->
-<footer style="position:relative;z-index:1;text-align:center;padding:2.5rem 1rem 2rem;border-top:1px solid rgba(201,168,76,.12);margin-top:2rem">
-  <div style="font-family:'Cormorant Garant',serif;font-size:1.1rem;color:var(--gold);margin-bottom:.3rem;letter-spacing:.04em" id="footerBrand">🌻 Remembered</div>
-  <div style="font-size:.75rem;color:var(--muted);margin-bottom:.6rem;line-height:1.6" id="footerTagline">A place to celebrate the lives they lived.</div>
-  <div style="display:inline-flex;align-items:center;gap:.5rem;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.18);border-radius:20px;padding:.35rem .9rem">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
-      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <span style="font-size:.78rem;font-weight:600;color:var(--gold);letter-spacing:.03em" id="footerCredit">Created by DW Labs</span>
-  </div>
-  <div style="margin-top:.8rem;font-size:.68rem;color:var(--muted)" id="footerRights">© 2025 DW Labs · All rights reserved</div>
-</footer>
-
-<!-- FRIEND RELATIONSHIP MODAL -->
-<div class="ov" id="friendRelModal">
-  <div class="modal sm" style="max-width:420px">
-    <div class="mhdr"><p class="mhdr-title">🤝 Your Connection</p><button type="button" class="mclose" onclick="closeModal('friendRelModal')">×</button></div>
-    <div class="mbody">
-      <p style="font-size:.85rem;color:var(--lavender)">How do you know <strong id="friendRelName" style="color:var(--gold)"></strong>?</p>
-      <p style="font-size:.75rem;color:var(--muted);margin-top:.2rem">This helps personalise your feed and connections.</p>
-      <div class="friend-rel-grid" id="friendRelGrid">
-        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Family',this)">👨‍👩‍👧 Family</button>
-        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Parent',this)">👪 Parent</button>
-        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Sibling',this)">👫 Sibling</button>
-        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Cousin',this)">🧑‍🤝‍🧑 Cousin</button>
-        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Spouse',this)">💑 Spouse</button>
-        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Child',this)">👶 Child</button>
-        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Relative',this)">🏠 Relative</button>
-        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Close Friend',this)">❤️ Close Friend</button>
-        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Friend',this)">😊 Friend</button>
-        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Colleague',this)">💼 Colleague</button>
-        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Classmate',this)">🎓 Classmate</button>
-        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Neighbour',this)">🏡 Neighbour</button>
-      </div>
-      <div class="fg" style="margin-top:.6rem">
-        <label style="font-size:.75rem;color:var(--muted)">Or type your own</label>
-        <input type="text" id="friendRelCustom" placeholder="e.g. Uncle, Godfather, Mentor…" style="margin-top:.3rem">
-      </div>
-    </div>
-    <div class="mftr">
-      <button type="button" class="btn btn-o" onclick="skipFriendRel()">Skip</button>
-      <button type="button" class="btn btn-g" onclick="saveFriendRel()">Save Relationship</button>
-    </div>
-  </div>
-</div>
-
-<!-- EMAIL CONFIRMATION MODAL -->
-<div class="ov" id="emailConfirmModal" style="z-index:500">
-  <div class="modal sm" style="max-width:400px;border-color:rgba(201,168,76,.4)">
-    <div style="padding:2rem 1.5rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:.8rem">
-      <div style="font-size:4rem;line-height:1">📧</div>
-      <h2 style="font-family:'Cormorant Garant',serif;font-size:1.6rem;font-weight:300;color:var(--gold)">Check Your Email!</h2>
-      <p style="font-size:.88rem;color:var(--lavender);line-height:1.7">
-        We sent a confirmation link to:
-      </p>
-      <div style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.3);border-radius:10px;padding:.7rem 1.2rem;width:100%">
-        <span id="confirmEmailAddress" style="font-size:.95rem;font-weight:600;color:var(--gold);word-break:break-all"></span>
-      </div>
-      <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:.9rem 1rem;width:100%;text-align:left;font-size:.8rem;color:var(--lavender);line-height:1.8">
-        <strong style="color:var(--ivory)">What to do next:</strong><br>
-        1. Open your email inbox now<br>
-        2. Find the email from <strong>Supabase / Remembered</strong><br>
-        3. Click the <strong style="color:var(--gold)">"Confirm your email"</strong> button<br>
-        4. You'll be redirected back here & logged in automatically<br>
-        5. Or return here and click <strong>Sign In</strong>
-      </div>
-      <div style="font-size:.75rem;color:var(--muted);padding:.5rem .8rem;background:rgba(255,255,255,.03);border-radius:8px;width:100%;text-align:left">
-        📁 <strong>Can't find it?</strong> Check your <strong>Spam</strong> or <strong>Junk</strong> folder
-      </div>
-      <button type="button" class="btn btn-g" style="width:100%;margin-top:.3rem" onclick="closeModal('emailConfirmModal');showPage('authPage');setAuthMode('login');resetLoginForm()">
-        ✅ I've confirmed my email — Sign In
-      </button>
-      <button type="button" class="btn btn-o btn-sm" style="width:100%" id="resendBtn" onclick="handleResend()">
-        📧 Resend confirmation email
-      </button>
-      <p style="font-size:.72rem;color:var(--muted)">You can close this and check back later</p>
-    </div>
-  </div>
-</div>
-
-<div id="toast">Done</div>
-
-<script>
+<script defer>
 // ═══════════════════════════════════════════════════════════
 // SUPABASE CLIENT
 // ═══════════════════════════════════════════════════════════
@@ -2666,458 +1882,55 @@ function updateMobileNav(){
 // PARTICLES
 // ═══════════════════════════════════════════════════════════
 (function(){
-  const c=document.getElementById('bgCanvas'),ctx=c.getContext('2d');
-  let pts=[];
-  function rsz(){c.width=innerWidth;c.height=innerHeight;}
-  rsz();addEventListener('resize',rsz);
-  class P{
-    constructor(){this.r();}
-    r(){this.x=Math.random()*c.width;this.y=c.height+5;this.s=Math.random()*1.8+.6;this.vy=Math.random()*.7+.25;this.vx=(Math.random()-.5)*.35;this.a=1;this.da=Math.random()*.0025+.0008;this.h=Math.random()*35+15;}
-    u(){this.y-=this.vy;this.x+=this.vx;this.a-=this.da;if(this.a<=0||this.y<-5)this.r();}
-    d(){ctx.save();ctx.globalAlpha=this.a*.35;ctx.fillStyle=`hsl(${this.h},88%,62%)`;ctx.beginPath();ctx.arc(this.x,this.y,this.s,0,Math.PI*2);ctx.fill();ctx.restore();}
+  function initParticles(){
+    var c=document.getElementById('bgCanvas');
+    if(!c)return; // canvas not in DOM yet
+    var ctx=c.getContext('2d');
+    if(!ctx)return;
+    var pts=[];
+    function rsz(){c.width=innerWidth;c.height=innerHeight;}
+    rsz();
+    window.addEventListener('resize',rsz);
+    function P(){this.r();}
+    P.prototype.r=function(){
+      this.x=Math.random()*c.width;this.y=c.height+5;
+      this.s=Math.random()*1.8+.6;this.vy=Math.random()*.7+.25;
+      this.vx=(Math.random()-.5)*.35;this.a=1;
+      this.da=Math.random()*.0025+.0008;this.h=Math.random()*35+15;
+    };
+    P.prototype.u=function(){
+      this.y-=this.vy;this.x+=this.vx;this.a-=this.da;
+      if(this.a<=0||this.y<-5)this.r();
+    };
+    P.prototype.d=function(){
+      ctx.save();ctx.globalAlpha=this.a*.35;
+      ctx.fillStyle='hsl('+this.h+',88%,62%)';
+      ctx.beginPath();ctx.arc(this.x,this.y,this.s,0,Math.PI*2);
+      ctx.fill();ctx.restore();
+    };
+    var particleCount=window.innerWidth<640?15:40;
+    for(var i=0;i<particleCount;i++){
+      var p=new P();p.y=Math.random()*c.height;pts.push(p);
+    }
+    function loop(){
+      ctx.clearRect(0,0,c.width,c.height);
+      pts.forEach(function(p){p.u();p.d();});
+      requestAnimationFrame(loop);
+    }
+    loop();
   }
-  const particleCount=window.innerWidth<640?20:55;
-for(let i=0;i<particleCount;i++){const p=new P();p.y=Math.random()*c.height;pts.push(p);}
-  function loop(){ctx.clearRect(0,0,c.width,c.height);pts.forEach(p=>{p.u();p.d();});requestAnimationFrame(loop);}
-  loop();
-// ── REGISTER REAL FUNCTIONS for stub delegation ──
-window._handlePostInput=handlePostInput;
-window._submitPost=submitPost;
-window._saveDeceased=saveDeceased;
-window._openDeceasedModal=openDeceasedModal;
-window._switchPostType=switchPostType;
-window._previewPostImage=previewPostImage;
-window._prevDPhoto=prevDPhoto;
-window._prevDMedia=prevDMedia;
-window._selectFriendRel=selectFriendRel;
-window._saveFriendRel=saveFriendRel;
-window._skipFriendRel=skipFriendRel;
-window._openSetRelationship=openSetRelationship;
-window._acceptFriendById=acceptFriendById;
-window._declineFriend=declineFriend;
-window._sendFriendReq=sendFriendReq;
-window._doLogin=doLogin;
-window._doRegister=doRegister;
-window._openConnect=openConnect;
-window._saveConnection=saveConnection;
-window._quickPrayer=quickPrayer;
-window._submitPrayer=submitPrayer;
-window._setTpl=setTpl;
-window._toggleSmile=toggleSmile;
-window._openDeceased=openDeceased;
-window._toggleComments=toggleComments;
-window._postComment=postComment;
-window._replyToComment=replyToComment;
-window._openShare=openShare;
-window._openInviteModal=openInviteModal;
-window._openPeoplePage=openPeoplePage;
-window._openUserProfile=openUserProfile;
-window._openMyProfile=openMyProfile;
-window._doLogout=doLogout;
-window._showUTab=showUTab;
-window._openEditProfile=openEditProfile;
-window._saveProfile=saveProfile;
-window._copyInvite=copyInvite;
-window._sendInvite=sendInvite;
-window._searchFriends=searchFriends;
-window._openDonationModal=openDonationModal;
-window._switchPayTab=switchPayTab;
-window._doDonate=doDonate;
-window._pickDon=pickDon;
-window._copyDuitNow=copyDuitNow;
-window._copyGrabPay=copyGrabPay;
-window._setFeedTab=setFeedTab;
-window._setFeedFilter=setFeedFilter;
-window._renderPeopleResults=renderPeopleResults;
-window._acceptFriend=acceptFriend;
-window._mnavGo=mnavGo;
-window._toggleLangMenu=toggleLangMenu;
-window._setLang=setLang;
-window._togglePostLike=togglePostLike;
-window._togglePostComments=togglePostComments;
-window._submitPostComment=submitPostComment;
-window._previewEpPhoto=previewEpPhoto;
-window._quickAvatarUpload=quickAvatarUpload;
-window._handleResend=handleResend;
-window._resendConfirmation=resendConfirmation;
-window._submitInlinePrayer=submitInlinePrayer;
-window._showNotifs=showNotifs;
-console.log('All functions registered ✓');
-
+  // Wait for DOM to be ready
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',initParticles);
+  }else{
+    initParticles();
+  }
 })();
 
 // ═══════════════════════════════════════════════════════════
 // INIT — Supabase Auth + load data
 // ═══════════════════════════════════════════════════════════
-(async()=>{
-  showLoader(true);
-  const lh=document.getElementById('loadingHint');
-  if(lh)lh.style.display='block';
-  // Load public data first so guests can browse
-  await loadAllData();
-  // Check if user already has a session
-  const {data:{session}}=await sb.auth.getSession();
-  if(session){
-    if(lh)lh.style.display='none';
-    await afterAuth(session.user);
-  }else{
-    showLoader(false);
-    if(lh)lh.style.display='none';
-    showPageDirect('heroPage');
-    updateNav();
-  }
-  // Apply language
-  initLang();
-  // Listen for future auth changes
-  sb.auth.onAuthStateChange(async(event,session)=>{
-    if(event==='SIGNED_IN'&&session&&(!CU||CU.id!==session.user.id)){
-      await afterAuth(session.user);
-    }else if(event==='SIGNED_OUT'){
-      CU=null;localStorage.removeItem('rb_cu');
-      Object.keys(CACHE).forEach(k=>CACHE[k]=[]);
-      updateNav();showPageDirect('heroPage');
-    }
-  });
-
-
-// ═══════════════════════════════════════════════════════════
-// POSTS SYSTEM
-// ═══════════════════════════════════════════════════════════
-let currentPostType='post';
-let postImageData='';
-let pendingFriendReqId=null;
-let pendingFriendReqToId=null;
-let selectedFriendRel='Friend';
-
-function switchPostType(type,btn){
-  currentPostType=type;
-  document.querySelectorAll('.post-type-tab').forEach(b=>b.classList.remove('act'));
-  if(btn)btn.classList.add('act');
-  if(type==='memorial'){
-    closeCreatePost();
-    openDeceasedModal();
-  }
-}
-function closeCreatePost(){
-  document.getElementById('postTextInput').value='';
-  postImageData='';
-  document.getElementById('postImagePreview').style.display='none';
-  document.getElementById('postImagePreview').innerHTML='';
-}
-function previewPostImage(input){
-  const f=input.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=e=>{
-    postImageData=e.target.result;
-    const prev=document.getElementById('postImagePreview');
-    prev.style.display='block';
-    prev.innerHTML=`<div style="position:relative;display:inline-block;width:100%">
-      <img src="${e.target.result}" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
-      <button type="button" onclick="removePostImage()" style="position:absolute;top:.4rem;right:.4rem;background:rgba(0,0,0,.6);border:none;color:#fff;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.8rem">✕</button>
-    </div>`;
-  };
-  r.readAsDataURL(f);
-}
-function removePostImage(){
-  postImageData='';
-  document.getElementById('postImagePreview').style.display='none';
-  document.getElementById('postImagePreview').innerHTML='';
-  document.getElementById('postImageFile').value='';
-}
-async function submitPost(){
-  if(!CU){toast('Please sign in to post.');showPage('authPage');setAuthMode('login');return;}
-  if(!sb){toast('Not connected. Please refresh.');return;}
-  var input=document.getElementById('postTextInput');
-  var text=input?input.value.trim():'';
-  if(!text&&!postImageData){toast('Please write something or add a photo.');return;}
-  var visEl=document.getElementById('postVisibility');
-  var visibility=visEl?visEl.value:'friends';
-  var btn=document.getElementById('postSubmitBtn');
-  if(btn){btn.disabled=true;btn.textContent='Posting…';}
-  hideMentionDropdown();
-  try{
-    var imageUrl='';
-    if(postImageData){
-      try{imageUrl=await uploadBase64(postImageData,'posts');}
-      catch(e){console.warn('Image upload:',e);}
-    }
-    var res=await sb.from('posts').insert({
-      user_id:CU.id,
-      text:text,
-      image_url:imageUrl||null,
-      visibility:visibility,
-      created_at:new Date().toISOString()
-    }).select().single();
-    if(res.error)throw new Error(res.error.message);
-    CACHE.posts.unshift(res.data);
-    if(input)input.value='';
-    postImageData='';
-    var prev=document.getElementById('postImagePreview');
-    if(prev){prev.style.display='none';prev.innerHTML='';}
-    var fi=document.getElementById('postImageFile');
-    if(fi)fi.value='';
-    if(btn){btn.disabled=false;btn.textContent='Share Post';}
-    toast('✅ Post shared!');
-    renderFeed();
-    var fids=getMyFriendIds();
-    fids.forEach(function(fid){addNotif(fid,uName(CU)+' shared a new post','📝');});
-  }catch(e){
-    if(btn){btn.disabled=false;btn.textContent='Share Post';}
-    console.error('Post error:',e);
-    toast('❌ Could not post: '+e.message);
-  }
-}
-
-// ── @ MENTION SYSTEM ──
-var _mentionStart=0;
-function handlePostInput(){
-  var input=document.getElementById('postTextInput');
-  if(!input)return;
-  var text=input.value;
-  var pos=input.selectionStart||text.length;
-  var before=text.slice(0,pos);
-  var atIdx=before.lastIndexOf('@');
-  if(atIdx>=0&&(atIdx===0||/\s/.test(before[atIdx-1]))){
-    var q=before.slice(atIdx+1);
-    if(!q.includes(' ')){_mentionStart=atIdx;showMentionDropdown(q);return;}
-  }
-  hideMentionDropdown();
-}
-function showMentionDropdown(q){
-  var dd=document.getElementById('mentionDropdown');
-  if(!dd){
-    dd=document.createElement('div');
-    dd.id='mentionDropdown';
-    dd.style.cssText='position:absolute;bottom:100%;left:0;right:0;background:var(--navy-l);border:1px solid var(--border);border-radius:10px;z-index:500;max-height:180px;overflow-y:auto;box-shadow:0 -4px 20px rgba(0,0,0,.5);';
-    var box=document.getElementById('createPostBox');
-    if(box){box.style.position='relative';box.appendChild(dd);}else{document.body.appendChild(dd);}
-  }
-  var fids=CU?getMyFriendIds():[];
-  fids.push(CU?CU.id:'');
-  var matches=CACHE.users.filter(function(u){return fids.includes(u.id)&&uName(u).toLowerCase().indexOf(q.toLowerCase())>=0;}).slice(0,6);
-  if(!matches.length){dd.style.display='none';return;}
-  dd.innerHTML='';
-  matches.forEach(function(u){
-    var d=document.createElement('div');
-    d.style.cssText='display:flex;align-items:center;gap:.6rem;padding:.55rem .9rem;cursor:pointer;font-size:.84rem;color:var(--ivory);';
-    var av=u.avatar_url?'<img src="'+u.avatar_url+'" style="width:28px;height:28px;border-radius:50%;object-fit:cover">':'<div style="width:28px;height:28px;border-radius:50%;background:var(--navy-m);display:flex;align-items:center;justify-content:center;font-size:.75rem;color:var(--gold)">'+(u.first_name||'?').charAt(0)+'</div>';
-    d.innerHTML=av+'<span>'+uName(u)+'</span>';
-    d.onmouseover=function(){this.style.background='rgba(201,168,76,.12)';};
-    d.onmouseout=function(){this.style.background='';};
-    d.onclick=function(){insertMention(uName(u));};
-    dd.appendChild(d);
-  });
-  dd.style.display='block';
-}
-function hideMentionDropdown(){
-  var dd=document.getElementById('mentionDropdown');
-  if(dd)dd.style.display='none';
-}
-function insertMention(name){
-  var input=document.getElementById('postTextInput');
-  if(!input)return;
-  var text=input.value;
-  var pos=input.selectionStart||text.length;
-  var before=text.slice(0,_mentionStart);
-  var after=text.slice(pos);
-  input.value=before+'@'+name+' '+after;
-  input.focus();
-  var np=before.length+name.length+2;
-  input.setSelectionRange(np,np);
-  hideMentionDropdown();
-}
-document.addEventListener('click',function(e){
-  if(e.target&&e.target.id!=='postTextInput'&&!e.target.closest('#mentionDropdown'))hideMentionDropdown();
-});
-
-function renderPostCard(p){
-  const u=CACHE.users.find(x=>x.id===p.user_id)||(CU&&p.user_id===CU.id?{id:CU.id,first_name:CU.firstName,last_name:CU.lastName,avatar_url:CU.avatar}:null);
-  const av=u?(u.avatar_url||u.avatar)?`<img src="${u.avatar_url||u.avatar}" style="width:100%;height:100%;object-fit:cover">`:(((u.first_name||u.firstName||'?').charAt(0))+((u.last_name||u.lastName||'').charAt(0))):'👤';
-  const name=u?uName(u):'Someone';
-  const fids=getMyFriendIds();
-  const fr=CACHE.friends.find(f=>(f.from_id===CU?.id&&f.to_id===p.user_id)||(f.to_id===CU?.id&&f.from_id===p.user_id));
-  const relLabel=fr?.relationship?`<span class="friend-tag">${fr.relationship}</span>`:'';
-  const comments=CACHE.comments.filter(c=>c.post_id===p.id);
-  const isLiked=p.liked_by&&CU&&p.liked_by.includes(CU.id);
-  const likeCount=p.like_count||0;
-  const vis=p.visibility==='public'?'🌍 Everyone':'👥 Friends';
-  return `<div class="post-card mcard" id="post-${p.id}">
-    <div class="post-header">
-      <div class="post-av" onclick="${u?`openUserProfile('${u.id}')`:'void(0)'}">${av}</div>
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
-          <span class="post-author" onclick="${u?`openUserProfile('${u.id}')`:'void(0)'}">${name}</span>
-          ${relLabel}
-        </div>
-        <div class="post-time">${timeSince(p.created_at)} · <span class="post-visibility">${vis}</span></div>
-      </div>
-    </div>
-    ${p.text?`<div class="post-body">${p.text}</div>`:''}
-    ${p.image_url&&!p.image_url.startsWith('data:')?`<img class="post-image" src="${p.image_url}" alt="post image" loading="lazy">`:''}
-    ${p.image_url&&p.image_url.startsWith('data:')?`<img class="post-image" src="${p.image_url}" alt="post image">`:''}
-    <div class="post-actions">
-      <button type="button" class="act-btn${isLiked?' on':''}" onclick="togglePostLike('${p.id}')">❤️ ${likeCount} Like${likeCount!==1?'s':''}</button>
-      <button type="button" class="act-btn" onclick="togglePostComments('${p.id}')">💬 ${comments.length} Comment${comments.length!==1?'s':''}</button>
-      <button type="button" class="act-btn" onclick="openPostShare('${p.id}')">↗ Share</button>
-    </div>
-    <div class="comments-section" id="postcomments-${p.id}" style="display:none">
-      <div class="comments-list" id="postCommentsList-${p.id}"></div>
-      <div class="comment-input-row">
-        ${CU?uAvHtml(CU,28):'<div style="width:28px;height:28px;border-radius:50%;background:var(--navy-m);display:flex;align-items:center;justify-content:center;font-size:.7rem">👤</div>'}
-        <input type="text" id="postCommentInput-${p.id}" placeholder="Write a comment…" onkeydown="if(event.key==='Enter')submitPostComment('${p.id}')">
-        <button type="button" onclick="submitPostComment('${p.id}')">Post</button>
-      </div>
-    </div>
-  </div>`;
-}
-function togglePostComments(postId){
-  const el=document.getElementById('postcomments-'+postId);
-  if(!el)return;
-  const isOpen=el.style.display!=='none';
-  el.style.display=isOpen?'none':'block';
-  if(!isOpen)renderPostComments(postId);
-}
-function renderPostComments(postId){
-  const list=document.getElementById('postCommentsList-'+postId);if(!list)return;
-  const comments=CACHE.comments.filter(c=>c.post_id===postId);
-  if(!comments.length){list.innerHTML='<div class="txt-m txt-sm" style="padding:.3rem">No comments yet.</div>';return;}
-  list.innerHTML=comments.map(c=>{
-    const cu=CACHE.users.find(x=>x.id===c.user_id);
-    return `<div class="comment-item">
-      <div onclick="${cu?`openUserProfile('${c.user_id}')`:'void(0)'}">${uAvHtml(cu,24)}</div>
-      <div class="comment-bubble">
-        <div class="comment-author">${c.author}</div>
-        <div class="comment-text">${c.text}</div>
-        <div class="comment-time">${timeSince(c.created_at)}</div>
-      </div>
-    </div>`;
-  }).join('');
-}
-async function submitPostComment(postId){
-  if(!CU){toast('Please sign in.');return;}
-  const input=document.getElementById('postCommentInput-'+postId);
-  if(!input)return;
-  const txt=input.value.trim();if(!txt)return;
-  const comment={id:'pc'+Date.now(),post_id:postId,user_id:CU.id,author:uName(CU),text:txt,created_at:new Date().toISOString()};
-  try{
-    await sb.from('comments').insert({...comment,deceased_id:null});
-  }catch(e){console.warn('Comment save:',e);}
-  CACHE.comments.unshift(comment);
-  input.value='';
-  renderPostComments(postId);
-  const btn=document.querySelector(`#post-${postId} [onclick^="togglePostComments"]`);
-  if(btn){const c=CACHE.comments.filter(x=>x.post_id===postId).length;btn.textContent=`💬 ${c} Comment${c!==1?'s':''}`;}
-  toast('💬 Comment posted!');
-}
-async function togglePostLike(postId){
-  if(!CU){toast('Please sign in.');return;}
-  const p=CACHE.posts.find(x=>x.id===postId);if(!p)return;
-  p.like_count=(p.like_count||0);
-  p.liked_by=p.liked_by||[];
-  if(p.liked_by.includes(CU.id)){
-    p.liked_by=p.liked_by.filter(id=>id!==CU.id);
-    p.like_count=Math.max(0,p.like_count-1);
-  }else{
-    p.liked_by.push(CU.id);
-    p.like_count++;
-  }
-  try{await sb.from('posts').update({like_count:p.like_count,liked_by:p.liked_by}).eq('id',postId);}catch(e){console.warn(e);}
-  renderFeed();
-}
-function openPostShare(postId){toast('Share this post with your friends! Copy the link: deswats.github.io/remembered');}
-
-// ═══════════════════════════════════════════════════════════
-// FRIEND RELATIONSHIP SYSTEM
-// ═══════════════════════════════════════════════════════════
-function selectFriendRel(rel,btn){
-  selectedFriendRel=rel;
-  document.querySelectorAll('.friend-rel-opt').forEach(b=>b.classList.remove('sel'));
-  if(btn)btn.classList.add('sel');
-  document.getElementById('friendRelCustom').value='';
-}
-function skipFriendRel(){
-  closeModal('friendRelModal');
-  // Complete friend request without relationship
-  completeFriendReq(pendingFriendReqId,'Friend');
-}
-async function completeFriendReq(frId,relationship){
-  if(!frId){toast('Error: missing ID.');return;}
-  if(!sb){toast('Not connected.');return;}
-  try{
-    await sb.from('friends').update({status:'accepted',relationship:relationship}).eq('id',frId);
-    var fr=CACHE.friends.find(function(x){return x.id===frId;});
-    if(fr){fr.status='accepted';fr.relationship=relationship;}
-    if(fr&&fr.from_id!==CU.id){
-      await addNotif(fr.from_id,uName(CU)+' connected with you as '+relationship+' 🤝','🤝');
-    }
-    toast('🤝 Connected as: '+relationship+'!');
-    renderMyFriends();renderNotifications();updateNotifBadge();
-    renderFeed();renderFriendSuggestions();renderSidebarProfile();
-    if(viewingUserId)setTimeout(function(){openUserProfile(viewingUserId);},200);
-    var psi=document.getElementById('peopleSearchInput');
-    renderPeopleResults(psi?psi.value:'');
-  }catch(e){
-    console.error('completeFriendReq:',e);
-    toast('❌ '+e.message);
-  }
-}
-async function saveFriendRel(){
-  var custEl=document.getElementById('friendRelCustom');
-  var custom=custEl?custEl.value.trim():'';
-  var rel=custom||selectedFriendRel||'Friend';
-  closeModal('friendRelModal');
-  await completeFriendReq(pendingFriendReqId,rel);
-}
-function skipFriendRel(){
-  closeModal('friendRelModal');
-  completeFriendReq(pendingFriendReqId,'Friend');
-}
-function openSetRelationship(uid){
-  var fr=CACHE.friends.find(function(f){
-    return (f.from_id===CU.id&&f.to_id===uid)||(f.from_id===uid&&f.to_id===CU.id);
-  });
-  if(!fr){toast('You are not connected yet.');return;}
-  pendingFriendReqId=fr.id;
-  selectedFriendRel=fr.relationship||'Friend';
-  var u=CACHE.users.find(function(x){return x.id===uid;});
-  var nameEl=document.getElementById('friendRelName');
-  if(nameEl)nameEl.textContent=u?uName(u):'your friend';
-  document.querySelectorAll('.friend-rel-opt').forEach(function(b){
-    b.classList.remove('sel');
-    if(b.textContent.trim()===selectedFriendRel)b.classList.add('sel');
-  });
-  var custEl=document.getElementById('friendRelCustom');
-  if(custEl)custEl.value='';
-  openModal('friendRelModal');
-}
-function selectFriendRel(rel,btn){
-  selectedFriendRel=rel;
-  document.querySelectorAll('.friend-rel-opt').forEach(function(b){b.classList.remove('sel');});
-  if(btn)btn.classList.add('sel');
-  var custEl=document.getElementById('friendRelCustom');
-  if(custEl)custEl.value='';
-}
-async function acceptFriendById(frId){
-  pendingFriendReqId=frId;
-  selectedFriendRel='Friend';
-  const fr=CACHE.friends.find(x=>x.id===frId);
-  const fromUser=fr?CACHE.users.find(x=>x.id===fr.from_id):null;
-  const nameEl=document.getElementById('friendRelName');
-  if(nameEl)nameEl.textContent=fromUser?uName(fromUser):'your friend';
-  // Reset selection
-  document.querySelectorAll('.friend-rel-opt').forEach(b=>b.classList.remove('sel'));
-  // Select 'Friend' option by default
-  document.querySelectorAll('.friend-rel-opt').forEach(function(b){
-    if(b.textContent.trim().indexOf('Friend')>-1 && b.textContent.trim().indexOf('Close')===-1){
-      b.classList.add('sel');
-      selectedFriendRel='Friend';
-    }
-  });
-  if(document.getElementById('friendRelCustom'))document.getElementById('friendRelCustom').value='';
-  openModal('friendRelModal');
-}
-
-})();
+// Old IIFE removed - using initApp() instead
 
 // ═══════════════════════════════════════════════════════════
 // LANGUAGE SYSTEM — must be GLOBAL (outside IIFE) so HTML buttons can call it
@@ -3232,9 +2045,6 @@ function initLang(){
   console.log('Language initialized:',currentLang);
 }
 
-
-// Register lang functions
-window._toggleLangMenu=typeof toggleLangMenu==='function'?toggleLangMenu:window._toggleLangMenu;
 window._setLang=typeof setLang==='function'?setLang:window._setLang;
 // Auto-init when DOM ready
 if(document.readyState==='loading'){
@@ -3315,5 +2125,724 @@ function startWhenReady(){
 // Start the app
 startWhenReady();
 </script>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<div id="iosTouch" style="display:none" ontouchstart=""></div>
+
+<script>
+
+// ═══════════════════════════════════════════════════════════
+// iOS SAFARI CLICK FIX
+// Prevents 300ms delay and fixes elements that don't respond
+// ═══════════════════════════════════════════════════════════
+(function(){
+  // Only apply on iOS
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  if(!isIOS) return;
+  
+  // Add touchend handler to document to fire click on any element with onclick
+  document.addEventListener('touchend', function(e){
+    var el = e.target;
+    // SKIP lang elements - they handle their own touch events
+    if(el.closest('#langWrap'))return;
+    // Walk up DOM to find clickable element
+    for(var i=0; i<5; i++){
+      if(!el) break;
+      // If element has onclick or is a button/a tag
+      if(el.onclick || el.tagName==='BUTTON' || el.tagName==='A' || 
+         el.getAttribute('onclick') || el.role==='button'){
+        // Don't fire if user is scrolling
+        if(e.changedTouches && e.changedTouches.length > 0){
+          var touch = e.changedTouches[0];
+          if(Math.abs(touch.clientX - (el._touchStartX||touch.clientX)) < 10 &&
+             Math.abs(touch.clientY - (el._touchStartY||touch.clientY)) < 10){
+            // It's a tap, not a scroll — fire click
+            if(el.getAttribute('onclick') && el.tagName !== 'BUTTON' && el.tagName !== 'A'){
+              e.preventDefault();
+              // Execute the onclick
+              try{ el.click(); }catch(err){ 
+                var fn = new Function(el.getAttribute('onclick'));
+                fn.call(el);
+              }
+            }
+          }
+        }
+        break;
+      }
+      el = el.parentElement;
+    }
+  }, {passive:false});
+  
+  // Track touch start position to distinguish tap from scroll
+  document.addEventListener('touchstart', function(e){
+    if(e.touches && e.touches.length > 0){
+      var el = e.target;
+      el._touchStartX = e.touches[0].clientX;
+      el._touchStartY = e.touches[0].clientY;
+    }
+  }, {passive:true});
+  
+  console.log('iOS touch fix applied');
+})();
+
+// Early page switcher — works immediately, before Supabase loads
+function showPage(id){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');p.style.display='none';});
+  var el=document.getElementById(id);
+  if(el){el.classList.add('active');el.style.display=(['authPage','heroPage'].includes(id)?'flex':'block');}
+  var sw=document.getElementById('navSearchWrap');
+  if(sw)sw.style.display=(['appPage','deceasedPage','userPage','peoplePage'].includes(id))?'flex':'none';
+}
+function setAuthMode(m){
+  var lf=document.getElementById('loginF');
+  var rf=document.getElementById('regF');
+  if(!lf||!rf)return;
+  if(m==='login'){lf.classList.remove('hidden');rf.classList.add('hidden');}
+  else{lf.classList.add('hidden');rf.classList.remove('hidden');}
+}
+function guestBrowse(){showPage('appPage');}
+</script>
+
+
+<!-- NAV -->
+<nav>
+  <div class="brand" onclick="goHome()" ontouchend="goHome();event.preventDefault()" role="button" tabindex="0">🌻 Remembered</div>
+  <div class="nav-search" id="navSearchWrap" style="display:none">
+    <span class="si">🔍</span>
+    <input type="text" id="globalSearch" placeholder="Search deceased by name…" oninput="handleSearch(this.value)" autocomplete="off">
+    <div id="searchDropdown"></div>
+  </div>
+  <div class="lang-wrap" id="langWrap">
+    <button type="button" class="lang-btn" onclick="toggleLangMenu()" id="langBtn">
+      <span class="lang-flag" id="currentFlag">🇬🇧</span>
+      <span id="currentLangLabel">EN</span> ▾
+    </button>
+    <div class="lang-dropdown" id="langDropdown">
+      <button type="button" class="lang-option active" onclick="setLang('en',this)"><span class="lf">🇬🇧</span> English</button>
+      <button type="button" class="lang-option" onclick="setLang('ms',this)"><span class="lf">🇲🇾</span> Bahasa Malaysia</button>
+      <button type="button" class="lang-option" onclick="setLang('fil',this)"><span class="lf">🇵🇭</span> Filipino</button>
+      <button type="button" class="lang-option" onclick="setLang('zh',this)"><span class="lf">🇨🇳</span> 中文</button>
+    </div>
+  </div>
+  <div class="nav-actions" id="navActions">
+    <button type="button" class="nb" onclick="showPage('authPage');setAuthMode('login')">Sign In</button>
+    <button type="button" class="nb prim" onclick="showPage('authPage');setAuthMode('register')">Join Free</button>
+  </div>
+</div>
+</nav>
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<div id="heroPage" class="page active">
+  <p class="h-eye" id="heroEyebrow">A celebration of lives lived</p>
+  <h1 class="h-title" id="heroTitle">Laugh. <em>Celebrate.</em><br>Always Remember.</h1>
+  <p class="h-sub" id="heroSub">Remembered is where families and friends come together to honour those who have passed — sharing photos, stories, prayers, and the connections that keep them alive in our hearts.</p>
+  <div class="h-acts">
+    <button type="button" class="btn btn-g" onclick="showPage('authPage');setAuthMode('register')" id="heroCelebBtn">🌻 Celebrate Someone</button>
+    <button type="button" class="btn btn-o" onclick="guestBrowse()" id="heroBrowseBtn">Browse Memorials</button>
+  </div>
+  <div id="loadingHint" style="margin-top:1rem;font-size:.75rem;color:var(--muted);display:none">⏳ Connecting to server…</div>
+</div>
+
+<!-- ═══════════════ AUTH ═══════════════ -->
+<div id="authPage" class="page">
+  <div class="auth-card">
+    <div id="loginF">
+      <p class="auth-t" id="loginTitle">Welcome back</p>
+      <p class="auth-s" id="loginSub">Sign in to celebrate someone you love</p>
+      <div style="display:flex;flex-direction:column;gap:.7rem">
+        <div class="fg"><label id="loginEmailLabel">Email</label><input type="email" id="liEmail" placeholder="you@email.com"></div>
+        <div class="fg"><label id="loginPassLabel">Password</label><input type="password" id="liPass" placeholder="••••••••"></div>
+        <button type="button" class="btn btn-g" style="width:100%;margin-top:.2rem" onclick="doLogin()" id="loginBtn">Sign In</button>
+      </div>
+      <div class="auth-sw"><span id="loginNoAccount">New here?</span> <a onclick="setAuthMode('register')" id="loginCreateLink">Create an account →</a></div>
+    </div>
+    <div id="regF" class="hidden">
+      <p class="auth-t" id="regTitle">Join Remembered</p>
+      <p class="auth-s" id="regSub">Create a free account to honour those you love</p>
+      <div style="display:flex;flex-direction:column;gap:.7rem">
+        <div class="fr">
+          <div class="fg"><label id="regFirstLabel">First Name</label><input type="text" id="rgFirst" placeholder="First"></div>
+          <div class="fg"><label id="regLastLabel">Last Name</label><input type="text" id="rgLast" placeholder="Last"></div>
+        </div>
+        <div class="fg"><label>Email</label><input type="email" id="rgEmail" placeholder="you@email.com"></div>
+        <div class="fg"><label>Password</label><input type="password" id="rgPass" placeholder="min. 6 characters"></div>
+        <div class="fg"><label id="regCountryLabel">Country</label>
+          <select id="rgCountry">
+            <option value="">Select country…</option>
+            <option>Malaysia</option><option>Indonesia</option><option>Philippines</option><option>Singapore</option><option>Thailand</option><option>Vietnam</option><option>China</option><option>India</option><option>United States</option><option>United Kingdom</option><option>Australia</option><option>Canada</option><option>Japan</option><option>South Korea</option><option>Other</option>
+          </select>
+        </div>
+        <button type="button" class="btn btn-g" style="width:100%;margin-top:.2rem" onclick="doRegister()" id="regCreateBtn">Create Account</button>
+      </div>
+      <div class="auth-sw"><span id="regAlreadyMember">Already a member?</span> <a onclick="setAuthMode('login')" id="regSignInLink">Sign in →</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ MAIN APP ═══════════════ -->
+<div id="appPage" class="page">
+  <div class="three-col">
+    <!-- LEFT -->
+    <aside class="side-l">
+      <div class="w" id="myProfileCard"></div>
+      <div class="w">
+        <p class="wt" id="sidebarConnectionsTitle">👥 My Connections</p>
+        <div id="myFriendsList" style="display:flex;flex-direction:column;gap:.5rem"></div>
+        <button type="button" class="btn btn-o btn-sm" style="width:100%;margin-top:.6rem" onclick="openInviteModal()" id="sidebarInviteBtn">+ Invite Friends</button>
+      </div>
+      <div class="w">
+        <p class="wt" id="sidebarCalTitle">📅 Sacred Observances</p>
+        <div id="calList"></div>
+        <div class="divider"></div>
+        <div style="font-size:.72rem;color:var(--muted)">All dates are indicative. Actual observances may vary by year and region.</div>
+      </div>
+    </aside>
+
+    <!-- FEED -->
+    <main>
+      <div class="feed">
+        <div class="create-post-box" id="createPostBox">
+          <div class="post-type-tabs">
+            <button type="button" class="post-type-tab act" id="ptPost" onclick="switchPostType('post',this)">📝 Post</button>
+            <button type="button" class="post-type-tab" id="ptMemorial" onclick="switchPostType('memorial',this)">🌻 Memorial</button>
+          </div>
+          <div id="postCreateArea">
+            <div style="display:flex;gap:.7rem;align-items:flex-start">
+              <div class="ua" id="feedAvatar" onclick="openMyProfile()">🌻</div>
+              <div style="flex:1">
+                <textarea id="postTextInput" oninput="handlePostInput()" placeholder="What's on your mind? Share a memory, thought or message with your friends…" rows="3" onclick="if(!CU){showPage('authPage');setAuthMode('login');}"></textarea>
+                <div id="postImagePreview" style="display:none;margin-top:.4rem"></div>
+              </div>
+            </div>
+            <div class="post-actions-row">
+              <div class="post-extras">
+                <label class="post-extra-btn" style="cursor:pointer">
+                  📷 Photo
+                  <input type="file" id="postImageFile" accept="image/*" style="display:none" onchange="previewPostImage(this)">
+                </label>
+                <select class="visibility-select" id="postVisibility" title="Who can see this?">
+                  <option value="friends">👥 Friends</option>
+                  <option value="public">🌍 Everyone</option>
+                </select>
+              </div>
+              <button type="button" class="btn btn-g btn-sm" onclick="submitPost()" id="postSubmitBtn" >Share Post</button>
+            </div>
+          </div>
+        </div>
+        <div class="feed-tab-row">
+          <button type="button" class="feed-tab act" id="feedTabAll" onclick="setFeedTab('all',this)">🌍 All Posts</button>
+          <button type="button" class="feed-tab" id="feedTabFriends" onclick="setFeedTab('friends',this)">👥 Friends <span class="new-badge" id="friendsFeedBadge" style="display:none">New</span></button>
+        </div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap" id="feedFilters">
+          <button type="button" class="nb act" id="fAll" onclick="setFeedFilter('all',this)" id="filterAll">All</button>
+          <button type="button" class="nb" id="fC" onclick="setFeedFilter('Christian',this)" id="filterC">✝ Christian</button>
+          <button type="button" class="nb" id="fM" onclick="setFeedFilter('Muslim',this)" id="filterM">☪ Muslim</button>
+          <button type="button" class="nb" id="fB" onclick="setFeedFilter('Buddhist',this)" id="filterB">☸ Buddhist</button>
+          <button type="button" class="nb" id="fG" onclick="setFeedFilter('General',this)">🌟 General</button>
+        </div>
+        <div id="mainFeed"></div>
+      </div>
+    </main>
+
+    <!-- RIGHT -->
+    <aside class="side-r">
+      <div class="w">
+        <p class="wt" id="sidebarCommunityTitle">📊 Community</p>
+        <div class="grid2" id="statsGrid"></div>
+      </div>
+      <div class="w">
+        <p class="wt" id="sidebarNotifTitle">🔔 Notifications</p>
+        <div id="notifList" style="display:flex;flex-direction:column;gap:.5rem;max-height:200px;overflow-y:auto"></div>
+      </div>
+      <div class="w">
+        <p class="wt" id="sidebarSuggestTitle">💡 People You May Know</p>
+        <div class="suggest-row" id="suggestList"></div>
+        <button type="button" class="btn btn-o btn-sm" style="width:100%;margin-top:.6rem" onclick="openPeoplePage()" id="sidebarBrowseAll">Browse All Members →</button>
+      </div>
+      <div class="w">
+        <p class="wt" id="sidebarTopTitle">😊 Most Celebrated</p>
+        <div id="topMemorials" style="display:flex;flex-direction:column;gap:.5rem"></div>
+      </div>
+      <div class="w" style="background:linear-gradient(135deg,rgba(201,168,76,.1),rgba(201,168,76,.02));border-color:rgba(201,168,76,.25)">
+        <p class="wt" id="sidebarDonateTitle">☀️ Keep Their Story Alive</p>
+        <p style="font-size:.74rem;color:var(--muted);margin-bottom:.5rem;line-height:1.55" id="sidebarDonateSub">Help us keep this celebration of lives alive — ad-free, always here.</p>
+        <div style="display:flex;flex-direction:column;gap:.4rem">
+          <button type="button" class="btn btn-sm" style="width:100%;background:rgba(220,30,30,.15);border:1px solid rgba(220,30,30,.35);color:#ff5252;font-weight:600" onclick="openDonationModal();switchPayTab('duitnow')" id="donateQRBtn">📱 Scan QR to Donate (DuitNow)</button>
+          <button type="button" class="btn btn-sm" style="width:100%;background:rgba(0,177,79,.1);border:1px solid rgba(0,177,79,.3);color:#00b14f" onclick="openDonationModal();switchPayTab('grab')" id="donateGrabBtn">🟢 GrabPay</button>
+          <button type="button" class="btn btn-sm" style="width:100%;background:rgba(0,112,186,.1);border:1px solid rgba(0,112,186,.3);color:#009CDE" onclick="openDonationModal();switchPayTab('paypal')" id="donatePaypalBtn">💙 PayPal (International)</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ═══════════════ PEOPLE / DISCOVER ═══════════════ -->
+<div id="peoplePage" class="page">
+  <div class="people-page">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+      <h2 style="font-family:'Cormorant Garant',serif;font-size:1.6rem;font-weight:300;color:var(--gold)">👥 Find Friends</h2>
+      <button type="button" class="btn btn-o btn-sm" onclick="showPage('appPage');renderApp()">← Back to Feed</button>
+    </div>
+    <div class="people-search-bar">
+      <input type="text" id="peopleSearchInput" placeholder="Search members by name or country…" oninput="renderPeopleResults(this.value)">
+    </div>
+
+    <!-- Pending requests -->
+    <div id="pendingRequestsSection" style="margin-bottom:1.2rem"></div>
+
+    <!-- Search results or suggestions -->
+    <div>
+      <p class="section-title" id="peopleResultsLabel">✨ Suggested People</p>
+      <div class="people-grid" id="peopleGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ DECEASED PROFILE ═══════════════ -->
+<div id="deceasedPage" class="page">
+  <div class="prof-hero" id="dpHero">
+    <button type="button" class="back-b" onclick="goBack()">← Back</button>
+    <div class="ph-photo" id="dpPhoto">👤</div>
+    <h1 class="ph-name" id="dpName"></h1>
+    <p class="ph-dates" id="dpDates"></p>
+    <p class="ph-dates" id="dpLoc" style="color:var(--lavender)"></p>
+    <div class="ph-actions" id="dpActions"></div>
+  </div>
+  <div class="prof-body">
+    <div class="ps" id="dpConnections"><h3>🤝 Connected Loved Ones</h3><div id="dpConnList"></div></div>
+    <div class="ps" id="dpGallery"><h3>📸 Photos & Memories</h3><div class="mgal" id="dpGalleryGrid"></div></div>
+    <div class="ps"><h3>🙏 Prayer & Memory Wall</h3><div class="pw-add" id="dpPrayerAdd"></div><div class="divider"></div><div class="prayer-wall" id="dpPrayerWall"></div></div>
+  </div>
+</div>
+
+<!-- ═══════════════ USER PROFILE ═══════════════ -->
+<div id="userPage" class="page">
+  <div class="upage">
+    <div class="u-hero">
+      <div id="upAvatarWrap" style="flex-shrink:0">
+        <div class="u-av-lg" id="upAvatar">👤</div>
+      </div>
+      <div class="u-meta">
+        <h2 id="upName"></h2>
+        <p id="upMeta"></p>
+        <div class="u-tags" id="upTags"></div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:.5rem;flex-wrap:wrap" id="upActions"></div>
+    </div>
+    <div class="u-tabs">
+      <button type="button" class="u-tab act" onclick="showUTab('memorials',this)">🌻 Memorials</button>
+      <button type="button" class="u-tab" onclick="showUTab('connections',this)">👥 Connections</button>
+      <button type="button" class="u-tab" onclick="showUTab('friends',this)">🤝 Friends</button>
+    </div>
+    <div id="uTabContent"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ MODALS ═══════════════ -->
+
+<!-- CREATE DECEASED -->
+<div class="ov" id="deceasedModal">
+  <div class="modal">
+    <div class="mhdr"><p class="mhdr-title">🌻 Add a Memorial</p><button type="button" class="mclose" onclick="closeModal('deceasedModal')">×</button></div>
+    <div class="mbody">
+      <div class="fr">
+        <div class="fg"><label>Full Name *</label><input id="dName" placeholder="e.g. Maria Santos"></div>
+        <div class="fg"><label>Nickname <span class="opt">optional</span></label><input id="dNick" placeholder="e.g. Mama"></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label>Date of Birth *</label><input type="date" id="dDob"></div>
+        <div class="fg"><label>Date of Passing *</label><input type="date" id="dDod"></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label>Place of Birth</label><input id="dPob" placeholder="e.g. Kota Kinabalu, Sabah"></div>
+        <div class="fg"><label>Place of Rest <span class="opt">optional</span></label><input id="dBurial" placeholder="e.g. Nirvana Memorial Park"></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label id="regCountryLabel">Country</label>
+          <select id="dCountry"><option value="">Country…</option><option>Malaysia</option><option>Indonesia</option><option>Philippines</option><option>Singapore</option><option>Thailand</option><option>Vietnam</option><option>China</option><option>India</option><option>United States</option><option>United Kingdom</option><option>Australia</option><option>Canada</option><option>Japan</option><option>Other</option></select>
+        </div>
+        <div class="fg"><label>Faith / Religion</label>
+          <select id="dRel"><option value="General">General</option><option value="Christian">Christian</option><option value="Muslim">Muslim</option><option value="Buddhist">Buddhist</option></select>
+        </div>
+      </div>
+      <div class="fg"><label>Your relationship to them *</label>
+        <div class="rel-grid" id="relGrid"></div>
+      </div>
+      <div class="fg">
+        <label>Profile Photo</label>
+        <div class="upload-z"><input type="file" id="dPhoto" accept="image/*" onchange="prevDPhoto(this)"><div class="ui">📷</div><div class="ut"><strong>Upload a photo</strong> of them</div></div>
+        <img id="dPhotoP" style="display:none;width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--gold);margin-top:.5rem">
+      </div>
+      <div class="fg">
+        <label>Photos & Videos <span class="opt">memories — multiple allowed</span></label>
+        <div class="upload-z"><input type="file" id="dMedia" accept="image/*,video/*" multiple onchange="prevDMedia(this)"><div class="ui">🖼️</div><div class="ut"><strong>Upload photos or videos</strong> from their life</div></div>
+        <div class="pgrid" id="dMediaGrid"></div>
+      </div>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-o" onclick="closeModal('deceasedModal')">Cancel</button>
+      <button type="button" class="btn btn-g" onclick="saveDeceased()">🌻 Publish Memorial</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONNECT TO DECEASED (for other users) -->
+<div class="ov" id="connectModal">
+  <div class="modal sm">
+    <div class="mhdr"><p class="mhdr-title">🤝 Connect to this Memorial</p><button type="button" class="mclose" onclick="closeModal('connectModal')">×</button></div>
+    <div class="mbody">
+      <p style="font-size:.85rem;color:var(--lavender)">How were you connected to <strong id="connectName" style="color:var(--gold)"></strong>?</p>
+      <div class="fg"><label>Your relationship</label><div class="rel-grid" id="connectRelGrid"></div></div>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-o" onclick="closeModal('connectModal')">Cancel</button>
+      <button type="button" class="btn btn-g" onclick="saveConnection()">Save Connection</button>
+    </div>
+  </div>
+</div>
+
+<!-- PRAYER MODAL -->
+<div class="ov" id="prayerModal">
+  <div class="modal sm">
+    <div class="mhdr"><p class="mhdr-title">🙏 Leave a Prayer</p><button type="button" class="mclose" onclick="closeModal('prayerModal')">×</button></div>
+    <div class="mbody">
+      <p style="font-size:.83rem;color:var(--lavender)">For <strong id="pmName" style="color:var(--gold)"></strong></p>
+      <div class="tpl-row">
+        <button type="button" class="tpl-b" onclick="setTpl('c')">✝ Christian</button>
+        <button type="button" class="tpl-b" onclick="setTpl('m')">☪ Islamic</button>
+        <button type="button" class="tpl-b" onclick="setTpl('b')">☸ Buddhist</button>
+        <button type="button" class="tpl-b" onclick="setTpl('j')">✨ Joy</button>
+        <button type="button" class="tpl-b" onclick="setTpl('mem')">💭 Memory</button>
+      </div>
+      <div class="fg"><textarea id="pmText" placeholder="Write your prayer, memory, or kind words…" style="min-height:110px"></textarea></div>
+      <div class="fg"><label>Your name</label><input id="pmAuthor" placeholder="e.g. A loving friend"></div>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-o" onclick="closeModal('prayerModal')">Cancel</button>
+      <button type="button" class="btn btn-g" onclick="submitPrayer()">🙏 Post Prayer</button>
+    </div>
+  </div>
+</div>
+
+<!-- INVITE FRIENDS -->
+<div class="ov" id="inviteModal">
+  <div class="modal sm">
+    <div class="mhdr"><p class="mhdr-title">👥 Invite Friends</p><button type="button" class="mclose" onclick="closeModal('inviteModal')">×</button></div>
+    <div class="mbody">
+      <div class="fg"><label>Invite by email</label><input type="email" id="inviteEmail" placeholder="friend@email.com"></div>
+      <button type="button" class="btn btn-g btn-sm" onclick="sendInvite()">Send Invite</button>
+      <div class="divider"></div>
+      <p style="font-size:.78rem;color:var(--lavender)">Or share your personal invite link:</p>
+      <div class="invite-link-box">
+        <span id="inviteLink">deswats.github.io/remembered?ref=…</span>
+        <button type="button" class="btn btn-o btn-sm" onclick="copyInvite()">Copy</button>
+      </div>
+      <div class="divider"></div>
+      <p class="wt" style="margin-bottom:.5rem">Find existing members</p>
+      <input type="text" id="friendSearch" placeholder="Search by name…" oninput="searchFriends(this.value)">
+      <div id="friendSearchResults" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.5rem;max-height:200px;overflow-y:auto"></div>
+    </div>
+    <div class="mftr"><button type="button" class="btn btn-o" onclick="closeModal('inviteModal')">Close</button></div>
+  </div>
+</div>
+
+<!-- DONATION -->
+<div class="ov" id="donationModal">
+  <div class="modal sm">
+    <div class="mhdr"><p class="mhdr-title">🌻 Support Remembered</p><button type="button" class="mclose" onclick="closeModal('donationModal')">×</button></div>
+    <div class="mbody">
+      <p style="font-size:.85rem;color:var(--lavender);line-height:1.6">Your contribution keeps this platform alive — ad-free, always here so their stories are never lost. Every ringgit helps. 💛</p>
+
+      <!-- Amount selector (RM) -->
+      <div class="fg"><label>Select Amount (RM)</label>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem">
+          <button type="button" class="nb" onclick="pickDon(this,'5')">RM5</button>
+          <button type="button" class="nb act" onclick="pickDon(this,'10')">RM10</button>
+          <button type="button" class="nb" onclick="pickDon(this,'20')">RM20</button>
+          <button type="button" class="nb" onclick="pickDon(this,'50')">RM50</button>
+        </div>
+      </div>
+      <div class="fg"><label>Or enter custom amount (RM)</label><input type="number" id="donCustom" placeholder="e.g. 15" min="1"></div>
+
+      <!-- TAB selector -->
+      <div style="display:flex;gap:.4rem;margin:.2rem 0">
+        <button type="button" class="nb act" id="tabDuitNow" onclick="switchPayTab('duitnow')">🏦 DuitNow</button>
+        <button type="button" class="nb" id="tabGrab" onclick="switchPayTab('grab')">🟢 GrabPay</button>
+        <button type="button" class="nb" id="tabPayPal" onclick="switchPayTab('paypal')">💙 PayPal</button>
+      </div>
+
+      <!-- DUITNOW PANEL -->
+      <div id="panelDuitNow">
+        <div style="background:rgba(220,30,30,.08);border:1px solid rgba(220,30,30,.3);border-radius:14px;padding:1rem;display:flex;flex-direction:column;align-items:center;gap:.7rem;text-align:center">
+          <!-- Header -->
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span style="font-size:1.3rem">🏦</span>
+            <div>
+              <div style="font-size:.9rem;font-weight:700;color:#e53935">Malaysia National QR</div>
+              <div style="font-size:.7rem;color:var(--muted)">Scan with any Malaysian bank app or e-wallet</div>
+            </div>
+          </div>
+          <!-- QR CODE -->
+          <div style="background:#fff;border-radius:12px;padding:10px;display:inline-block;box-shadow:0 4px 20px rgba(0,0,0,.3)">
+            <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" alt="Malaysia National QR — DuitNow" style="width:180px;height:180px;display:block">
+          </div>
+          <!-- Instruction -->
+          <div style="font-size:.76rem;color:var(--lavender);line-height:1.65;text-align:left;width:100%">
+            <strong style="color:var(--ivory)">How to scan & pay:</strong><br>
+            1. Open your <strong>bank app</strong> or <strong>e-wallet</strong><br>
+            2. Tap <strong>Scan QR</strong> or <strong>Pay</strong><br>
+            3. Point camera at the QR code above<br>
+            4. Enter your amount → confirm ✓
+          </div>
+          <!-- Supported apps -->
+          <div style="width:100%;display:flex;flex-wrap:wrap;gap:.3rem;justify-content:center">
+            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">Maybank</span>
+            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">CIMB</span>
+            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">RHB</span>
+            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">Public Bank</span>
+            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">Hong Leong</span>
+            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">AmBank</span>
+            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">Touch 'n Go</span>
+            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">Boost</span>
+            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">ShopeePay</span>
+            <span style="font-size:.67rem;background:rgba(255,255,255,.07);padding:.2rem .5rem;border-radius:8px;color:var(--muted)">& all banks</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- GRABPAY PANEL -->
+      <div id="panelGrab" style="display:none">
+        <div style="background:rgba(0,177,79,.1);border:1px solid rgba(0,177,79,.25);border-radius:12px;padding:1rem;display:flex;flex-direction:column;align-items:center;gap:.7rem;text-align:center">
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span style="font-size:1.4rem">🟢</span>
+            <div>
+              <div style="font-size:.9rem;font-weight:700;color:#00b14f">GrabPay</div>
+              <div style="font-size:.7rem;color:var(--muted)">Use the Malaysia National QR above — it works with GrabPay too!</div>
+            </div>
+          </div>
+          <div style="background:rgba(0,177,79,.08);border:1px solid rgba(0,177,79,.2);border-radius:10px;padding:.8rem 1rem;width:100%;font-size:.78rem;color:var(--lavender);line-height:1.65;text-align:left">
+            <strong style="color:var(--ivory)">Pay with GrabPay:</strong><br>
+            1. Open your <strong>Grab app</strong><br>
+            2. Tap <strong>Pay</strong> → <strong>Scan QR</strong><br>
+            3. Scan the <strong>Malaysia National QR</strong> on the DuitNow tab<br>
+            4. Enter your amount → Pay ✓<br><br>
+            <span style="color:var(--muted)">💡 The Malaysia National QR is universally accepted by GrabPay, Touch 'n Go, Boost, ShopeePay and all Malaysian bank apps.</span>
+          </div>
+          <button type="button" class="btn btn-o btn-sm" onclick="switchPayTab('duitnow')" style="width:100%">← Back to QR Code</button>
+        </div>
+      </div>
+
+      <!-- PAYPAL PANEL -->
+      <div id="panelPayPal" style="display:none">
+        <div style="background:rgba(0,112,186,.12);border:1px solid rgba(0,112,186,.3);border-radius:12px;padding:1rem;display:flex;flex-direction:column;gap:.6rem">
+          <div style="display:flex;align-items:center;gap:.6rem">
+            <svg viewBox="0 0 24 24" style="width:28px;height:28px;flex-shrink:0" fill="none"><path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 0 1 .923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z" fill="#009CDE"/></svg>
+            <div>
+              <div style="font-size:.82rem;font-weight:600;color:#009CDE">Pay via PayPal</div>
+              <div style="font-size:.72rem;color:var(--muted)">For international donors — USD accepted</div>
+            </div>
+          </div>
+          <div style="background:rgba(255,255,255,.06);border-radius:8px;padding:.5rem .75rem;font-size:.78rem;display:flex;justify-content:space-between;align-items:center">
+            <span style="color:var(--lavender)">PayPal address</span>
+            <span style="color:var(--ivory);font-weight:600">quartno74@yahoo.com</span>
+          </div>
+          <div style="font-size:.76rem;color:var(--lavender);line-height:1.6">
+            <strong style="color:var(--ivory)">How to pay:</strong><br>
+            1. Log in to PayPal → <strong>Send Money</strong><br>
+            2. Enter <strong>quartno74@yahoo.com</strong><br>
+            3. Enter amount in USD → Send ✓
+          </div>
+        </div>
+      </div>
+
+      <p style="font-size:.72rem;color:var(--muted);text-align:center;line-height:1.5;margin-top:.2rem">100% goes toward keeping Remembered running. No ads. No selling your data. Ever. 🌻</p>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-o" onclick="closeModal('donationModal')">Maybe Later</button>
+      <button type="button" class="btn btn-g" id="donateActionBtn" onclick="doDonate()">✓ I've Sent My Contribution</button>
+    </div>
+  </div>
+</div>
+
+<!-- SHARE MODAL -->
+<div class="ov" id="shareModal">
+  <div class="modal sm">
+    <div class="mhdr"><p class="mhdr-title">↗ Share This Memorial</p><button type="button" class="mclose" onclick="closeModal('shareModal')">×</button></div>
+    <div class="mbody">
+      <p style="font-size:.84rem;color:var(--lavender);line-height:1.55">Help others find and connect with <strong id="shareMemName" style="color:var(--gold)"></strong>'s memorial. Every share brings more love and prayers.</p>
+
+      <!-- Copy link row -->
+      <div class="share-link-row">
+        <span id="shareLink">deswats.github.io/remembered#…</span>
+        <button type="button" class="btn btn-o btn-sm" onclick="copyShareLink()" style="white-space:nowrap">📋 Copy</button>
+      </div>
+
+      <!-- Social buttons grid -->
+      <div class="soc-grid">
+        <button type="button" class="soc-btn soc-fb" onclick="doShareFB()">
+          <svg class="soc-icon" viewBox="0 0 24 24"><path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.235 2.686.235v2.97h-1.514c-1.491 0-1.956.93-1.956 1.874v2.25h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
+          Facebook
+        </button>
+        <button type="button" class="soc-btn soc-tw" onclick="doShareTwitter()">
+          <svg class="soc-icon" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          X / Twitter
+        </button>
+        <button type="button" class="soc-btn soc-wa" onclick="doShareWhatsApp()">
+          <svg class="soc-icon" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          WhatsApp
+        </button>
+        <button type="button" class="soc-btn soc-tg" onclick="doShareTelegram()">
+          <svg class="soc-icon" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+          Telegram
+        </button>
+      </div>
+
+      <div style="text-align:center;font-size:.72rem;color:var(--muted);margin-top:.4rem">Sharing brings more people to celebrate their memory 🌻</div>
+    </div>
+    <div class="mftr"><button type="button" class="btn btn-o" onclick="closeModal('shareModal')">Close</button></div>
+  </div>
+</div>
+
+<!-- EDIT PROFILE / PHOTO UPLOAD MODAL -->
+<div class="ov" id="editProfileModal">
+  <div class="modal sm">
+    <div class="mhdr"><p class="mhdr-title">✏️ Edit Your Profile</p><button type="button" class="mclose" onclick="closeModal('editProfileModal')">×</button></div>
+    <div class="mbody">
+      <!-- Avatar upload with live preview -->
+      <div class="fg" style="align-items:center">
+        <label style="text-align:center;width:100%">Profile Photo</label>
+        <div class="avatar-upload-wrap" style="margin:0 auto">
+          <div id="epAvatarPreview" style="width:90px;height:90px;border-radius:50%;background:var(--navy-m);border:3px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:2.2rem;overflow:hidden;"></div>
+          <div class="avatar-edit-badge">📷</div>
+          <input type="file" id="epPhotoFile" accept="image/*" onchange="previewEpPhoto(this)">
+        </div>
+        <div style="font-size:.73rem;color:var(--muted);text-align:center;margin-top:.3rem">Click the photo to change it</div>
+      </div>
+      <div class="divider"></div>
+      <div class="fr">
+        <div class="fg"><label id="regFirstLabel">First Name</label><input id="epFirst" placeholder="First name"></div>
+        <div class="fg"><label id="regLastLabel">Last Name</label><input id="epLast" placeholder="Last name"></div>
+      </div>
+      <div class="fg"><label id="regCountryLabel">Country</label>
+        <select id="epCountry">
+          <option value="">Select country…</option>
+          <option>Malaysia</option><option>Indonesia</option><option>Philippines</option><option>Singapore</option><option>Thailand</option><option>Vietnam</option><option>China</option><option>India</option><option>United States</option><option>United Kingdom</option><option>Australia</option><option>Canada</option><option>Japan</option><option>South Korea</option><option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-o" onclick="closeModal('editProfileModal')">Cancel</button>
+      <button type="button" class="btn btn-g" onclick="saveProfile()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- MOBILE BOTTOM NAV -->
+<nav class="mobile-nav">
+  <div class="mobile-nav-inner">
+    <button type="button" class="mnav-btn act" id="mnav-home" onclick="mnavGo('home',this)" ontouchend="mnavGo('home',this);event.preventDefault()">
+      <span class="mni">🏠</span><span style="font-size:.55rem">Home</span>
+    </button>
+    <button type="button" class="mnav-btn" id="mnav-search" onclick="mnavGo('search',this)" ontouchend="mnavGo('search',this);event.preventDefault()">
+      <span class="mni">🔍</span><span style="font-size:.55rem">Search</span>
+    </button>
+    <button type="button" class="mnav-btn" id="mnav-add" onclick="openDeceasedModal()" ontouchend="openDeceasedModal();event.preventDefault()" style="padding:.2rem .4rem">
+      <span style="width:44px;height:44px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--navy);font-size:1.6rem;line-height:1">+</span>
+    </button>
+    <button type="button" class="mnav-btn" id="mnav-people" onclick="mnavGo('people',this)" ontouchend="mnavGo('people',this);event.preventDefault()">
+      <span class="mni">👥</span><span style="font-size:.55rem">People</span>
+      <span class="mnav-badge" id="mnavFriendBadge">0</span>
+    </button>
+    <button type="button" class="mnav-btn" id="mnav-profile" onclick="mnavGo('profile',this)" ontouchend="mnavGo('profile',this);event.preventDefault()">
+      <span class="mni" id="mnavProfileIcon">👤</span><span style="font-size:.55rem">Me</span>
+      <span class="mnav-badge" id="mnavNotifBadge">0</span>
+    </button>
+  </div>
+</nav>
+
+<!-- FOOTER -->
+<footer style="position:relative;z-index:1;text-align:center;padding:2.5rem 1rem 2rem;border-top:1px solid rgba(201,168,76,.12);margin-top:2rem">
+  <div style="font-family:'Cormorant Garant',serif;font-size:1.1rem;color:var(--gold);margin-bottom:.3rem;letter-spacing:.04em" id="footerBrand">🌻 Remembered</div>
+  <div style="font-size:.75rem;color:var(--muted);margin-bottom:.6rem;line-height:1.6" id="footerTagline">A place to celebrate the lives they lived.</div>
+  <div style="display:inline-flex;align-items:center;gap:.5rem;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.18);border-radius:20px;padding:.35rem .9rem">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span style="font-size:.78rem;font-weight:600;color:var(--gold);letter-spacing:.03em" id="footerCredit">Created by DW Labs</span>
+  </div>
+  <div style="margin-top:.8rem;font-size:.68rem;color:var(--muted)" id="footerRights">© 2025 DW Labs · All rights reserved</div>
+</footer>
+
+<!-- FRIEND RELATIONSHIP MODAL -->
+<div class="ov" id="friendRelModal">
+  <div class="modal sm" style="max-width:420px">
+    <div class="mhdr"><p class="mhdr-title">🤝 Your Connection</p><button type="button" class="mclose" onclick="closeModal('friendRelModal')">×</button></div>
+    <div class="mbody">
+      <p style="font-size:.85rem;color:var(--lavender)">How do you know <strong id="friendRelName" style="color:var(--gold)"></strong>?</p>
+      <p style="font-size:.75rem;color:var(--muted);margin-top:.2rem">This helps personalise your feed and connections.</p>
+      <div class="friend-rel-grid" id="friendRelGrid">
+        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Family',this)">👨‍👩‍👧 Family</button>
+        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Parent',this)">👪 Parent</button>
+        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Sibling',this)">👫 Sibling</button>
+        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Cousin',this)">🧑‍🤝‍🧑 Cousin</button>
+        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Spouse',this)">💑 Spouse</button>
+        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Child',this)">👶 Child</button>
+        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Relative',this)">🏠 Relative</button>
+        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Close Friend',this)">❤️ Close Friend</button>
+        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Friend',this)">😊 Friend</button>
+        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Colleague',this)">💼 Colleague</button>
+        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Classmate',this)">🎓 Classmate</button>
+        <button type="button" class="friend-rel-opt" onclick="selectFriendRel('Neighbour',this)">🏡 Neighbour</button>
+      </div>
+      <div class="fg" style="margin-top:.6rem">
+        <label style="font-size:.75rem;color:var(--muted)">Or type your own</label>
+        <input type="text" id="friendRelCustom" placeholder="e.g. Uncle, Godfather, Mentor…" style="margin-top:.3rem">
+      </div>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-o" onclick="skipFriendRel()">Skip</button>
+      <button type="button" class="btn btn-g" onclick="saveFriendRel()">Save Relationship</button>
+    </div>
+  </div>
+</div>
+
+<!-- EMAIL CONFIRMATION MODAL -->
+<div class="ov" id="emailConfirmModal" style="z-index:500">
+  <div class="modal sm" style="max-width:400px;border-color:rgba(201,168,76,.4)">
+    <div style="padding:2rem 1.5rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:.8rem">
+      <div style="font-size:4rem;line-height:1">📧</div>
+      <h2 style="font-family:'Cormorant Garant',serif;font-size:1.6rem;font-weight:300;color:var(--gold)">Check Your Email!</h2>
+      <p style="font-size:.88rem;color:var(--lavender);line-height:1.7">
+        We sent a confirmation link to:
+      </p>
+      <div style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.3);border-radius:10px;padding:.7rem 1.2rem;width:100%">
+        <span id="confirmEmailAddress" style="font-size:.95rem;font-weight:600;color:var(--gold);word-break:break-all"></span>
+      </div>
+      <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:.9rem 1rem;width:100%;text-align:left;font-size:.8rem;color:var(--lavender);line-height:1.8">
+        <strong style="color:var(--ivory)">What to do next:</strong><br>
+        1. Open your email inbox now<br>
+        2. Find the email from <strong>Supabase / Remembered</strong><br>
+        3. Click the <strong style="color:var(--gold)">"Confirm your email"</strong> button<br>
+        4. You'll be redirected back here & logged in automatically<br>
+        5. Or return here and click <strong>Sign In</strong>
+      </div>
+      <div style="font-size:.75rem;color:var(--muted);padding:.5rem .8rem;background:rgba(255,255,255,.03);border-radius:8px;width:100%;text-align:left">
+        📁 <strong>Can't find it?</strong> Check your <strong>Spam</strong> or <strong>Junk</strong> folder
+      </div>
+      <button type="button" class="btn btn-g" style="width:100%;margin-top:.3rem" onclick="closeModal('emailConfirmModal');showPage('authPage');setAuthMode('login');resetLoginForm()">
+        ✅ I've confirmed my email — Sign In
+      </button>
+      <button type="button" class="btn btn-o btn-sm" style="width:100%" id="resendBtn" onclick="handleResend()">
+        📧 Resend confirmation email
+      </button>
+      <p style="font-size:.72rem;color:var(--muted)">You can close this and check back later</p>
+    </div>
+  </div>
+</div>
+
+<div id="toast">Done</div>
+
 </body>
 </html>
