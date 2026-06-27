@@ -2689,7 +2689,7 @@ function renderPostComments(postId){
       +'<div data-uid="'+uid+'" onclick="if(this.dataset.uid)openUserProfile(this.dataset.uid)">'+uAvHtml(cu,24)+'</div>'
       +'<div class="comment-bubble">'
       +'<div class="comment-author">'+c.author+'</div>'
-      +'<div class="comment-text">'+c.text+'</div>'
+      +'<div class="comment-text">'+sanitizeText(c.text)+'</div>'
       +'<div class="comment-time">'+timeSince(c.created_at)+'</div>'
       +'</div></div>';
   }).join('');
@@ -3408,7 +3408,7 @@ function renderDpWall(deceasedId){
         +'</div>'
         +(canDelete?'<button type="button" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.8rem" data-wid="'+p.id+'" data-did="'+deceasedId+'" onclick="deleteWallPost(this.dataset.wid,this.dataset.did)">🗑️</button>':'')
         +'</div>'
-        +(p.message?'<div class="wall-post-text">'+p.message+'</div>':'')
+        +(p.message?'<div class="wall-post-text">'+sanitizeText(p.message)+'</div>':'')
         +mediaHtml
         +'</div>';
     }).join('');
@@ -3515,6 +3515,27 @@ async function loadWallPosts(deceasedId){
     console.warn('loadWallPosts:',e);
     renderDpWall(deceasedId);
   }
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// SECURITY — XSS Prevention
+// ═══════════════════════════════════════════════════════════
+function sanitize(str){
+  if(!str)return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#x27;')
+    .replace(/\//g,'&#x2F;');
+}
+
+// Sanitize but allow basic line breaks
+function sanitizeText(str){
+  if(!str)return '';
+  return sanitize(str).replace(/\n/g,'<br>');
 }
 
 console.log('Post + Friend functions loaded ✓');
@@ -3646,7 +3667,7 @@ function renderDpPrayers(id){
       ?prayers.map(function(p){
         return '<div class="pw-item">'
           +'<div class="pw-auth">🙏 '+p.author+'</div>'
-          +'<div class="pw-text">'+p.text+'</div>'
+          +'<div class="pw-text">'+sanitizeText(p.text)+'</div>'
           +'<div class="pw-time">'+timeSince(p.created_at)+'</div>'
           +'</div>';
       }).join('')
