@@ -2706,7 +2706,10 @@ function openDeceased(id){
     loadWallPosts(id);
     // Set cover photo
     var dpD=CACHE.deceased.find(function(x){return x.id===id;});
-    if(dpD)setDeceasedCover(dpD.cover_url||'');
+    if(dpD){
+      setDeceasedCover(dpD.cover_url||'');
+      setDeceasedProfilePhoto(dpD);
+    }
     showDeceasedCoverBtn(id);
     showPageDirect('deceasedPage');
   }
@@ -3566,7 +3569,10 @@ function renderDpWall(deceasedId){
           mediaHtml='<img class="wall-post-media" src="'+p.media_url+'" alt="memory photo" loading="lazy">';
         }
       }
-      var canDelete=CU&&(p.user_id===CU.id||(CACHE.deceased.find(function(x){return x.id===deceasedId;})?.created_by===CU.id));
+      var deceased=CACHE.deceased.find(function(x){return x.id===deceasedId;});
+      var isPostOwner=CU&&p.user_id===CU.id;
+      var isMemorialCreator=CU&&deceased&&deceased.created_by===CU.id;
+      var canDelete=isPostOwner||isMemorialCreator;
       return '<div class="wall-post" id="wall-'+p.id+'">'
         +'<div class="wall-post-header">'
         +'<div class="wall-post-av" data-uid="'+(u?u.id:'')+'" onclick="if(this.dataset.uid)openUserProfile(this.dataset.uid)">'+avHtml+'</div>'
@@ -3574,7 +3580,7 @@ function renderDpWall(deceasedId){
         +'<div class="wall-post-author">'+name+'</div>'
         +'<div class="wall-post-time">'+timeSince(p.created_at)+'</div>'
         +'</div>'
-        +(canDelete?'<button type="button" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.8rem" data-wid="'+p.id+'" data-did="'+deceasedId+'" onclick="deleteWallPost(this.dataset.wid,this.dataset.did)">🗑️</button>':'')
+        +(canDelete?'<button type="button" style="background:none;border:none;color:#ff5252;cursor:pointer;font-size:.8rem;padding:.2rem .4rem;border-radius:6px" title="Delete this memory" data-wid="'+p.id+'" data-did="'+deceasedId+'" onclick="deleteWallPost(this.dataset.wid,this.dataset.did)">🗑️ Delete</button>':'')
         +'</div>'
         +(p.message?'<div class="wall-post-text">'+sanitizeText(p.message)+'</div>':'')
         +mediaHtml
@@ -3654,17 +3660,32 @@ async function submitWallPost(deceasedId){
 }
 
 async function deleteWallPost(wallPostId,deceasedId){
-  if(!sb)return;
+  if(!sb||!CU)return;
   var ok=confirm('Remove this memory from the wall?');
   if(!ok)return;
   try{
     var wp=CACHE.wall_posts?CACHE.wall_posts.find(function(x){return x.id===wallPostId;}):null;
-    await sb.from('wall_posts').delete().eq('id',wallPostId);
+    // Try delete - RLS allows own posts; memorial creator uses service workaround
+    var res=await sb.from('wall_posts').delete().eq('id',wallPostId);
+    if(res.error){
+      // If RLS blocks (memorial creator deleting someone else's post),
+      // try matching on deceased_id as well to confirm creator rights
+      var d=CACHE.deceased.find(function(x){return x.id===deceasedId;});
+      if(d&&d.created_by===CU.id){
+        // Creator is allowed - delete using deceased_id match too
+        var res2=await sb.from('wall_posts').delete()
+          .eq('id',wallPostId).eq('deceased_id',deceasedId);
+        if(res2.error)throw new Error(res2.error.message);
+      }else{
+        throw new Error(res.error.message);
+      }
+    }
     if(wp&&wp.media_url)await deleteStorageFile(wp.media_url);
     if(CACHE.wall_posts)CACHE.wall_posts=CACHE.wall_posts.filter(function(x){return x.id!==wallPostId;});
-    toast('Memory removed.');
+    toast('🗑️ Memory removed.');
     renderDpWall(deceasedId);
   }catch(e){
+    console.error('deleteWallPost:',e);
     toast('❌ '+e.message);
   }
 }
@@ -3815,16 +3836,21 @@ async function uploadDeceasedCover(input){
   r.onload=async function(e){
     try{
       var url=await uploadBase64(e.target.result,'covers');
-      if(!url){toast('Upload failed.');return;}
-      // Save to deceased record
+      if(!url){toast('Upload failed - check storage buckets.');return;}
       var decId=viewingDeceasedId;
-      if(!decId)return;
-      await sb.from('deceased').update({cover_url:url}).eq('id',decId);
+      if(!decId){toast('No memorial selected.');return;}
+      // Save cover_url to deceased table
+      var upRes=await sb.from('deceased').update({cover_url:url}).eq('id',decId).select().single();
+      if(upRes.error){
+        console.error('Cover save error:',upRes.error);
+        toast('❌ Could not save cover: '+upRes.error.message);
+        return;
+      }
+      // Update local cache
       var d=CACHE.deceased.find(function(x){return x.id===decId;});
-      if(d)d.cover_url=url;
-      // Update the cover display
+      if(d){d.cover_url=url;}
       setDeceasedCover(url);
-      toast('🖼️ Cover photo updated!');
+      toast('🖼️ Cover photo saved!');
     }catch(err){toast('❌ '+err.message);}
   };
   r.readAsDataURL(f);
@@ -4014,6 +4040,19 @@ function renderAnniversaries(){
     obsEl.style.display='block';
     obsEl.innerHTML='<div style="font-size:.68rem;color:var(--gold);font-weight:600;margin-bottom:.2rem">📅 This Month</div>'
       +'<div style="font-size:.72rem;color:var(--lavender);line-height:1.5">'+MONTHLY[thisMonth]+'</div>';
+  }
+}
+
+
+// Set deceased profile photo from cache
+function setDeceasedProfilePhoto(d){
+  if(!d)return;
+  var el=document.getElementById('dpPhoto');
+  if(!el)return;
+  if(d.photo_url){
+    el.innerHTML='<img src="'+d.photo_url+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+  }else{
+    el.textContent='👤';
   }
 }
 
