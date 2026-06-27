@@ -620,16 +620,16 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 
 /* ── COVER PHOTO / WALLPAPER ── */
 .prof-hero{position:relative;padding:0 0 1.2rem 0;text-align:center;border-bottom:1px solid var(--border);}
-.prof-cover{width:100%;height:180px;object-fit:cover;display:block;background:linear-gradient(160deg,var(--navy-m),#1a2a3a);position:relative;}
+.prof-cover{width:100%;height:240px;object-fit:cover;display:block;background:linear-gradient(160deg,var(--navy-m),#1a2a3a);position:relative;}
 .prof-cover img{width:100%;height:100%;object-fit:cover;display:block;}
-.prof-cover-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(13,27,42,.85));pointer-events:none;}
+.prof-cover-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 50%,rgba(13,27,42,.85));pointer-events:none;}
 .prof-cover-change{position:absolute;top:.6rem;right:.6rem;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:.3rem .6rem;color:#fff;font-size:.7rem;cursor:pointer;display:flex;align-items:center;gap:.3rem;backdrop-filter:blur(4px);}
 .prof-cover-change:hover{background:rgba(0,0,0,.75);}
 .ph-photo{width:100px;height:100px;border-radius:50%;border:3px solid var(--gold);margin:-50px auto .5rem;position:relative;z-index:2;object-fit:cover;background:var(--navy-m);display:flex;align-items:center;justify-content:center;font-size:2.5rem;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.4);}
 .ph-photo img{width:100%;height:100%;object-fit:cover;}
 .ph-name{margin-top:.3rem;}
 /* User profile cover */
-.u-cover{width:100%;height:160px;border-radius:14px 14px 0 0;object-fit:cover;display:block;background:linear-gradient(135deg,var(--navy-m),#1a2a3a);position:relative;overflow:hidden;}
+.u-cover{width:100%;height:220px;border-radius:14px 14px 0 0;object-fit:cover;display:block;background:linear-gradient(135deg,var(--navy-m),#1a2a3a);position:relative;overflow:hidden;}
 .u-cover img{width:100%;height:100%;object-fit:cover;display:block;}
 .u-cover-change{position:absolute;top:.5rem;right:.5rem;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.2);border-radius:7px;padding:.25rem .5rem;color:#fff;font-size:.65rem;cursor:pointer;}
 .u-hero-with-cover{padding-top:0;border-radius:14px;overflow:hidden;display:block;}
@@ -1698,9 +1698,9 @@ async function declineFriend(frId){
 }
 function acceptFriend(frId){acceptFriendById(frId);}
 function renderMyFriends(){
-  const el=document.getElementById('myFriendsList');if(!el||!CU)return;
-  const accepted=CACHE.friends.filter(f=>(f.from_id===CU.id||f.to_id===CU.id)&&f.status==='accepted');
-  const pending=CACHE.friends.filter(f=>f.to_id===CU.id&&f.status==='pending');
+  var el=document.getElementById('myFriendsList');if(!el||!CU)return;
+  var accepted=CACHE.friends.filter(function(f){return (f.from_id===CU.id||f.to_id===CU.id)&&f.status==='accepted';});
+  var pending=CACHE.friends.filter(function(f){return f.to_id===CU.id&&f.status==='pending';});
   let html='';
   if(pending.length){
     html+=`<div style="font-size:.72rem;color:var(--muted);margin-bottom:.3rem">📨 ${pending.length} pending — <span style="color:var(--gold);cursor:pointer" onclick="openPeoplePage()">View →</span></div>`;
@@ -1746,21 +1746,43 @@ function renderFriendSuggestions(){
 // USER PROFILE PAGE
 // ═══════════════════════════════════════════════════════════
 function openMyProfile(){if(CU)openUserProfile(CU.id);}
-function openUserProfile(uid){
+async function openUserProfile(uid){
   prevPage=document.querySelector('.page.active')?.id||'appPage';
   viewingUserId=uid;
-  const u=CACHE.users.find(x=>x.id===uid)||(CU&&uid===CU.id?{id:CU.id,first_name:CU.firstName,last_name:CU.lastName,country:CU.country,avatar_url:CU.avatar}:null);
+  // Find user — prefer CACHE, but for the logged-in user use CU data
+  var u=CACHE.users.find(function(x){return x.id===uid;});
+  if(!u&&CU&&uid===CU.id){
+    u={id:CU.id,first_name:CU.firstName,last_name:CU.lastName,
+       country:CU.country,avatar_url:CU.avatar,
+       cover_url:CU.cover_url||'',bio:CU.bio||'',
+       bio_font:CU.bio_font||'font-serif',bio_colour:CU.bio_colour||'#FFFFFF',
+       created_at:CU.joined?new Date(CU.joined).toISOString():''};
+  }
   if(!u)return;
-  const isMe=CU&&uid===CU.id;
-  const wrap=document.getElementById('upAvatarWrap');
+
+  // If cover/bio not in cache, fetch fresh from Supabase
+  if(sb && (u.cover_url===undefined||u.bio===undefined)){
+    try{
+      var fresh=await sb.from('profiles').select('*').eq('id',uid).single();
+      if(fresh.data){
+        // Merge into cache
+        var ci=CACHE.users.findIndex(function(x){return x.id===uid;});
+        if(ci>=0)CACHE.users[ci]=Object.assign(CACHE.users[ci],fresh.data);
+        u=fresh.data;
+      }
+    }catch(e){console.warn('Profile fetch:',e);}
+  }
+
+  var isMe=CU&&uid===CU.id;
+  var wrap=document.getElementById('upAvatarWrap');
   if(isMe){
     wrap.innerHTML=`<div class="avatar-upload-wrap" title="Change photo"><div class="u-av-lg" id="upAvatar">${uAvHtml(u,90)}</div><div class="avatar-edit-badge">📷</div><input type="file" accept="image/*" onchange="quickAvatarUpload(this)"></div>`;
   }else{
     wrap.innerHTML=`<div class="u-av-lg" id="upAvatar">${uAvHtml(u,90)}</div>`;
   }
   document.getElementById('upName').textContent=uName(u);
-  // Set cover photo and bio
-  setUserCover(u.cover_url||CU?.cover_url||'');
+  // Set cover photo — use VIEWED USER's cover only, never fall back to my own
+  setUserCover(u.cover_url||'');
   showUserCoverBtn(uid);
   renderUserBio(u);
   document.getElementById('upMeta').textContent=(u.country||'')+' · Member since '+(u.created_at?new Date(u.created_at).getFullYear():new Date().getFullYear());
@@ -2836,19 +2858,37 @@ function getMyFriendRelationship(userId){
       &&f.status==='accepted';
   });
   if(!fr)return null;
-  var rel=fr.relationship||'Friend';
-  // Check localStorage backup if still default
-  if(rel==='Friend'){
-    var stored=localStorage.getItem('rb_rel_'+fr.id);
-    if(stored){
-      try{
-        var data=JSON.parse(stored);
-        if(data.setBy===CU.id)rel=data.relationship;
-        else if(data.reciprocal)rel=data.reciprocal;
-      }catch(e){}
-    }
+
+  // The relationship field stores the label set by whoever accepted/set it
+  // Check localStorage for which side set it and show correct perspective
+  var stored=null;
+  try{stored=JSON.parse(localStorage.getItem('rb_rel_'+fr.id)||'null');}catch(e){}
+
+  if(stored){
+    // I set the relationship - show what I called them
+    if(stored.setBy===CU.id)return stored.relationship||fr.relationship||'Friend';
+    // They set it - show the reciprocal label (what they called me)
+    if(stored.reciprocal)return stored.reciprocal;
   }
-  return rel;
+  return fr.relationship||'Friend';
+}
+
+function getTheirRelationshipToMe(userId){
+  // Returns what userId calls ME (from their perspective)
+  if(!CU||!userId)return null;
+  var fr=CACHE.friends.find(function(f){
+    return ((f.from_id===CU.id&&f.to_id===userId)||(f.from_id===userId&&f.to_id===CU.id))
+      &&f.status==='accepted';
+  });
+  if(!fr)return null;
+  try{
+    var stored=JSON.parse(localStorage.getItem('rb_rel_'+fr.id)||'null');
+    if(stored){
+      if(stored.setBy===userId)return stored.relationship;
+      if(stored.setBy===CU.id)return stored.reciprocal||fr.relationship;
+    }
+  }catch(e){}
+  return fr.relationship||'Friend';
 }
 
 function amIFamilyOf(userId){
@@ -3782,8 +3822,9 @@ async function uploadUserCover(input){
 function setUserCover(url){
   var bg=document.getElementById('upCoverBg');
   if(!bg)return;
-  if(url){
-    bg.innerHTML='<img src="'+url+'" style="width:100%;height:100%;object-fit:cover;display:block">';
+  if(url&&url.trim()){
+    bg.innerHTML='<img src="'+url+'" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.parentElement.innerHTML=\'\';this.parentElement.style.background=\'linear-gradient(135deg,#162233,#1a3045)\';">';
+    bg.style.background='none';
   }else{
     bg.innerHTML='';
     bg.style.background='linear-gradient(135deg,#162233,#1a3045)';
