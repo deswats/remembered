@@ -2008,10 +2008,7 @@ function renderSidebarProfile(){
     <div class="stat-box"><div class="stat-n">${friendCount}</div><div class="stat-l">Friends</div></div>
   </div>`;
 }
-function renderCalendar(){
-  const el=document.getElementById('calList');if(!el)return;
-  el.innerHTML=SACRED.map(s=>`<div class="cal-item"><div class="cal-dt">${s.d}</div><div class="cal-n">${s.n}</div><div class="cal-r">${s.r}</div></div>`).join('');
-}
+function renderCalendar(){renderAnniversaries();}
 function renderStats(){
   var el=document.getElementById('statsGrid');if(!el)return;
   var memberCount=CACHE.users.length;
@@ -3944,6 +3941,80 @@ function renderUserBio(u){
   var el=document.getElementById('upCoverBio');
   if(!el||!u)return;
   renderBioOverlay(el, u.bio||'', u.bio_font||'font-serif', u.bio_colour||'#FFFFFF');
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// MEMORIAL ANNIVERSARIES SIDEBAR
+// ═══════════════════════════════════════════════════════════
+function renderAnniversaries(){
+  var listEl=document.getElementById('anniversaryList');
+  var obsEl=document.getElementById('monthlyObservance');
+  // Also try calList as fallback
+  if(!listEl){listEl=document.getElementById('calList');}
+  if(!listEl)return;
+
+  var now=new Date();
+  var thisMonth=now.getMonth();
+
+  // ── Memorial anniversaries ──
+  var upcoming=[];
+  (CACHE.deceased||[]).forEach(function(d){
+    if(!d.dod)return;
+    try{
+      var dod=new Date(d.dod);
+      var anniv=new Date(now.getFullYear(),dod.getMonth(),dod.getDate());
+      var diff=Math.ceil((anniv-now)/(1000*60*60*24));
+      if(diff>=-1&&diff<=60){
+        upcoming.push({
+          name:d.name,photo:d.photo_url||'',
+          dod:dod,anniv:anniv,diff:diff,
+          id:d.id,yearsAgo:now.getFullYear()-dod.getFullYear()
+        });
+      }
+    }catch(e){}
+  });
+  upcoming.sort(function(a,b){return a.diff-b.diff;});
+
+  if(!upcoming.length){
+    listEl.innerHTML='<div style="font-size:.75rem;color:var(--muted);text-align:center;padding:.5rem">No anniversaries in the next 60 days</div>';
+  }else{
+    listEl.innerHTML=upcoming.map(function(u){
+      var dayLabel=u.diff===0?'Today 🌻':u.diff===1?'Tomorrow':u.diff===-1?'Yesterday':'In '+u.diff+' days';
+      var monthDay=u.anniv.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+      var isToday=u.diff===0;
+      var av=u.photo
+        ?'<img src="'+u.photo+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1.5px solid var(--gold)">'
+        :'<div style="width:32px;height:32px;border-radius:50%;background:var(--navy-m);display:flex;align-items:center;justify-content:center;font-size:1rem">🌻</div>';
+      return '<div data-did="'+u.id+'" onclick="openDeceasedProfile(this.dataset.did)" style="display:flex;align-items:center;gap:.6rem;padding:.5rem .6rem;border-radius:10px;cursor:pointer;margin-bottom:.3rem;background:'+(isToday?'rgba(201,168,76,.12)':'rgba(255,255,255,.03)')+';border:1px solid '+(isToday?'rgba(201,168,76,.3)':'var(--border)')+';">'
+        +av
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:.78rem;font-weight:600;color:var(--ivory);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+u.name+'</div>'
+        +'<div style="font-size:.68rem;color:var(--muted)">'+monthDay+' &middot; '+u.yearsAgo+' yr ago</div>'
+        +'</div>'
+        +'<div style="font-size:.68rem;color:'+(isToday?'var(--gold)':'var(--muted)')+';text-align:right;white-space:nowrap">'+dayLabel+'</div>'
+        +'</div>';
+    }).join('');
+  }
+
+  // ── Monthly observance note ──
+  var MONTHLY=['January — New Year Day of Prayer (All Faiths)',
+    'February — Qingming / Tomb Sweeping Day (Buddhist)',
+    'March — Lent season (Christian)',
+    'April — Good Friday & Easter (Christian)',
+    'May — Vesak Day (Buddhist)',
+    'June — Eid celebrations (Muslim)',
+    'July — Eid al-Adha (Muslim)',
+    'August — Hungry Ghost Festival (Buddhist)',
+    'September — Mid-Autumn Festival',
+    'October — All Hallows season (Christian)',
+    'November — All Saints and All Souls Day (Christian)',
+    'December — Christmas Memorial Mass (Christian)'];
+  if(obsEl){
+    obsEl.style.display='block';
+    obsEl.innerHTML='<div style="font-size:.68rem;color:var(--gold);font-weight:600;margin-bottom:.2rem">📅 This Month</div>'
+      +'<div style="font-size:.72rem;color:var(--lavender);line-height:1.5">'+MONTHLY[thisMonth]+'</div>';
+  }
 }
 
 console.log('Post + Friend functions loaded ✓');
