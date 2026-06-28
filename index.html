@@ -106,7 +106,7 @@ nav{position:sticky;top:0;z-index:200;background:rgba(13,27,42,.97);backdrop-fil
 .btn-danger{background:var(--danger);color:#fff;}
 
 /* FEED */
-.feed{display:flex;flex-direction:column;gap:1rem;}
+.feed{-webkit-overflow-scrolling:touch;will-change:scroll-position;display:flex;flex-direction:column;gap:1rem;}
 .create-bar{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:.9rem;display:flex;align-items:center;gap:.8rem;cursor:pointer;transition:.2s;}
 .create-bar:hover{border-color:var(--gold);}
 .ua{width:40px;height:40px;border-radius:50%;background:var(--navy-m);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;overflow:hidden;cursor:pointer;}
@@ -420,7 +420,7 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
   .auth-card{border-radius:20px 20px 0 0;padding:1.5rem 1.2rem 2rem;max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 
   /* Feed */
-  .feed{gap:.8rem;}
+  .feed{-webkit-overflow-scrolling:touch;will-change:scroll-position;gap:.8rem;}
   .create-bar{padding:.7rem;}
   .feed-tab-row{gap:.3rem;overflow-x:auto;flex-wrap:nowrap;padding-bottom:.2rem;}
   .feed-tab{white-space:nowrap;flex-shrink:0;}
@@ -707,6 +707,21 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .chat-input-row input:focus{border-color:var(--gold);}
 .chat-input-row button{background:var(--gold);border:none;border-radius:50%;width:34px;height:34px;color:var(--navy);font-size:1rem;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
 .chat-typing{font-size:.7rem;color:var(--muted);padding:0 .7rem .3rem;font-style:italic;min-height:16px;}
+
+/* ── POST INPUT PERFORMANCE ── */
+#postTextInput{
+  transition: height 0.1s ease;
+  overflow-y: hidden;
+  resize: none;
+  min-height: 52px;
+  max-height: 200px;
+  will-change: height;
+  -webkit-overflow-scrolling: touch;
+}
+/* Prevent layout thrash during typing */
+.post-create-box{
+  contain: layout style;
+}
 </style>
 
 <script defer>
@@ -2756,7 +2771,22 @@ async function submitPost(){
   }
 }
 
+var _postInputTimer = null;
 function handlePostInput(){
+  // Auto-expand textarea smoothly
+  var input=document.getElementById('postTextInput');
+  if(input){
+    input.style.height='auto';
+    input.style.height=Math.min(input.scrollHeight, 200)+'px';
+  }
+  // Debounce mention search - only run 300ms after typing stops
+  clearTimeout(_postInputTimer);
+  _postInputTimer = setTimeout(function(){
+    handlePostInputMentions();
+  }, 300);
+}
+
+function handlePostInputMentions(){
   var input=document.getElementById('postTextInput');
   if(!input)return;
   var text=input.value;
@@ -2956,7 +2986,7 @@ function renderPostCard(p){
   h+='<div class="comments-list" id="postCommentsList-'+pid+'"></div>';
   h+='<div class="comment-input-row">';
   h+=(CU?uAvHtml(CU,28):'<div style="width:28px;height:28px;border-radius:50%;background:var(--navy-m);display:flex;align-items:center;justify-content:center">👤</div>');
-  h+='<input type="text" id="postCommentInput-'+pid+'" placeholder="Write a comment…" style="flex:1">';
+  h+='<input type="text" id="postCommentInput-'+pid+'" placeholder="Write a comment…" style="flex:1;touch-action:manipulation;-webkit-user-select:text;user-select:text">';
   h+='<button type="button" id="postCommentBtn-'+pid+'" data-pid="'+pid+'" onclick="submitPostComment(this.dataset.pid)" style="padding:.4rem .8rem;border-radius:8px;background:var(--gold);border:none;color:var(--navy);font-weight:600;font-size:.78rem;cursor:pointer">Post</button>';
   h+='</div></div></div>';
   return h;
@@ -5384,7 +5414,7 @@ function guestBrowse(){showPage('appPage');}
             <div style="display:flex;gap:.7rem;align-items:flex-start">
               <div class="ua" id="feedAvatar" onclick="openMyProfile()">🌻</div>
               <div style="flex:1">
-                <textarea id="postTextInput" oninput="handlePostInput()" placeholder="What's on your mind? Share a memory, thought or message with your friends…" rows="3" onclick="if(!CU){showPage('authPage');setAuthMode('login');}"></textarea>
+                <textarea id="postTextInput" oninput="handlePostInput()" placeholder="What's on your mind? Share a memory, thought or message with your friends…" rows="2" style="touch-action:manipulation;-webkit-user-select:text;user-select:text;" onclick="if(!CU){showPage('authPage');setAuthMode('login');}"></textarea>
                 <div id="postImagePreview" style="display:none;margin-top:.4rem"></div>
               </div>
             </div>
@@ -6107,7 +6137,7 @@ function guestBrowse(){showPage('appPage');}
   <div class="chat-input-row">
     <input type="text" id="chatInput" placeholder="Type a message…" maxlength="500"
       onkeydown="if(event.key==='Enter')sendChatMsg()"
-      oninput="sendTyping()">
+      oninput="sendTyping()" style="touch-action:manipulation;-webkit-user-select:text;user-select:text;">
     <button onclick="sendChatMsg()">➤</button>
   </div>
 </div>
