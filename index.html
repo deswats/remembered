@@ -6,7 +6,7 @@
 <meta http-equiv="pragma" content="no-cache">
 <meta http-equiv="expires" content="0">
 <!-- v3.0 SUPABASE BUILD -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -710,18 +710,29 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 
 /* ── POST INPUT PERFORMANCE ── */
 #postTextInput{
-  transition: height 0.1s ease;
-  overflow-y: hidden;
-  resize: none;
-  min-height: 52px;
-  max-height: 200px;
-  will-change: height;
-  -webkit-overflow-scrolling: touch;
+  resize:none;
+  min-height:56px;
+  max-height:180px;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  word-break:break-word;
+  font-size:16px !important;
+  line-height:1.5;
+  padding:.6rem .8rem;
+  border-radius:10px;
+  width:100%;
+  box-sizing:border-box;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--border);
+  color:var(--ivory);
+  font-family:'Inter',sans-serif;
+  outline:none;
+  -webkit-user-select:text;
+  user-select:text;
+  touch-action:manipulation;
 }
-/* Prevent layout thrash during typing */
-.post-create-box{
-  contain: layout style;
-}
+#postTextInput:focus{border-color:var(--gold);}
+.post-create-box{contain:none;}
 </style>
 
 <script defer>
@@ -2773,17 +2784,10 @@ async function submitPost(){
 
 var _postInputTimer = null;
 function handlePostInput(){
-  // Auto-expand textarea smoothly
-  var input=document.getElementById('postTextInput');
-  if(input){
-    input.style.height='auto';
-    input.style.height=Math.min(input.scrollHeight, 200)+'px';
-  }
-  // Debounce mention search - only run 300ms after typing stops
+  // Legacy - now handled by event listener
+  // Kept for compatibility
   clearTimeout(_postInputTimer);
-  _postInputTimer = setTimeout(function(){
-    handlePostInputMentions();
-  }, 300);
+  _postInputTimer = setTimeout(handlePostInputMentions, 400);
 }
 
 function handlePostInputMentions(){
@@ -5414,7 +5418,7 @@ function guestBrowse(){showPage('appPage');}
             <div style="display:flex;gap:.7rem;align-items:flex-start">
               <div class="ua" id="feedAvatar" onclick="openMyProfile()">🌻</div>
               <div style="flex:1">
-                <textarea id="postTextInput" oninput="handlePostInput()" placeholder="What's on your mind? Share a memory, thought or message with your friends…" rows="2" style="touch-action:manipulation;-webkit-user-select:text;user-select:text;" onclick="if(!CU){showPage('authPage');setAuthMode('login');}"></textarea>
+                <textarea id="postTextInput" placeholder="What's on your mind? Share a memory, thought or message with your friends…" rows="3" autocomplete="off" autocorrect="on" autocapitalize="sentences" spellcheck="true"></textarea>
                 <div id="postImagePreview" style="display:none;margin-top:.4rem"></div>
               </div>
             </div>
