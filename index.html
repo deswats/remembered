@@ -716,8 +716,67 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 var SUPABASE_URL = 'https://bemukaghdzqqjszwtfrk.supabase.co';
 var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJlbXVrYWdoZHpxcWpzend0ZnJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MzA1NDgsImV4cCI6MjA5ODAwNjU0OH0.QF4eOTvHu418VCRH599SuEErkLbnEtCbi7pNMhIWb6U';
 // Initialize Supabase immediately — it's bundled inline so always available
-var sb = (typeof supabase !== 'undefined') ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON) : null;
+var sb = (typeof supabase !== 'undefined') ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage,
+    storageKey: 'sb-remembered-auth'
+  }
+}) : null;
 console.log('sb initialized at load time:', sb ? '✓' : '✗ supabase not available yet');
+
+// ═══════════════════════════════════════════════════════════
+// SESSION MANAGEMENT - fixes iOS Safari auth issues
+// ═══════════════════════════════════════════════════════════
+var _sessionChecked = false;
+var _sessionValid = false;
+
+async function ensureSession(){
+  if(!sb)return false;
+  try{
+    // Try to get current session
+    var {data, error} = await sb.auth.getSession();
+    if(data && data.session){
+      _sessionValid = true;
+      _sessionChecked = true;
+      return true;
+    }
+    // Try to refresh the session
+    var {data:refreshData, error:refreshError} = await sb.auth.refreshSession();
+    if(refreshData && refreshData.session){
+      _sessionValid = true;
+      _sessionChecked = true;
+      console.log('Session refreshed ✓');
+      return true;
+    }
+    _sessionValid = false;
+    console.warn('No valid session found');
+    return false;
+  }catch(e){
+    console.warn('ensureSession error:', e);
+    return false;
+  }
+}
+
+// Listen for auth state changes (important for iOS)
+if(sb){
+  sb.auth.onAuthStateChange(function(event, session){
+    console.log('Auth state change:', event);
+    if(event === 'SIGNED_IN' && session){
+      _sessionValid = true;
+      console.log('Session active ✓');
+    } else if(event === 'SIGNED_OUT'){
+      _sessionValid = false;
+      CU = null;
+      localStorage.removeItem('rb_cu');
+    } else if(event === 'TOKEN_REFRESHED' && session){
+      _sessionValid = true;
+      console.log('Token refreshed ✓');
+    }
+  });
+}
 
 // ═══════════════════════════════════════════════════════════
 // CONSTANTS
@@ -2899,6 +2958,7 @@ function renderPostComments(postId){
 async function submitPostComment(postId){
   if(!CU){toast('Please sign in.');return;}
   if(!sb){toast('Not connected.');return;}
+  await ensureSession();
   var input=document.getElementById('postCommentInput-'+postId);
   if(!input)return;
   var txt=input.value.trim();
@@ -4447,13 +4507,8 @@ async function sendChatMsg(){
   var text=inp.value.trim();
   if(!text)return;
 
-  // Verify session is active
-  var sessionOk=false;
-  try{
-    var {data:sessionData}=await sb.auth.getSession();
-    sessionOk=!!(sessionData&&sessionData.session);
-  }catch(e){sessionOk=false;}
-
+  // Verify session is active (fixes iOS Safari)
+  var sessionOk = await ensureSession();
   if(!sessionOk){
     toast('❌ Session expired. Please sign in again.');
     return;
