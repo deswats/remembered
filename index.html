@@ -720,9 +720,11 @@ var sb = (typeof supabase !== 'undefined') ? supabase.createClient(SUPABASE_URL,
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storage: window.localStorage,
-    storageKey: 'sb-remembered-auth'
+    detectSessionInUrl: false,
+    flowType: 'implicit'
+  },
+  global: {
+    headers: {}
   }
 }) : null;
 console.log('sb initialized at load time:', sb ? '✓' : '✗ supabase not available yet');
@@ -736,26 +738,62 @@ var _sessionValid = false;
 async function ensureSession(){
   if(!sb)return false;
   try{
-    // Try to get current session
-    var {data, error} = await sb.auth.getSession();
-    if(data && data.session){
+    // Step 1: Check current session
+    var res = await sb.auth.getSession();
+    if(res.data && res.data.session && res.data.session.access_token){
       _sessionValid = true;
-      _sessionChecked = true;
       return true;
     }
-    // Try to refresh the session
-    var {data:refreshData, error:refreshError} = await sb.auth.refreshSession();
-    if(refreshData && refreshData.session){
+    // Step 2: Try refresh
+    console.log('No session found, attempting refresh...');
+    var ref = await sb.auth.refreshSession();
+    if(ref.data && ref.data.session){
       _sessionValid = true;
-      _sessionChecked = true;
       console.log('Session refreshed ✓');
       return true;
     }
+    // Step 3: Try our own stored token
+    var rbToken=localStorage.getItem('rb_token');
+    var rbRefresh=localStorage.getItem('rb_refresh');
+    if(rbToken){
+      try{
+        await sb.auth.setSession({access_token:rbToken,refresh_token:rbRefresh||''});
+        var chk2=await sb.auth.getSession();
+        if(chk2.data&&chk2.data.session){
+          _sessionValid=true;
+          console.log('Session restored from rb_token ✓');
+          return true;
+        }
+      }catch(e3){console.warn('rb_token restore failed:',e3.message);}
+    }
+    // Step 4: Check localStorage for Supabase token
+    var tokenKeys = Object.keys(localStorage).filter(function(k){
+      return k.includes('supabase') || k.includes('sb-');
+    });
+    for(var i=0;i<tokenKeys.length;i++){
+      try{
+        var val = JSON.parse(localStorage.getItem(tokenKeys[i])||'{}');
+        if(val.access_token || (val.currentSession && val.currentSession.access_token)){
+          var token = val.access_token || val.currentSession.access_token;
+          // Try to set session manually
+          await sb.auth.setSession({
+            access_token: token,
+            refresh_token: val.refresh_token || val.currentSession?.refresh_token || ''
+          });
+          var check = await sb.auth.getSession();
+          if(check.data && check.data.session){
+            _sessionValid = true;
+            console.log('Session restored from storage ✓');
+            return true;
+          }
+        }
+      }catch(e2){}
+    }
     _sessionValid = false;
-    console.warn('No valid session found');
+    console.warn('Could not restore session');
     return false;
   }catch(e){
-    console.warn('ensureSession error:', e);
+    console.warn('ensureSession error:', e.message);
     return false;
   }
 }
@@ -1114,6 +1152,15 @@ async function afterAuth(user){
       const {data:np}=await sb.from('profiles').select('*').eq('id',user.id).single();
       profile=np;
     }
+    // Store access token for iOS recovery
+    try{
+      var {data:tokenData}=await sb.auth.getSession();
+      if(tokenData&&tokenData.session){
+        localStorage.setItem('rb_token',tokenData.session.access_token);
+        localStorage.setItem('rb_refresh',tokenData.session.refresh_token||'');
+        _sessionValid=true;
+      }
+    }catch(e){}
     CU={
       id:user.id,email:user.email,
       firstName:profile?.first_name||user.user_metadata?.first_name||'Friend',
