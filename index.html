@@ -665,7 +665,7 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .lightbox-caption{position:absolute;bottom:1.5rem;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.8);font-size:.85rem;text-align:center;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis;}
 
 /* ── ONLINE PRESENCE ── */
-.online-dot{width:10px;height:10px;border-radius:50%;background:#4caf7b;border:2px solid var(--navy);position:absolute;bottom:1px;right:1px;flex-shrink:0;}
+.online-dot{width:11px;height:11px;border-radius:50%;background:#4caf7b;border:2px solid var(--navy-l);position:absolute;bottom:0;right:0;flex-shrink:0;box-shadow:0 0 4px rgba(76,175,123,.6);}
 .online-dot.offline{background:#888;}
 .av-wrap{position:relative;display:inline-block;}
 
@@ -1072,7 +1072,16 @@ async function afterAuth(user){
     renderApp();
     toast('Welcome, '+CU.firstName+'! 🌻');
     setTimeout(refreshPostData, 2000);
-    setTimeout(initChat, 1000);  // Refresh reactions after login
+    setTimeout(function(){
+      initChat();
+      // Show FAB immediately as fallback
+      setTimeout(function(){
+        var fab=document.getElementById('chatFab');
+        if(fab)fab.classList.add('show');
+        loadUnreadCounts();
+        renderChatList();
+      }, 2000);
+    }, 800);  // Refresh reactions after login
     setTimeout(renderStats, 500);  // Re-render stats with admin panel now CU is set
     setTimeout(restoreLocalRelationships, 1500);
     updateMnavProfileIcon();
@@ -1794,8 +1803,10 @@ function renderMyFriends(){
   html+=accepted.slice(0,5).map(f=>{
     const uid=f.from_id===CU.id?f.to_id:f.from_id;
     const u=CACHE.users.find(x=>x.id===uid);if(!u)return'';
+    const online=isOnline(uid);
     return `<div style="display:flex;align-items:center;gap:.5rem;cursor:pointer;padding:.25rem 0" onclick="openUserProfile('${u.id}')">
-      ${uAvHtml(u,30)}<div style="flex:1;min-width:0"><div style="font-size:.8rem;color:var(--lavender);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${uName(u)}</div></div>
+      <div class="av-wrap" style="flex-shrink:0">${uAvHtml(u,30,false)}<div class="online-dot${online?'':' offline'}" data-online-uid="${uid}" style="${online?'':'background:#555;box-shadow:none;'}"></div></div>
+      <div style="flex:1;min-width:0"><div style="font-size:.8rem;color:var(--lavender);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${uName(u)}</div></div>
     </div>`;
   }).join('');
   if(accepted.length>5)html+=`<div style="font-size:.72rem;color:var(--muted);cursor:pointer;margin-top:.2rem" onclick="openPeoplePage()">+${accepted.length-5} more</div>`;
@@ -4234,15 +4245,16 @@ function initChat(){
       }
     })
     .subscribe(async function(status){
+      console.log('Chat channel status:',status);
       if(status==='SUBSCRIBED'){
         await chatChannel.track({uid:CU.id,name:uName(CU)});
         console.log('Chat ready ✓');
-        var fab=document.getElementById('chatFab');
-        if(fab)fab.classList.add('show');
-        // Load unread counts from DB
-        loadUnreadCounts();
-        renderChatList();
       }
+      // Show FAB regardless of realtime status
+      var fab=document.getElementById('chatFab');
+      if(fab)fab.classList.add('show');
+      loadUnreadCounts();
+      renderChatList();
     });
 }
 
