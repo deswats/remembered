@@ -654,6 +654,15 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .colour-picker{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.4rem;}
 .colour-opt{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:.15s;flex-shrink:0;}
 .colour-opt.sel{border-color:var(--gold);transform:scale(1.15);}
+
+/* ── PHOTO LIGHTBOX ── */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:99999;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s;pointer-events:none;}
+.lightbox.open{opacity:1;pointer-events:all;}
+.lightbox img{max-width:92vw;max-height:88vh;object-fit:contain;border-radius:12px;box-shadow:0 8px 48px rgba(0,0,0,.8);transform:scale(.92);transition:transform .25s;}
+.lightbox.open img{transform:scale(1);}
+.lightbox-close{position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,.15);border:none;color:#fff;width:40px;height:40px;border-radius:50%;font-size:1.3rem;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.lightbox-close:hover{background:rgba(255,255,255,.25);}
+.lightbox-caption{position:absolute;bottom:1.5rem;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.8);font-size:.85rem;text-align:center;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis;}
 </style>
 
 <script defer>
@@ -1802,7 +1811,8 @@ async function openUserProfile(uid){
   if(isMe){
     wrap.innerHTML=`<div class="avatar-upload-wrap" title="Change photo"><div class="u-av-lg" id="upAvatar">${uAvHtml(u,90)}</div><div class="avatar-edit-badge">📷</div><input type="file" accept="image/*" onchange="quickAvatarUpload(this)"></div>`;
   }else{
-    wrap.innerHTML=`<div class="u-av-lg" id="upAvatar">${uAvHtml(u,90)}</div>`;
+    var avSrc=u.avatar_url||u.avatar||'';
+    wrap.innerHTML=`<div class="u-av-lg" id="upAvatar" ${avSrc?`onclick="openLightbox('${avSrc}','${uName(u)}')" style="cursor:zoom-in" title="Tap to enlarge"`:''} >${uAvHtml(u,90)}</div>`;
   }
   document.getElementById('upName').textContent=uName(u);
   // Set cover photo — use VIEWED USER's cover only, never fall back to my own
@@ -4050,11 +4060,38 @@ function setDeceasedProfilePhoto(d){
   var el=document.getElementById('dpPhoto');
   if(!el)return;
   if(d.photo_url){
-    el.innerHTML='<img src="'+d.photo_url+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+    el.innerHTML='<img src="'+d.photo_url+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;cursor:zoom-in" onclick="openLightbox(this.src,\''+d.name+'\');" title="Tap to enlarge">';
   }else{
     el.textContent='👤';
   }
 }
+
+
+// ═══════════════════════════════════════════════════════════
+// PHOTO LIGHTBOX
+// ═══════════════════════════════════════════════════════════
+function openLightbox(src, caption){
+  if(!src)return;
+  var lb=document.getElementById('photoLightbox');
+  var img=document.getElementById('lightboxImg');
+  var cap=document.getElementById('lightboxCaption');
+  if(!lb||!img)return;
+  img.src=src;
+  if(cap)cap.textContent=caption||'';
+  lb.classList.add('open');
+  document.body.style.overflow='hidden';
+}
+
+function closeLightbox(){
+  var lb=document.getElementById('photoLightbox');
+  if(lb)lb.classList.remove('open');
+  document.body.style.overflow='';
+}
+
+// Close on Escape key
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape')closeLightbox();
+});
 
 console.log('Post + Friend functions loaded ✓');
 
@@ -5438,5 +5475,12 @@ function guestBrowse(){showPage('appPage');}
   <button class="ios-hint-close" onclick="dismissIosHint()">Got it</button>
 </div>
 
+
+<!-- PHOTO LIGHTBOX -->
+<div class="lightbox" id="photoLightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightboxImg" src="" alt="">
+  <div class="lightbox-caption" id="lightboxCaption"></div>
+</div>
 </body>
 </html>
