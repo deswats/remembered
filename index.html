@@ -193,7 +193,7 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
 .ps h3{font-family:'Cormorant Garant',serif;color:var(--gold);font-weight:400;margin-bottom:.8rem;font-size:1.05rem;}
 .mgal{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.5rem;}
 .mgal-item{border-radius:8px;overflow:hidden;aspect-ratio:1;background:var(--navy-m);}
-.mgal-item img,.mgal-item video{width:100%;height:100%;object-fit:cover;cursor:pointer;}
+.mgal-item img,.mgal-item video{width:100%;height:100%;object-fit:cover;cursor:zoom-in;}
 .connected-list{display:flex;flex-wrap:wrap;gap:.5rem;}
 .conn-person{display:flex;align-items:center;gap:.5rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:.4rem .7rem;cursor:pointer;transition:.15s;}
 .conn-person:hover{border-color:var(--gold);}
@@ -1207,7 +1207,7 @@ function renderFeed(){
 }
 function renderCard(d){
   const rc=relClass(d.religion);
-  const photo=d.photo_url?`<img src="${d.photo_url}" style="width:100%;height:100%;object-fit:cover;pointer-events:none">`:'👤';
+  const photo=d.photo_url?`<img src="${d.photo_url}" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="event.stopPropagation();openLightbox(this.src,'${d.name}')" title="Tap to enlarge">`:'👤';
   const conns=CACHE.connections.filter(c=>c.deceased_id===d.id);
   const myConn=CU?conns.find(c=>c.user_id===CU.id):null;
   const smiles=conns.filter(c=>c.smiled).length;
@@ -2757,10 +2757,10 @@ function renderPostCard(p){
   if(p.text)h+='<div class="post-body">'+p.text+'</div>';
   if(p.image_url){
     if(p.media_type==='video'||p.image_url.includes('post-videos')){
-      h+='<video src="'+p.image_url+'" controls style="width:100%;max-height:400px;display:block;background:#000" preload="metadata">'
+      h+='<video src="'+p.image_url+'" controls style="width:100%;max-height:400px;display:block;background:#000;border-radius:8px" preload="metadata" playsinline>'
         +'<source src="'+p.image_url+'">Your browser does not support video.</video>';
     }else{
-      h+='<img src="'+p.image_url+'" style="width:100%;max-height:360px;object-fit:cover;display:block" loading="lazy">';
+      h+='<img src="'+p.image_url+'" style="width:100%;max-height:360px;object-fit:cover;display:block;cursor:zoom-in" loading="lazy" onclick="openLightbox(this.src,\'\');" title="Tap to enlarge">';
     }
   }
   h+='<div class="post-actions">';
@@ -3574,9 +3574,9 @@ function renderDpWall(deceasedId){
       var mediaHtml='';
       if(p.media_url){
         if(p.media_type==='video'){
-          mediaHtml='<video class="wall-post-video" controls preload="metadata"><source src="'+p.media_url+'">Your browser does not support video.</video>';
+          mediaHtml='<video class="wall-post-video" controls preload="metadata" playsinline><source src="'+p.media_url+'">Your browser does not support video.</video>';
         }else{
-          mediaHtml='<img class="wall-post-media" src="'+p.media_url+'" alt="memory photo" loading="lazy">';
+          mediaHtml='<img class="wall-post-media" src="'+p.media_url+'" alt="memory photo" loading="lazy" onclick="openLightbox(this.src,\''+name+'\')" style="cursor:zoom-in" title="Tap to enlarge">';
         }
       }
       var deceased=CACHE.deceased.find(function(x){return x.id===deceasedId;});
@@ -4087,6 +4087,20 @@ function closeLightbox(){
   if(lb)lb.classList.remove('open');
   document.body.style.overflow='';
 }
+
+// Global tap-to-enlarge for any image with data-lightbox or inside .mgal
+document.addEventListener('click', function(e){
+  // Gallery images inside .mgal
+  var mgalImg = e.target.closest('.mgal') ? e.target : null;
+  if(mgalImg && mgalImg.tagName === 'IMG'){
+    openLightbox(mgalImg.src, mgalImg.alt||'');
+    return;
+  }
+  // Any img with data-lb attribute
+  if(e.target.tagName === 'IMG' && e.target.dataset.lb){
+    openLightbox(e.target.src, e.target.dataset.lb||'');
+  }
+});
 
 // Close on Escape key
 document.addEventListener('keydown',function(e){
