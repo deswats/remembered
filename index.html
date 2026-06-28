@@ -4387,23 +4387,35 @@ async function openChat(uid){
 
 // ── Load history from Supabase ──
 async function loadChatHistory(uid){
-  if(!sb||!CU)return;
+  if(!CU)return;
+  // Load localStorage first for instant display
   try{
+    var stored=localStorage.getItem('rb_chat_'+CU.id+'_'+uid);
+    if(stored){
+      chatMessages[uid]=JSON.parse(stored);
+      renderChatMsgs(uid);
+    }
+  }catch(e){}
+
+  // Then try Supabase for latest messages
+  if(!sb)return;
+  try{
+    var {data:sessionData}=await sb.auth.getSession();
+    if(!sessionData||!sessionData.session)return;
     var res=await sb.from('messages')
       .select('*')
       .or('and(from_id.eq.'+CU.id+',to_id.eq.'+uid+'),and(from_id.eq.'+uid+',to_id.eq.'+CU.id+')')
       .order('created_at',{ascending:true})
       .limit(50);
-    if(res.data){
+    if(res.data&&res.data.length){
       chatMessages[uid]=res.data;
+      // Merge with localStorage messages not yet in DB
+      try{
+        localStorage.setItem('rb_chat_'+CU.id+'_'+uid,JSON.stringify(res.data.slice(-100)));
+      }catch(e){}
     }
   }catch(e){
-    console.warn('Load chat history:',e);
-    // Fall back to localStorage
-    try{
-      var stored=localStorage.getItem('rb_chat_'+CU.id+'_'+uid);
-      if(stored)chatMessages[uid]=JSON.parse(stored);
-    }catch(e2){}
+    console.warn('Load chat history from DB:',e);
   }
 }
 
@@ -4434,6 +4446,19 @@ async function sendChatMsg(){
   if(!inp)return;
   var text=inp.value.trim();
   if(!text)return;
+
+  // Verify session is active
+  var sessionOk=false;
+  try{
+    var {data:sessionData}=await sb.auth.getSession();
+    sessionOk=!!(sessionData&&sessionData.session);
+  }catch(e){sessionOk=false;}
+
+  if(!sessionOk){
+    toast('❌ Session expired. Please sign in again.');
+    return;
+  }
+
   inp.value='';
   inp.disabled=true;
 
@@ -4442,35 +4467,60 @@ async function sendChatMsg(){
     var res=await sb.from('messages').insert({
       from_id:CU.id,
       to_id:activeChatUid,
-      text:text,
+      text:sanitize(text),
       read:false,
       created_at:new Date().toISOString()
     }).select().single();
 
-    if(res.error)throw new Error(res.error.message);
+    if(res.error){
+      // If DB save fails, use broadcast only (realtime fallback)
+      console.warn('DB save failed, using broadcast fallback:',res.error.message);
+      var localMsg={
+        id:'local_'+Date.now(),
+        from_id:CU.id,
+        to_id:activeChatUid,
+        text:sanitize(text),
+        read:false,
+        created_at:new Date().toISOString()
+      };
+      if(!chatMessages[activeChatUid])chatMessages[activeChatUid]=[];
+      chatMessages[activeChatUid].push(localMsg);
+      // Still broadcast so the other person gets it
+      if(chatChannel){
+        await chatChannel.send({type:'broadcast',event:'msg',payload:localMsg});
+      }
+      // Save to localStorage as backup
+      try{
+        var lsKey='rb_chat_'+CU.id+'_'+activeChatUid;
+        var existing=JSON.parse(localStorage.getItem(lsKey)||'[]');
+        existing.push(localMsg);
+        localStorage.setItem(lsKey,JSON.stringify(existing.slice(-100)));
+      }catch(e2){}
+      renderChatMsgs(activeChatUid);
+      renderChatList();
+      inp.disabled=false;
+      inp.focus();
+      return;
+    }
 
     var saved=res.data;
-    // Add to local cache
     if(!chatMessages[activeChatUid])chatMessages[activeChatUid]=[];
     chatMessages[activeChatUid].push(saved);
     renderChatMsgs(activeChatUid);
     renderChatList();
 
-    // Broadcast to recipient via realtime
+    // Broadcast to recipient
     if(chatChannel){
-      await chatChannel.send({
-        type:'broadcast',
-        event:'msg',
-        payload:saved
-      });
+      try{
+        await chatChannel.send({type:'broadcast',event:'msg',payload:saved});
+      }catch(e){console.warn('Broadcast failed:',e);}
     }
-    // Notify via app notifications
     addNotif(activeChatUid,uName(CU)+' sent you a message 💬','💬');
 
   }catch(e){
     console.error('sendChatMsg:',e);
-    toast('❌ Message not sent: '+e.message);
-    inp.value=text; // restore
+    toast('❌ '+e.message);
+    inp.value=text;
   }finally{
     inp.disabled=false;
     inp.focus();
