@@ -6,7 +6,7 @@
 <meta http-equiv="pragma" content="no-cache">
 <meta http-equiv="expires" content="0">
 <!-- v3.0 SUPABASE BUILD -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=3.0">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -106,7 +106,7 @@ nav{position:sticky;top:0;z-index:200;background:rgba(13,27,42,.97);backdrop-fil
 .btn-danger{background:var(--danger);color:#fff;}
 
 /* FEED */
-.feed{display:flex;flex-direction:column;gap:1rem;}
+.feed{-webkit-overflow-scrolling:touch;will-change:scroll-position;display:flex;flex-direction:column;gap:1rem;}
 .create-bar{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:.9rem;display:flex;align-items:center;gap:.8rem;cursor:pointer;transition:.2s;}
 .create-bar:hover{border-color:var(--gold);}
 .ua{width:40px;height:40px;border-radius:50%;background:var(--navy-m);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;overflow:hidden;cursor:pointer;}
@@ -420,7 +420,7 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
   .auth-card{border-radius:20px 20px 0 0;padding:1.5rem 1.2rem 2rem;max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 
   /* Feed */
-  .feed{gap:.8rem;}
+  .feed{-webkit-overflow-scrolling:touch;will-change:scroll-position;gap:.8rem;}
   .create-bar{padding:.7rem;}
   .feed-tab-row{gap:.3rem;overflow-x:auto;flex-wrap:nowrap;padding-bottom:.2rem;}
   .feed-tab{white-space:nowrap;flex-shrink:0;}
@@ -707,6 +707,32 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .chat-input-row input:focus{border-color:var(--gold);}
 .chat-input-row button{background:var(--gold);border:none;border-radius:50%;width:34px;height:34px;color:var(--navy);font-size:1rem;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
 .chat-typing{font-size:.7rem;color:var(--muted);padding:0 .7rem .3rem;font-style:italic;min-height:16px;}
+
+/* ── POST INPUT PERFORMANCE ── */
+#postTextInput{
+  resize:none;
+  min-height:56px;
+  max-height:180px;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  word-break:break-word;
+  font-size:16px !important;
+  line-height:1.5;
+  padding:.6rem .8rem;
+  border-radius:10px;
+  width:100%;
+  box-sizing:border-box;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--border);
+  color:var(--ivory);
+  font-family:'Inter',sans-serif;
+  outline:none;
+  -webkit-user-select:text;
+  user-select:text;
+  touch-action:manipulation;
+}
+#postTextInput:focus{border-color:var(--gold);}
+.post-create-box{contain:none;}
 </style>
 
 <script defer>
@@ -1050,7 +1076,7 @@ async function doRegister(){
       email,password:pass,
       options:{
         data:{first_name:first,last_name:last,country},
-        emailRedirectTo:'https://deswats.github.io/remembered/'
+        emailRedirectTo:'https://remembered.asia/'
       }
     });
 
@@ -1112,7 +1138,7 @@ async function resendConfirmation(email){
   try{
     const {error}=await sb.auth.resend({
       type:'signup',email,
-      options:{emailRedirectTo:'https://deswats.github.io/remembered/'}
+      options:{emailRedirectTo:'https://remembered.asia/'}
     });
     showLoader(false);
     if(error)toast('❌ '+error.message);
@@ -1180,6 +1206,7 @@ async function afterAuth(user){
     setTimeout(refreshPostData, 2000);
     setTimeout(function(){
       initChat();
+      startPresenceHeartbeat();
       // Show FAB immediately as fallback
       setTimeout(function(){
         var fab=document.getElementById('chatFab');
@@ -1307,7 +1334,7 @@ function renderApp(){
     const feedAv=document.getElementById('feedAvatar');
     if(feedAv)feedAv.innerHTML=CU.avatar?`<img src="${CU.avatar}">`:(CU.firstName.charAt(0)+(CU.lastName?.charAt(0)||''));
     const invLink=document.getElementById('inviteLink');
-    if(invLink)invLink.textContent=`deswats.github.io/remembered?ref=${CU.inviteCode||CU.id}`;
+    if(invLink)invLink.textContent=`remembered.asia?ref=${CU.inviteCode||CU.id}`;
   }
 }
 
@@ -1841,7 +1868,7 @@ function renderPendingRequests(){
 // ═══════════════════════════════════════════════════════════
 function openInviteModal(){
   if(!CU){toast('Please sign in.');showPageDirect('authPage');setAuthMode('login');return;}
-  const il=document.getElementById('inviteLink');if(il)il.textContent=`deswats.github.io/remembered?ref=${CU.inviteCode||CU.id}`;
+  const il=document.getElementById('inviteLink');if(il)il.textContent=`remembered.asia?ref=${CU.inviteCode||CU.id}`;
   document.getElementById('inviteEmail').value='';
   document.getElementById('friendSearch').value='';
   document.getElementById('friendSearchResults').innerHTML='';
@@ -2149,23 +2176,52 @@ async function addNotif(userId,text,icon){
 }
 function updateNotifBadge(){
   if(!CU)return;
-  const unread=CACHE.notifications.filter(n=>!n.read).length;
+  const unread=CACHE.notifications.filter(function(n){return !n.read;}).length;
   const badge=document.getElementById('notifCount');
-  if(badge){badge.textContent=unread;badge.style.display=unread?'block':'none';}
+  if(badge){
+    badge.textContent=unread>99?'99+':String(unread);
+    badge.style.display=unread>0?'flex':'none';
+  }
+  // Update mobile nav badge
+  var mb=document.getElementById('mnavNotifBadge');
+  if(mb){mb.textContent=unread>0?String(unread):'0';mb.style.display=unread>0?'flex':'none';}
   if(typeof updateMobileNav==="function")updateMobileNav();
 }
-function renderNotifications(){
-  const el=document.getElementById('notifList');if(!el||!CU)return;
-  const notifs=CACHE.notifications.slice(0,8);
-  notifs.filter(n=>!n.read).forEach(n=>{
-    n.read=true;sb.from('notifications').update({read:true}).eq('id',n.id);
-  });
+async function renderNotifications(){
+  var el=document.getElementById('notifList');
+  if(!el||!CU)return;
+  var notifs=CACHE.notifications.slice(0,20);
+  // Mark all unread as read in Supabase
+  var unread=notifs.filter(function(n){return !n.read;});
+  if(unread.length>0&&sb){
+    try{
+      await sb.from('notifications').update({read:true}).eq('user_id',CU.id).eq('read',false);
+      unread.forEach(function(n){n.read=true;});
+    }catch(e){console.warn('Mark read:',e);}
+  }
   updateNotifBadge();
-  el.innerHTML=notifs.length?notifs.map(n=>`<div class="notif-item">
-    <div class="ni-icon">${n.icon||'🔔'}</div>
-    <div><div class="ni-text">${n.text}</div><div class="ni-time">${timeSince(n.created_at)}</div></div>
-  </div>`).join(''):'<div class="txt-m txt-sm" style="padding:.3rem">No notifications yet.</div>';
+  // Header
+  var header='<div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .8rem;border-bottom:1px solid var(--border)">'
+    +'<span style="font-size:.78rem;font-weight:600;color:var(--ivory)">Notifications</span>'
+    +'<div style="display:flex;gap:.4rem">'
+    +'<button type="button" onclick="markAllNotifsRead()" style="font-size:.68rem;background:none;border:none;color:var(--gold);cursor:pointer;padding:.2rem .4rem">Mark all read</button>'
+    +'<button type="button" onclick="clearAllNotifs()" style="font-size:.68rem;background:none;border:none;color:#ff5252;cursor:pointer;padding:.2rem .4rem">Clear all</button>'
+    +'</div></div>';
+  if(!notifs.length){
+    el.innerHTML=header+'<div style="padding:1.5rem;text-align:center;color:var(--muted);font-size:.82rem">No notifications yet</div>';
+    return;
+  }
+  var items=notifs.map(function(n){
+    return '<div class="notif-item'+(n.read?'':' unread')+'">'
+      +'<div class="ni-icon">'+(n.icon||'🔔')+'</div>'
+      +'<div><div class="ni-text">'+n.text+'</div>'
+      +'<div class="ni-time">'+timeSince(n.created_at)+'</div></div>'
+      +'</div>';
+  }).join('');
+  el.innerHTML=header+items;
 }
+
+
 function showNotifs(){renderNotifications();}
 
 // ═══════════════════════════════════════════════════════════
@@ -2323,7 +2379,7 @@ function openShare(id){
   shareTargetId=id;
   const d=CACHE.deceased.find(x=>x.id===id);if(!d)return;
   document.getElementById('shareMemName').textContent=d.name;
-  const baseUrl=`https://deswats.github.io/remembered/#${id}`;
+  const baseUrl=`https://remembered.asia/#${id}`;
   window._shareUrl=baseUrl;
   window._shareMsg=encodeURIComponent(`🌻 Remember ${d.name} (${fmtD(d.dob)} – ${fmtD(d.dod)}) on Remembered — a place to celebrate those we have lost. Come share a smile or leave a prayer. ${baseUrl}`);
   document.getElementById('shareLink').textContent=baseUrl;
@@ -2756,7 +2812,15 @@ async function submitPost(){
   }
 }
 
+var _postInputTimer = null;
 function handlePostInput(){
+  // Legacy - now handled by event listener
+  // Kept for compatibility
+  clearTimeout(_postInputTimer);
+  _postInputTimer = setTimeout(handlePostInputMentions, 400);
+}
+
+function handlePostInputMentions(){
   var input=document.getElementById('postTextInput');
   if(!input)return;
   var text=input.value;
@@ -2956,7 +3020,7 @@ function renderPostCard(p){
   h+='<div class="comments-list" id="postCommentsList-'+pid+'"></div>';
   h+='<div class="comment-input-row">';
   h+=(CU?uAvHtml(CU,28):'<div style="width:28px;height:28px;border-radius:50%;background:var(--navy-m);display:flex;align-items:center;justify-content:center">👤</div>');
-  h+='<input type="text" id="postCommentInput-'+pid+'" placeholder="Write a comment…" style="flex:1">';
+  h+='<input type="text" id="postCommentInput-'+pid+'" placeholder="Write a comment…" style="flex:1;touch-action:manipulation;-webkit-user-select:text;user-select:text">';
   h+='<button type="button" id="postCommentBtn-'+pid+'" data-pid="'+pid+'" onclick="submitPostComment(this.dataset.pid)" style="padding:.4rem .8rem;border-radius:8px;background:var(--gold);border:none;color:var(--navy);font-weight:600;font-size:.78rem;cursor:pointer">Post</button>';
   h+='</div></div></div>';
   return h;
@@ -3447,9 +3511,9 @@ async function deletePost(postId){
   if(!('serviceWorker' in navigator))return;
 
   // Register sw.js from the GitHub Pages path
-  var swPath = '/remembered/sw.js';
+  var swPath = '/sw.js';
 
-  navigator.serviceWorker.register(swPath, {scope: '/remembered/'})
+  navigator.serviceWorker.register(swPath, {scope: '/'})
     .then(function(reg){
       console.log('[SW] Registered ✓ scope:', reg.scope);
       reg.addEventListener('updatefound', function(){
@@ -3896,8 +3960,7 @@ function sanitize(str){
     .replace(/</g,'&lt;')
     .replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;')
-    .replace(/'/g,'&#x27;')
-    .replace(/\//g,'&#x2F;');
+    ;
 }
 
 // Sanitize but allow basic line breaks
@@ -4295,32 +4358,53 @@ function initChat(){
 
   // Supabase Realtime channel for presence + broadcast
   chatChannel = sb.channel('remembered-presence-v2',{
-    config:{presence:{key:CU.id}}
+    config:{
+      presence:{key:CU.id},
+      broadcast:{self:false}
+    }
   });
 
   chatChannel
     .on('presence','sync',function(){
       var state=chatChannel.presenceState();
       onlineUsers={};
+      // Parse presence state - key is the presence key (user id)
       Object.keys(state).forEach(function(k){
-        var p=state[k];
-        if(p&&p.length)onlineUsers[p[0].uid]=Date.now();
+        var presences=state[k];
+        if(presences&&presences.length){
+          // The key itself is the uid (since we set key:CU.id)
+          var uid=presences[0].uid||k;
+          onlineUsers[uid]=Date.now();
+          console.log('Online user detected:',uid);
+        }
       });
+      console.log('Online users:',Object.keys(onlineUsers).length);
       renderOnlineDots();
       renderChatList();
+      renderMyFriends();
     })
     .on('presence','join',function(payload){
       if(payload.newPresences&&payload.newPresences.length){
-        onlineUsers[payload.newPresences[0].uid]=Date.now();
-        renderOnlineDots();
-        renderChatList();
+        var uid=payload.newPresences[0].uid||payload.key;
+        if(uid){
+          onlineUsers[uid]=Date.now();
+          console.log('User joined:',uid);
+          renderOnlineDots();
+          renderChatList();
+          renderMyFriends();
+        }
       }
     })
     .on('presence','leave',function(payload){
       if(payload.leftPresences&&payload.leftPresences.length){
-        delete onlineUsers[payload.leftPresences[0].uid];
-        renderOnlineDots();
-        renderChatList();
+        var uid=payload.leftPresences[0].uid||payload.key;
+        if(uid){
+          delete onlineUsers[uid];
+          console.log('User left:',uid);
+          renderOnlineDots();
+          renderChatList();
+          renderMyFriends();
+        }
       }
     })
     .on('broadcast',{event:'msg'},function(payload){
@@ -4354,10 +4438,27 @@ function initChat(){
     .subscribe(async function(status){
       console.log('Chat channel status:',status);
       if(status==='SUBSCRIBED'){
-        await chatChannel.track({uid:CU.id,name:uName(CU)});
-        console.log('Chat ready ✓');
+        // Track presence with all identifying info
+        try{
+          await chatChannel.track({
+            uid:CU.id,
+            name:uName(CU),
+            online_at:new Date().toISOString()
+          });
+          console.log('Presence tracked ✓ uid:',CU.id);
+        }catch(e){
+          console.warn('Track error:',e);
+          // Retry once after 2 seconds
+          setTimeout(async function(){
+            try{await chatChannel.track({uid:CU.id,name:uName(CU)});}catch(e2){}
+          },2000);
+        }
+      } else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        console.warn('Channel error:',status,', retrying...');
+        setTimeout(function(){initChat();},5000);
+        return;
       }
-      // Show FAB regardless of realtime status
+      // Show FAB regardless
       var fab=document.getElementById('chatFab');
       if(fab)fab.classList.add('show');
       loadUnreadCounts();
@@ -4370,13 +4471,36 @@ function getUserName(uid){
   return u?uName(u):'Someone';
 }
 
-function isOnline(uid){return !!onlineUsers[uid];}
+function isOnline(uid){
+  if(!uid)return false;
+  // Consider online if seen within last 2 minutes
+  var ts=onlineUsers[uid];
+  if(!ts)return false;
+  return (Date.now()-ts) < 2*60*1000;
+}
 
 function renderOnlineDots(){
+  // Update all online dot elements in the DOM
   document.querySelectorAll('[data-online-uid]').forEach(function(el){
     var uid=el.dataset.onlineUid;
-    el.classList.toggle('online',isOnline(uid));
+    var online=isOnline(uid);
+    if(online){
+      el.style.background='#4caf7b';
+      el.style.boxShadow='0 0 4px rgba(76,175,123,.6)';
+    }else{
+      el.style.background='#555';
+      el.style.boxShadow='none';
+    }
   });
+  // Update chat window status if open
+  if(activeChatUid){
+    var st=document.getElementById('cwStatus');
+    if(st){
+      var online=isOnline(activeChatUid);
+      st.textContent=online?'● Online':'○ Offline';
+      st.style.color=online?'#4caf7b':'var(--muted)';
+    }
+  }
 }
 
 // ── Chat Panel ──
@@ -4682,6 +4806,72 @@ function updateChatBadge(){
   if(!badge)return;
   badge.textContent=total>9?'9+':String(total);
   badge.classList.toggle('show',total>0);
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// NOTIFICATION MANAGEMENT
+// ═══════════════════════════════════════════════════════════
+
+async function markAllNotifsRead(){
+  if(!CU||!sb)return;
+  try{
+    await sb.from('notifications').update({read:true}).eq('user_id',CU.id);
+    CACHE.notifications.forEach(function(n){n.read=true;});
+    updateNotifBadge();
+    renderNotifications();
+    toast('✓ All notifications marked as read');
+  }catch(e){
+    // Even if DB fails, clear locally
+    CACHE.notifications.forEach(function(n){n.read=true;});
+    updateNotifBadge();
+    toast('✓ Cleared');
+  }
+}
+
+async function clearAllNotifs(){
+  if(!CU||!sb)return;
+  var ok=confirm('Clear all notifications?');
+  if(!ok)return;
+  try{
+    await sb.from('notifications').delete().eq('user_id',CU.id);
+    CACHE.notifications=[];
+    updateNotifBadge();
+    renderNotifications();
+    toast('🗑️ Notifications cleared');
+  }catch(e){
+    // Clear locally even if DB fails
+    CACHE.notifications=[];
+    updateNotifBadge();
+    renderNotifications();
+    toast('🗑️ Cleared locally');
+  }
+}
+
+// Force-clear the badge (for stuck badges)
+function forceClearBadge(){
+  CACHE.notifications.forEach(function(n){n.read=true;});
+  updateNotifBadge();
+  if(sb&&CU){
+    sb.from('notifications').update({read:true}).eq('user_id',CU.id)
+      .then(function(){}).catch(function(){});
+  }
+}
+
+
+// ── Presence heartbeat - re-track every 30s ──
+function startPresenceHeartbeat(){
+  setInterval(async function(){
+    if(chatChannel&&CU){
+      try{
+        await chatChannel.track({
+          uid:CU.id,
+          name:uName(CU),
+          online_at:new Date().toISOString()
+        });
+      }catch(e){}
+    }
+  }, 30000);
 }
 
 console.log('Post + Friend functions loaded ✓');
@@ -5384,7 +5574,7 @@ function guestBrowse(){showPage('appPage');}
             <div style="display:flex;gap:.7rem;align-items:flex-start">
               <div class="ua" id="feedAvatar" onclick="openMyProfile()">🌻</div>
               <div style="flex:1">
-                <textarea id="postTextInput" oninput="handlePostInput()" placeholder="What's on your mind? Share a memory, thought or message with your friends…" rows="3" onclick="if(!CU){showPage('authPage');setAuthMode('login');}"></textarea>
+                <textarea id="postTextInput" placeholder="What's on your mind? Share a memory, thought or message with your friends…" rows="3" autocomplete="off" autocorrect="on" autocapitalize="sentences" spellcheck="true"></textarea>
                 <div id="postImagePreview" style="display:none;margin-top:.4rem"></div>
               </div>
             </div>
@@ -5648,7 +5838,7 @@ function guestBrowse(){showPage('appPage');}
       <div class="divider"></div>
       <p style="font-size:.78rem;color:var(--lavender)">Or share your personal invite link:</p>
       <div class="invite-link-box">
-        <span id="inviteLink">deswats.github.io/remembered?ref=…</span>
+        <span id="inviteLink">remembered.asia?ref=…</span>
         <button type="button" class="btn btn-o btn-sm" onclick="copyInvite()">Copy</button>
       </div>
       <div class="divider"></div>
@@ -5787,7 +5977,7 @@ function guestBrowse(){showPage('appPage');}
 
       <!-- Copy link row -->
       <div class="share-link-row">
-        <span id="shareLink">deswats.github.io/remembered#…</span>
+        <span id="shareLink">remembered.asia#…</span>
         <button type="button" class="btn btn-o btn-sm" onclick="copyShareLink()" style="white-space:nowrap">📋 Copy</button>
       </div>
 
@@ -6107,7 +6297,7 @@ function guestBrowse(){showPage('appPage');}
   <div class="chat-input-row">
     <input type="text" id="chatInput" placeholder="Type a message…" maxlength="500"
       onkeydown="if(event.key==='Enter')sendChatMsg()"
-      oninput="sendTyping()">
+      oninput="sendTyping()" style="touch-action:manipulation;-webkit-user-select:text;user-select:text;">
     <button onclick="sendChatMsg()">➤</button>
   </div>
 </div>

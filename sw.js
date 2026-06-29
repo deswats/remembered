@@ -1,8 +1,7 @@
-// Remembered Service Worker v1.0
-// Place this file at: github.com/deswats/remembered/sw.js
-var CACHE_NAME = 'remembered-v1';
-var OFFLINE_URL = '/remembered/';
-var ASSETS = ['/remembered/', '/remembered/index.html'];
+// Remembered Service Worker v2.0 — remembered.asia
+var CACHE_NAME = 'remembered-v2';
+var OFFLINE_URL = '/';
+var ASSETS = ['/', '/index.html'];
 
 self.addEventListener('install', function(e){
   e.waitUntil(
