@@ -1206,6 +1206,7 @@ async function afterAuth(user){
     setTimeout(refreshPostData, 2000);
     setTimeout(function(){
       initChat();
+      startPresenceHeartbeat();
       // Show FAB immediately as fallback
       setTimeout(function(){
         var fab=document.getElementById('chatFab');
@@ -4357,32 +4358,53 @@ function initChat(){
 
   // Supabase Realtime channel for presence + broadcast
   chatChannel = sb.channel('remembered-presence-v2',{
-    config:{presence:{key:CU.id}}
+    config:{
+      presence:{key:CU.id},
+      broadcast:{self:false}
+    }
   });
 
   chatChannel
     .on('presence','sync',function(){
       var state=chatChannel.presenceState();
       onlineUsers={};
+      // Parse presence state - key is the presence key (user id)
       Object.keys(state).forEach(function(k){
-        var p=state[k];
-        if(p&&p.length)onlineUsers[p[0].uid]=Date.now();
+        var presences=state[k];
+        if(presences&&presences.length){
+          // The key itself is the uid (since we set key:CU.id)
+          var uid=presences[0].uid||k;
+          onlineUsers[uid]=Date.now();
+          console.log('Online user detected:',uid);
+        }
       });
+      console.log('Online users:',Object.keys(onlineUsers).length);
       renderOnlineDots();
       renderChatList();
+      renderMyFriends();
     })
     .on('presence','join',function(payload){
       if(payload.newPresences&&payload.newPresences.length){
-        onlineUsers[payload.newPresences[0].uid]=Date.now();
-        renderOnlineDots();
-        renderChatList();
+        var uid=payload.newPresences[0].uid||payload.key;
+        if(uid){
+          onlineUsers[uid]=Date.now();
+          console.log('User joined:',uid);
+          renderOnlineDots();
+          renderChatList();
+          renderMyFriends();
+        }
       }
     })
     .on('presence','leave',function(payload){
       if(payload.leftPresences&&payload.leftPresences.length){
-        delete onlineUsers[payload.leftPresences[0].uid];
-        renderOnlineDots();
-        renderChatList();
+        var uid=payload.leftPresences[0].uid||payload.key;
+        if(uid){
+          delete onlineUsers[uid];
+          console.log('User left:',uid);
+          renderOnlineDots();
+          renderChatList();
+          renderMyFriends();
+        }
       }
     })
     .on('broadcast',{event:'msg'},function(payload){
@@ -4416,10 +4438,27 @@ function initChat(){
     .subscribe(async function(status){
       console.log('Chat channel status:',status);
       if(status==='SUBSCRIBED'){
-        await chatChannel.track({uid:CU.id,name:uName(CU)});
-        console.log('Chat ready ✓');
+        // Track presence with all identifying info
+        try{
+          await chatChannel.track({
+            uid:CU.id,
+            name:uName(CU),
+            online_at:new Date().toISOString()
+          });
+          console.log('Presence tracked ✓ uid:',CU.id);
+        }catch(e){
+          console.warn('Track error:',e);
+          // Retry once after 2 seconds
+          setTimeout(async function(){
+            try{await chatChannel.track({uid:CU.id,name:uName(CU)});}catch(e2){}
+          },2000);
+        }
+      } else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        console.warn('Channel error:',status,', retrying...');
+        setTimeout(function(){initChat();},5000);
+        return;
       }
-      // Show FAB regardless of realtime status
+      // Show FAB regardless
       var fab=document.getElementById('chatFab');
       if(fab)fab.classList.add('show');
       loadUnreadCounts();
@@ -4432,13 +4471,36 @@ function getUserName(uid){
   return u?uName(u):'Someone';
 }
 
-function isOnline(uid){return !!onlineUsers[uid];}
+function isOnline(uid){
+  if(!uid)return false;
+  // Consider online if seen within last 2 minutes
+  var ts=onlineUsers[uid];
+  if(!ts)return false;
+  return (Date.now()-ts) < 2*60*1000;
+}
 
 function renderOnlineDots(){
+  // Update all online dot elements in the DOM
   document.querySelectorAll('[data-online-uid]').forEach(function(el){
     var uid=el.dataset.onlineUid;
-    el.classList.toggle('online',isOnline(uid));
+    var online=isOnline(uid);
+    if(online){
+      el.style.background='#4caf7b';
+      el.style.boxShadow='0 0 4px rgba(76,175,123,.6)';
+    }else{
+      el.style.background='#555';
+      el.style.boxShadow='none';
+    }
   });
+  // Update chat window status if open
+  if(activeChatUid){
+    var st=document.getElementById('cwStatus');
+    if(st){
+      var online=isOnline(activeChatUid);
+      st.textContent=online?'● Online':'○ Offline';
+      st.style.color=online?'#4caf7b':'var(--muted)';
+    }
+  }
 }
 
 // ── Chat Panel ──
@@ -4794,6 +4856,22 @@ function forceClearBadge(){
     sb.from('notifications').update({read:true}).eq('user_id',CU.id)
       .then(function(){}).catch(function(){});
   }
+}
+
+
+// ── Presence heartbeat - re-track every 30s ──
+function startPresenceHeartbeat(){
+  setInterval(async function(){
+    if(chatChannel&&CU){
+      try{
+        await chatChannel.track({
+          uid:CU.id,
+          name:uName(CU),
+          online_at:new Date().toISOString()
+        });
+      }catch(e){}
+    }
+  }, 30000);
 }
 
 console.log('Post + Friend functions loaded ✓');
