@@ -2175,23 +2175,52 @@ async function addNotif(userId,text,icon){
 }
 function updateNotifBadge(){
   if(!CU)return;
-  const unread=CACHE.notifications.filter(n=>!n.read).length;
+  const unread=CACHE.notifications.filter(function(n){return !n.read;}).length;
   const badge=document.getElementById('notifCount');
-  if(badge){badge.textContent=unread;badge.style.display=unread?'block':'none';}
+  if(badge){
+    badge.textContent=unread>99?'99+':String(unread);
+    badge.style.display=unread>0?'flex':'none';
+  }
+  // Update mobile nav badge
+  var mb=document.getElementById('mnavNotifBadge');
+  if(mb){mb.textContent=unread>0?String(unread):'0';mb.style.display=unread>0?'flex':'none';}
   if(typeof updateMobileNav==="function")updateMobileNav();
 }
-function renderNotifications(){
-  const el=document.getElementById('notifList');if(!el||!CU)return;
-  const notifs=CACHE.notifications.slice(0,8);
-  notifs.filter(n=>!n.read).forEach(n=>{
-    n.read=true;sb.from('notifications').update({read:true}).eq('id',n.id);
-  });
+async function renderNotifications(){
+  var el=document.getElementById('notifList');
+  if(!el||!CU)return;
+  var notifs=CACHE.notifications.slice(0,20);
+  // Mark all unread as read in Supabase
+  var unread=notifs.filter(function(n){return !n.read;});
+  if(unread.length>0&&sb){
+    try{
+      await sb.from('notifications').update({read:true}).eq('user_id',CU.id).eq('read',false);
+      unread.forEach(function(n){n.read=true;});
+    }catch(e){console.warn('Mark read:',e);}
+  }
   updateNotifBadge();
-  el.innerHTML=notifs.length?notifs.map(n=>`<div class="notif-item">
-    <div class="ni-icon">${n.icon||'🔔'}</div>
-    <div><div class="ni-text">${n.text}</div><div class="ni-time">${timeSince(n.created_at)}</div></div>
-  </div>`).join(''):'<div class="txt-m txt-sm" style="padding:.3rem">No notifications yet.</div>';
+  // Header
+  var header='<div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .8rem;border-bottom:1px solid var(--border)">'
+    +'<span style="font-size:.78rem;font-weight:600;color:var(--ivory)">Notifications</span>'
+    +'<div style="display:flex;gap:.4rem">'
+    +'<button type="button" onclick="markAllNotifsRead()" style="font-size:.68rem;background:none;border:none;color:var(--gold);cursor:pointer;padding:.2rem .4rem">Mark all read</button>'
+    +'<button type="button" onclick="clearAllNotifs()" style="font-size:.68rem;background:none;border:none;color:#ff5252;cursor:pointer;padding:.2rem .4rem">Clear all</button>'
+    +'</div></div>';
+  if(!notifs.length){
+    el.innerHTML=header+'<div style="padding:1.5rem;text-align:center;color:var(--muted);font-size:.82rem">No notifications yet</div>';
+    return;
+  }
+  var items=notifs.map(function(n){
+    return '<div class="notif-item'+(n.read?'':' unread')+'">'
+      +'<div class="ni-icon">'+(n.icon||'🔔')+'</div>'
+      +'<div><div class="ni-text">'+n.text+'</div>'
+      +'<div class="ni-time">'+timeSince(n.created_at)+'</div></div>'
+      +'</div>';
+  }).join('');
+  el.innerHTML=header+items;
 }
+
+
 function showNotifs(){renderNotifications();}
 
 // ═══════════════════════════════════════════════════════════
@@ -4716,6 +4745,56 @@ function updateChatBadge(){
   if(!badge)return;
   badge.textContent=total>9?'9+':String(total);
   badge.classList.toggle('show',total>0);
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// NOTIFICATION MANAGEMENT
+// ═══════════════════════════════════════════════════════════
+
+async function markAllNotifsRead(){
+  if(!CU||!sb)return;
+  try{
+    await sb.from('notifications').update({read:true}).eq('user_id',CU.id);
+    CACHE.notifications.forEach(function(n){n.read=true;});
+    updateNotifBadge();
+    renderNotifications();
+    toast('✓ All notifications marked as read');
+  }catch(e){
+    // Even if DB fails, clear locally
+    CACHE.notifications.forEach(function(n){n.read=true;});
+    updateNotifBadge();
+    toast('✓ Cleared');
+  }
+}
+
+async function clearAllNotifs(){
+  if(!CU||!sb)return;
+  var ok=confirm('Clear all notifications?');
+  if(!ok)return;
+  try{
+    await sb.from('notifications').delete().eq('user_id',CU.id);
+    CACHE.notifications=[];
+    updateNotifBadge();
+    renderNotifications();
+    toast('🗑️ Notifications cleared');
+  }catch(e){
+    // Clear locally even if DB fails
+    CACHE.notifications=[];
+    updateNotifBadge();
+    renderNotifications();
+    toast('🗑️ Cleared locally');
+  }
+}
+
+// Force-clear the badge (for stuck badges)
+function forceClearBadge(){
+  CACHE.notifications.forEach(function(n){n.read=true;});
+  updateNotifBadge();
+  if(sb&&CU){
+    sb.from('notifications').update({read:true}).eq('user_id',CU.id)
+      .then(function(){}).catch(function(){});
+  }
 }
 
 console.log('Post + Friend functions loaded ✓');
