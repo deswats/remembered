@@ -6,7 +6,7 @@
 <meta http-equiv="pragma" content="no-cache">
 <meta http-equiv="expires" content="0">
 <!-- v3.0 SUPABASE BUILD -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=3.0">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1076,7 +1076,7 @@ async function doRegister(){
       email,password:pass,
       options:{
         data:{first_name:first,last_name:last,country},
-        emailRedirectTo:'https://deswats.github.io/remembered/'
+        emailRedirectTo:'https://remembered.asia/'
       }
     });
 
@@ -1138,7 +1138,7 @@ async function resendConfirmation(email){
   try{
     const {error}=await sb.auth.resend({
       type:'signup',email,
-      options:{emailRedirectTo:'https://deswats.github.io/remembered/'}
+      options:{emailRedirectTo:'https://remembered.asia/'}
     });
     showLoader(false);
     if(error)toast('❌ '+error.message);
@@ -1334,7 +1334,7 @@ function renderApp(){
     const feedAv=document.getElementById('feedAvatar');
     if(feedAv)feedAv.innerHTML=CU.avatar?`<img src="${CU.avatar}">`:(CU.firstName.charAt(0)+(CU.lastName?.charAt(0)||''));
     const invLink=document.getElementById('inviteLink');
-    if(invLink)invLink.textContent=`deswats.github.io/remembered?ref=${CU.inviteCode||CU.id}`;
+    if(invLink)invLink.textContent=`remembered.asia?ref=${CU.inviteCode||CU.id}`;
   }
 }
 
@@ -1868,7 +1868,7 @@ function renderPendingRequests(){
 // ═══════════════════════════════════════════════════════════
 function openInviteModal(){
   if(!CU){toast('Please sign in.');showPageDirect('authPage');setAuthMode('login');return;}
-  const il=document.getElementById('inviteLink');if(il)il.textContent=`deswats.github.io/remembered?ref=${CU.inviteCode||CU.id}`;
+  const il=document.getElementById('inviteLink');if(il)il.textContent=`remembered.asia?ref=${CU.inviteCode||CU.id}`;
   document.getElementById('inviteEmail').value='';
   document.getElementById('friendSearch').value='';
   document.getElementById('friendSearchResults').innerHTML='';
@@ -2379,7 +2379,7 @@ function openShare(id){
   shareTargetId=id;
   const d=CACHE.deceased.find(x=>x.id===id);if(!d)return;
   document.getElementById('shareMemName').textContent=d.name;
-  const baseUrl=`https://deswats.github.io/remembered/#${id}`;
+  const baseUrl=`https://remembered.asia/#${id}`;
   window._shareUrl=baseUrl;
   window._shareMsg=encodeURIComponent(`🌻 Remember ${d.name} (${fmtD(d.dob)} – ${fmtD(d.dod)}) on Remembered — a place to celebrate those we have lost. Come share a smile or leave a prayer. ${baseUrl}`);
   document.getElementById('shareLink').textContent=baseUrl;
@@ -3511,9 +3511,9 @@ async function deletePost(postId){
   if(!('serviceWorker' in navigator))return;
 
   // Register sw.js from the GitHub Pages path
-  var swPath = '/remembered/sw.js';
+  var swPath = '/sw.js';
 
-  navigator.serviceWorker.register(swPath, {scope: '/remembered/'})
+  navigator.serviceWorker.register(swPath, {scope: '/'})
     .then(function(reg){
       console.log('[SW] Registered ✓ scope:', reg.scope);
       reg.addEventListener('updatefound', function(){
@@ -5838,7 +5838,7 @@ function guestBrowse(){showPage('appPage');}
       <div class="divider"></div>
       <p style="font-size:.78rem;color:var(--lavender)">Or share your personal invite link:</p>
       <div class="invite-link-box">
-        <span id="inviteLink">deswats.github.io/remembered?ref=…</span>
+        <span id="inviteLink">remembered.asia?ref=…</span>
         <button type="button" class="btn btn-o btn-sm" onclick="copyInvite()">Copy</button>
       </div>
       <div class="divider"></div>
@@ -5977,7 +5977,7 @@ function guestBrowse(){showPage('appPage');}
 
       <!-- Copy link row -->
       <div class="share-link-row">
-        <span id="shareLink">deswats.github.io/remembered#…</span>
+        <span id="shareLink">remembered.asia#…</span>
         <button type="button" class="btn btn-o btn-sm" onclick="copyShareLink()" style="white-space:nowrap">📋 Copy</button>
       </div>
 
