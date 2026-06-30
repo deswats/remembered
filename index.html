@@ -1410,7 +1410,7 @@ function renderFeed(){
   const feed=document.getElementById('mainFeed');
   if(!feed)return;
   // Mix posts + memorials, sorted by date
-  let posts=[...CACHE.posts];
+  let posts=CACHE.posts.filter(function(p){return canSeePost(p);});
   if(feedTab==='friends'&&CU){
     const fids=getMyFriendIds();fids.push(CU.id);
     posts=posts.filter(p=>fids.includes(p.user_id));
