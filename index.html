@@ -2657,8 +2657,6 @@ function applyTranslations(){
   se('sidebarConnectionsTitle',L.myConnections);se('sidebarInviteBtn',L.inviteFriends);
   se('sidebarCalTitle','🌻 Memorial Anniversaries');se('sidebarSuggestTitle',L.peopleMayKnow);
   se('sidebarBrowseAll',L.browseAll);se('sidebarTopTitle',L.mostCelebrated);
-  se('sidebarDonateTitle',L.keepAlive);se('sidebarDonateSub',L.keepAliveSub);
-  se('donateQRBtn',L.donateQR);se('donateGrabBtn',L.donateGrab);se('donatePaypalBtn',L.donatePaypal);
   // Footer
   se('footerBrand','🌻 Remembered');se('footerTagline',L.footerTag);
   se('footerCredit',L.createdBy+' DW Labs');
@@ -6625,15 +6623,6 @@ function guestBrowse(){showPage('appPage');}
       <div class="w">
         <p class="wt" id="sidebarTopTitle">😊 Most Celebrated</p>
         <div id="topMemorials" style="display:flex;flex-direction:column;gap:.5rem"></div>
-      </div>
-      <div class="w" style="background:linear-gradient(135deg,rgba(201,168,76,.1),rgba(201,168,76,.02));border-color:rgba(201,168,76,.25)">
-        <p class="wt" id="sidebarDonateTitle">☀️ Keep Their Story Alive</p>
-        <p style="font-size:.74rem;color:var(--muted);margin-bottom:.5rem;line-height:1.55" id="sidebarDonateSub">Help us keep this celebration of lives alive — ad-free, always here.</p>
-        <div style="display:flex;flex-direction:column;gap:.4rem">
-          <button type="button" class="btn btn-sm" style="width:100%;background:rgba(220,30,30,.15);border:1px solid rgba(220,30,30,.35);color:#ff5252;font-weight:600" onclick="openDonationModal();switchPayTab('duitnow')" id="donateQRBtn">📱 Scan QR to Donate (DuitNow)</button>
-          <button type="button" class="btn btn-sm" style="width:100%;background:rgba(0,177,79,.1);border:1px solid rgba(0,177,79,.3);color:#00b14f" onclick="openDonationModal();switchPayTab('grab')" id="donateGrabBtn">🟢 GrabPay</button>
-          <button type="button" class="btn btn-sm" style="width:100%;background:rgba(0,112,186,.1);border:1px solid rgba(0,112,186,.3);color:#009CDE" onclick="openDonationModal();switchPayTab('paypal')" id="donatePaypalBtn">💙 PayPal (International)</button>
-        </div>
       </div>
     </aside>
   </div>
