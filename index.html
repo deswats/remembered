@@ -1147,6 +1147,9 @@ async function doRegister(){
     if(data.session){
       toast('✅ Account created! Welcome 🌻');
       maybeShowGuidelines();
+      setTimeout(function(){
+        if(data&&data.user)sendWelcomeNotification(data.user.id, currentLang);
+      }, 1500);
       if(createBtn){createBtn.disabled=false;createBtn.textContent='Create Account';}
       await afterAuth(data.user);
       return;
@@ -2254,7 +2257,7 @@ async function renderNotifications(){
   var items=notifs.map(function(n){
     return '<div class="notif-item'+(n.read?'':' unread')+'">'
       +'<div class="ni-icon">'+(n.icon||'🔔')+'</div>'
-      +'<div><div class="ni-text">'+n.text+'</div>'
+      +'<div><div class="ni-text" style="white-space:pre-line">'+n.text+'</div>'
       +'<div class="ni-time">'+timeSince(n.created_at)+'</div></div>'
       +'</div>';
   }).join('');
@@ -5119,6 +5122,7 @@ function openGuidelines(){
   var btn=document.getElementById('glContinueBtn');
   if(checkbox)checkbox.checked=false;
   if(btn)btn.disabled=true;
+  applyGuidelinesTranslation();
   openModal('guidelinesModal');
 }
 
@@ -5413,6 +5417,158 @@ function clearSpecificPeople(){
   if(row)row.style.display='none';
   var vis=document.getElementById('postVisibility');
   if(vis)vis.value='public';
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// AUTOMATED WELCOME MESSAGE — 4 Languages
+// ═══════════════════════════════════════════════════════════
+var WELCOME_MESSAGES = {
+  en: {
+    title: '🌻 Welcome to Remembered!',
+    body: "We're truly honoured you've joined our community. This is a sacred space to celebrate the lives of those we've loved and lost — through photos, stories, and the connections that keep their memory alive.\n\nIf you ever need help, feel free to reach out. We're here for you. 💛",
+    signature: '— The Remembered Team, DW Labs'
+  },
+  ms: {
+    title: '🌻 Selamat Datang ke Remembered!',
+    body: "Kami berbesar hati anda menyertai komuniti kami. Ini adalah ruang istimewa untuk meraikan kehidupan mereka yang kita sayangi dan kehilangan — melalui foto, kisah, dan hubungan yang mengekalkan kenangan mereka.\n\nJika anda memerlukan bantuan, sila hubungi kami. Kami sentiasa ada untuk anda. 💛",
+    signature: '— Pasukan Remembered, DW Labs'
+  },
+  fil: {
+    title: '🌻 Maligayang Pagdating sa Remembered!',
+    body: "Lubos kaming nagpapasalamat na sumali ka sa aming komunidad. Ito ay isang sagradong lugar upang ipagdiwang ang buhay ng mga taong mahal natin at nawala sa atin — sa pamamagitan ng mga larawan, kwento, at koneksyon na nagpapanatili sa kanilang alaala.\n\nKung kailangan mo ng tulong, huwag mag-atubiling makipag-ugnayan. Narito kami para sa iyo. 💛",
+    signature: '— Ang Koponan ng Remembered, DW Labs'
+  },
+  zh: {
+    title: '🌻 欢迎加入 Remembered！',
+    body: "我们非常荣幸您加入我们的社区。这是一个神圣的空间，让我们通过照片、故事和联系来纪念我们所爱并已逝去的人。\n\n如果您需要帮助，请随时联系我们。我们一直在这里支持您。💛",
+    signature: '— Remembered 团队，DW Labs'
+  }
+};
+
+// Send automated welcome notification based on user's language
+async function sendWelcomeNotification(userId, userLang){
+  if(!sb||!userId)return;
+  var lang = userLang || currentLang || 'en';
+  var msg = WELCOME_MESSAGES[lang] || WELCOME_MESSAGES.en;
+  var fullText = msg.title + '\n\n' + msg.body + '\n\n' + msg.signature;
+  try{
+    await addNotif(userId, fullText, '🌻');
+    console.log('Welcome notification sent in:', lang);
+  }catch(e){
+    console.warn('Welcome notification failed:', e);
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// COMMUNITY GUIDELINES — 4 Language Translations
+// ═══════════════════════════════════════════════════════════
+var GUIDELINES_TEXT = {
+  en: {
+    modalTitle: '🌻 Community Guidelines',
+    intro: "Remembered is a sacred space to honour those we've lost. To keep it respectful and safe for every family, we ask all members to follow these guidelines.",
+    rule1Title: 'No Spam or Self-Promotion',
+    rule1Desc: 'Please do not post repetitive content, advertisements, or unrelated promotional material. This space is reserved for genuine memories and tributes.',
+    rule2Title: 'No Inappropriate Content',
+    rule2Desc: 'Nudity, sexually explicit material, vulgar language, and graphic violence are strictly prohibited. Content that violates this rule will be removed immediately.',
+    rule3Title: 'Respect Privacy',
+    rule3Desc: 'Only share photos, videos, and information with the consent of those involved. Be mindful of grieving families and their wish for privacy where requested.',
+    rule4Title: 'Respect All Faiths & Backgrounds',
+    rule4Desc: 'Our community welcomes people of every religion, ethnicity, and culture. Comments that mock, demean, or discriminate against any belief or background will not be tolerated.',
+    rule5Title: 'Be Kind & Compassionate',
+    rule5Desc: 'Every memorial represents a life and a grieving family. Please engage with empathy, and report any content that breaches these guidelines.',
+    checkboxLabel: 'I have read and agree to follow the Remembered Community Guidelines',
+    agreeBtn: 'I Understand & Agree',
+    footerLink: 'Community Guidelines'
+  },
+  ms: {
+    modalTitle: '🌻 Garis Panduan Komuniti',
+    intro: "Remembered adalah ruang istimewa untuk menghormati mereka yang telah kita kehilangan. Untuk memastikan ia kekal hormat dan selamat untuk setiap keluarga, kami meminta semua ahli mematuhi garis panduan ini.",
+    rule1Title: 'Tiada Spam atau Promosi Diri',
+    rule1Desc: 'Sila jangan menyiarkan kandungan berulang, iklan, atau bahan promosi yang tidak berkaitan. Ruang ini dikhaskan untuk kenangan dan penghormatan yang tulus.',
+    rule2Title: 'Tiada Kandungan Tidak Sesuai',
+    rule2Desc: 'Ketelanjangan, bahan lucah, bahasa kesat, dan keganasan grafik adalah dilarang sama sekali. Kandungan yang melanggar peraturan ini akan dibuang serta-merta.',
+    rule3Title: 'Hormati Privasi',
+    rule3Desc: 'Hanya kongsi foto, video, dan maklumat dengan kebenaran mereka yang terlibat. Sentiasa peka terhadap keluarga yang berduka dan keperluan privasi mereka.',
+    rule4Title: 'Hormati Semua Agama & Latar Belakang',
+    rule4Desc: 'Komuniti kami menyambut baik semua agama, etnik, dan budaya. Komen yang mengejek, merendahkan, atau mendiskriminasi mana-mana kepercayaan atau latar belakang tidak akan dibenarkan.',
+    rule5Title: 'Bersikap Penyayang & Prihatin',
+    rule5Desc: 'Setiap memorial mewakili sebuah kehidupan dan keluarga yang berduka. Sila berinteraksi dengan empati, dan laporkan sebarang kandungan yang melanggar garis panduan ini.',
+    checkboxLabel: 'Saya telah membaca dan bersetuju mematuhi Garis Panduan Komuniti Remembered',
+    agreeBtn: 'Saya Faham & Bersetuju',
+    footerLink: 'Garis Panduan Komuniti'
+  },
+  fil: {
+    modalTitle: '🌻 Mga Alituntunin ng Komunidad',
+    intro: "Ang Remembered ay isang sagradong lugar upang parangalan ang mga taong nawala sa atin. Upang mapanatili itong magalang at ligtas para sa bawat pamilya, hinihiling namin sa lahat ng miyembro na sundin ang mga alituntuning ito.",
+    rule1Title: 'Walang Spam o Self-Promotion',
+    rule1Desc: 'Mangyaring huwag mag-post ng paulit-ulit na nilalaman, mga advertisement, o hindi kaugnay na promotional na materyal. Ang espasyong ito ay para sa tunay na alaala at pagpupugay.',
+    rule2Title: 'Walang Hindi Angkop na Nilalaman',
+    rule2Desc: 'Mahigpit na ipinagbabawal ang kahubaran, sekswal na nilalaman, bulgar na wika, at marahas na larawan. Ang nilalamang lumalabag sa patakarang ito ay agad na aalisin.',
+    rule3Title: 'Igalang ang Privacy',
+    rule3Desc: 'Magbahagi lamang ng mga larawan, video, at impormasyon nang may pahintulot ng mga kasangkot. Maging mapagmasid sa mga namamatay na pamilya at sa kanilang kahilingan para sa privacy.',
+    rule4Title: 'Igalang ang Lahat ng Relihiyon at Background',
+    rule4Desc: 'Tinatanggap ng aming komunidad ang mga tao mula sa lahat ng relihiyon, lahi, at kultura. Hindi pahihintulutan ang mga komentong nanlalait, nambababa, o nandidiskrimina sa anumang paniniwala o background.',
+    rule5Title: 'Maging Mabait at Mapagmalasakit',
+    rule5Desc: 'Bawat memoryal ay kumakatawan sa isang buhay at isang pamilyang nagdadalamhati. Mangyaring makipag-ugnayan nang may empatiya, at iulat ang anumang nilalamang lumalabag sa mga alituntuning ito.',
+    checkboxLabel: 'Nabasa ko at sumasang-ayon akong sundin ang Mga Alituntunin ng Komunidad ng Remembered',
+    agreeBtn: 'Nauunawaan Ko at Sumasang-ayon',
+    footerLink: 'Mga Alituntunin ng Komunidad'
+  },
+  zh: {
+    modalTitle: '🌻 社区准则',
+    intro: 'Remembered 是一个神圣的空间，用以缅怀我们失去的亲人。为了让每个家庭都能感受到尊重与安全，我们恳请所有会员遵守以下准则。',
+    rule1Title: '禁止垃圾信息或自我推广',
+    rule1Desc: '请勿发布重复内容、广告或无关的宣传材料。此空间专为真挚的回忆与悼念而设。',
+    rule2Title: '禁止不当内容',
+    rule2Desc: '严禁裸露、色情内容、粗俗语言及暴力画面。违反此规定的内容将被立即删除。',
+    rule3Title: '尊重隐私',
+    rule3Desc: '只有在相关人士同意的情况下才可分享照片、视频和信息。请体谅悲痛中的家庭及其隐私需求。',
+    rule4Title: '尊重所有信仰与背景',
+    rule4Desc: '我们的社区欢迎来自各宗教、种族和文化背景的人士。任何嘲笑、贬低或歧视他人信仰或背景的言论都将不被容忍。',
+    rule5Title: '保持善良与同理心',
+    rule5Desc: '每一个纪念页都代表着一个生命和一个悲痛的家庭。请以同理心互动，并举报任何违反这些准则的内容。',
+    checkboxLabel: '我已阅读并同意遵守 Remembered 社区准则',
+    agreeBtn: '我已了解并同意',
+    footerLink: '社区准则'
+  }
+};
+
+// Apply guidelines translation to the modal based on current language
+function applyGuidelinesTranslation(){
+  var lang = currentLang || 'en';
+  var t = GUIDELINES_TEXT[lang] || GUIDELINES_TEXT.en;
+  var modal = document.getElementById('guidelinesModal');
+  if(!modal)return;
+
+  var titleEl = modal.querySelector('.mhdr-title');
+  if(titleEl) titleEl.textContent = t.modalTitle;
+
+  var introEl = modal.querySelector('.mbody > p');
+  if(introEl) introEl.textContent = t.intro;
+
+  var rules = modal.querySelectorAll('.gl-rule');
+  var ruleData = [
+    [t.rule1Title, t.rule1Desc],
+    [t.rule2Title, t.rule2Desc],
+    [t.rule3Title, t.rule3Desc],
+    [t.rule4Title, t.rule4Desc],
+    [t.rule5Title, t.rule5Desc]
+  ];
+  rules.forEach(function(rule, i){
+    if(!ruleData[i])return;
+    var titleE = rule.querySelector('.gl-rule-title');
+    var descE = rule.querySelector('.gl-rule-desc');
+    if(titleE) titleE.textContent = ruleData[i][0];
+    if(descE) descE.textContent = ruleData[i][1];
+  });
+
+  var labelEl = modal.querySelector('.gl-checkbox-row label');
+  if(labelEl) labelEl.textContent = t.checkboxLabel;
+
+  var btnEl = document.getElementById('glContinueBtn');
+  if(btnEl) btnEl.textContent = t.agreeBtn;
 }
 
 console.log('Post + Friend functions loaded ✓');
