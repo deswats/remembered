@@ -760,6 +760,18 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .gl-checkbox-row{display:flex;align-items:center;gap:.6rem;margin-top:1rem;padding:.7rem;background:rgba(255,255,255,.03);border-radius:10px;cursor:pointer;}
 .gl-checkbox-row input{width:18px;height:18px;accent-color:var(--gold);cursor:pointer;}
 .gl-checkbox-row label{font-size:.78rem;color:var(--lavender);cursor:pointer;flex:1;}
+
+/* ── TAG PICKER ── */
+.tag-picker-list{max-height:320px;overflow-y:auto;}
+.tag-picker-item{display:flex;align-items:center;gap:.7rem;padding:.6rem .8rem;cursor:pointer;border-radius:10px;transition:.15s;}
+.tag-picker-item:hover{background:rgba(255,255,255,.06);}
+.tag-picker-item.tagged{background:rgba(201,168,76,.1);}
+.tag-picker-name{font-size:.85rem;font-weight:600;color:var(--ivory);}
+.tag-picker-rel{font-size:.7rem;color:var(--gold);}
+.tag-picker-check{margin-left:auto;width:22px;height:22px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.7rem;color:transparent;flex-shrink:0;}
+.tag-picker-item.tagged .tag-picker-check{background:var(--gold);border-color:var(--gold);color:var(--navy);}
+.tagged-chip{display:inline-flex;align-items:center;gap:.3rem;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.3);border-radius:14px;padding:.2rem .6rem;font-size:.74rem;color:var(--gold);margin:.2rem .3rem .2rem 0;}
+.tagged-chip button{background:none;border:none;color:var(--gold);cursor:pointer;font-size:.8rem;padding:0;line-height:1;margin-left:.1rem;}
 </style>
 
 <script defer>
@@ -3817,6 +3829,7 @@ function renderDpWall(deceasedId){
         +'<div class="wall-add-row">'
         +'<label class="post-extra-btn" style="cursor:pointer">📷 Photo<input type="file" accept="image/*" style="display:none" onchange="previewWallMedia(this,&quot;image&quot;)"></label>'
         +'<label class="post-extra-btn" style="cursor:pointer">🎬 Video<input type="file" accept="video/mp4,video/webm,video/quicktime" style="display:none" onchange="previewWallMedia(this,&quot;video&quot;)"></label>'
+        +'<button type="button" class="post-extra-btn" onclick="openTagFriends()">🏷️ Tag</button>'
         +'<button type="button" class="btn btn-g btn-sm" style="margin-left:auto" data-did="'+deceasedId+'" onclick="submitWallPost(this.dataset.did)">Post Memory</button>'
         +'</div></div>';
     }
@@ -5122,6 +5135,100 @@ function maybeShowGuidelines(){
   }
 }
 
+
+// ═══════════════════════════════════════════════════════════
+// TAG FRIENDS & FAMILY
+// ═══════════════════════════════════════════════════════════
+var taggedUserIds = [];
+
+function openTagFriends(){
+  if(!CU){toast('Please sign in.');return;}
+  var fids=getMyFriendIds();
+  if(!fids.length){toast('Add some friends first to tag them!');return;}
+  var search=document.getElementById('tagSearchInput');
+  if(search)search.value='';
+  renderTagPickerList('');
+  openModal('tagFriendsModal');
+}
+
+function renderTagPickerList(query){
+  var listEl=document.getElementById('tagPickerList');
+  if(!listEl||!CU)return;
+  var fids=getMyFriendIds();
+  var friends=CACHE.users.filter(function(u){
+    return fids.indexOf(u.id)>=0 &&
+      (!query||uName(u).toLowerCase().includes(query.toLowerCase()));
+  });
+
+  if(!friends.length){
+    listEl.innerHTML='<div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:.82rem">No friends found'+(query?' for "'+query+'"':'')+'</div>';
+    return;
+  }
+
+  // Sort: family first
+  friends.sort(function(a,b){
+    var aFam=isFamily(getMyFriendRelationship(a.id))?1:0;
+    var bFam=isFamily(getMyFriendRelationship(b.id))?1:0;
+    return bFam-aFam;
+  });
+
+  listEl.innerHTML=friends.map(function(u){
+    var rel=getMyFriendRelationship(u.id)||'Friend';
+    var isTagged=taggedUserIds.indexOf(u.id)>=0;
+    return '<div class="tag-picker-item'+(isTagged?' tagged':'')+'" data-uid="'+u.id+'" onclick="toggleTagUser(this.dataset.uid)">'
+      +uAvHtml(u,38,false)
+      +'<div><div class="tag-picker-name">'+uName(u)+'</div><div class="tag-picker-rel">'+rel+'</div></div>'
+      +'<div class="tag-picker-check">✓</div>'
+      +'</div>';
+  }).join('');
+}
+
+function toggleTagUser(uid){
+  var idx=taggedUserIds.indexOf(uid);
+  if(idx>=0){
+    taggedUserIds.splice(idx,1);
+  }else{
+    taggedUserIds.push(uid);
+  }
+  var search=document.getElementById('tagSearchInput');
+  renderTagPickerList(search?search.value:'');
+}
+
+function confirmTagFriends(){
+  closeModal('tagFriendsModal');
+  renderTaggedChips();
+  toast(taggedUserIds.length?'🏷️ '+taggedUserIds.length+' tagged':'Tags cleared');
+}
+
+function renderTaggedChips(){
+  var row=document.getElementById('taggedChipsRow');
+  if(!row)return;
+  if(!taggedUserIds.length){
+    row.style.display='none';
+    row.innerHTML='';
+    return;
+  }
+  row.style.display='block';
+  row.innerHTML='<div style="font-size:.7rem;color:var(--muted);margin-bottom:.3rem">🏷️ Tagged:</div>'
+    +taggedUserIds.map(function(uid){
+      var u=CACHE.users.find(function(x){return x.id===uid;});
+      if(!u)return'';
+      return '<span class="tagged-chip">'+uName(u)
+        +'<button type="button" data-uid="'+uid+'" onclick="removeTaggedUser(this.dataset.uid)">✕</button>'
+        +'</span>';
+    }).join('');
+}
+
+function removeTaggedUser(uid){
+  taggedUserIds=taggedUserIds.filter(function(x){return x!==uid;});
+  renderTaggedChips();
+}
+
+function clearTaggedUsers(){
+  taggedUserIds=[];
+  renderTaggedChips();
+}
+
 console.log('Post + Friend functions loaded ✓');
 
 // ═══════════════════════════════════════════════════════════
@@ -5824,6 +5931,7 @@ function guestBrowse(){showPage('appPage');}
               <div style="flex:1">
                 <textarea id="postTextInput" placeholder="What's on your mind? Share a memory, thought or message with your friends…" rows="3" autocomplete="off" autocorrect="on" autocapitalize="sentences" spellcheck="true"></textarea>
                 <div id="postImagePreview" style="display:none;margin-top:.4rem"></div>
+                <div id="taggedChipsRow" style="display:none;margin-top:.4rem"></div>
                 <div id="postLinkRow" style="display:none;margin-top:.4rem">
                   <div class="post-link-input-row">
                     <input type="text" id="postLinkInput" placeholder="Paste YouTube, TikTok or any video link…" oninput="previewLinkDebounced()" onpaste="setTimeout(previewLinkDebounced,100)">
@@ -5846,6 +5954,9 @@ function guestBrowse(){showPage('appPage');}
                 </label>
                 <button type="button" class="post-extra-btn" onclick="toggleLinkInput()">
                   🔗 Link
+                </button>
+                <button type="button" class="post-extra-btn" onclick="openTagFriends()">
+                  🏷️ Tag
                 </button>
                 <select class="visibility-select" id="postVisibility" title="Who can see this?">
                   <option value="public">🌍 Everyone</option>
@@ -6624,6 +6735,24 @@ function guestBrowse(){showPage('appPage');}
     </div>
     <div class="mftr">
       <button type="button" class="btn btn-g" id="glContinueBtn" onclick="closeGuidelines(true)" style="width:100%" disabled>I Understand & Agree</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- TAG FRIENDS MODAL -->
+<div class="ov" id="tagFriendsModal">
+  <div class="modal">
+    <div class="mhdr">
+      <p class="mhdr-title">🏷️ Tag Friends & Family</p>
+      <button type="button" class="mclose" onclick="closeModal('tagFriendsModal')">×</button>
+    </div>
+    <div class="mbody">
+      <input type="text" id="tagSearchInput" placeholder="Search friends…" oninput="renderTagPickerList(this.value)" style="width:100%;margin-bottom:.7rem;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:.5rem .8rem;color:var(--ivory);font-size:.85rem;outline:none">
+      <div class="tag-picker-list" id="tagPickerList"></div>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-g" style="width:100%" onclick="confirmTagFriends()">Done</button>
     </div>
   </div>
 </div>
