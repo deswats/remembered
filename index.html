@@ -5210,9 +5210,26 @@ function closeGuidelines(agreed){
     if(CU){
       try{sb.from('profiles').update({guidelines_agreed:true}).eq('id',CU.id);}catch(e){}
     }
+    showGlAgreedBadge();
   }
   closeModal('guidelinesModal');
 }
+
+function showGlAgreedBadge(){
+  var badge = document.getElementById('glAgreedBadge');
+  if(badge) badge.style.display = 'inline';
+}
+
+// Check on page load if user already agreed previously
+(function(){
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded', function(){
+      if(localStorage.getItem('rb_guidelines_agreed')) showGlAgreedBadge();
+    });
+  } else {
+    if(localStorage.getItem('rb_guidelines_agreed')) showGlAgreedBadge();
+  }
+})();
 
 // Direct element binding - most reliable approach, avoids event delegation timing issues
 var _glHandlerAttached = false;
@@ -7114,7 +7131,7 @@ function guestBrowse(){showPage('appPage');}
     </svg>
     <span style="font-size:.78rem;font-weight:600;color:var(--gold);letter-spacing:.03em" id="footerCredit">Created by DW Labs</span>
     <span style="margin:0 .5rem;color:var(--muted)">·</span>
-    <a href="javascript:void(0)" onclick="openGuidelines()" style="font-size:.75rem;color:var(--muted);text-decoration:underline">Community Guidelines</a>
+    <a href="javascript:void(0)" onclick="openGuidelines()" style="font-size:.75rem;color:var(--muted);text-decoration:underline">Community Guidelines</a><span id="glAgreedBadge" style="display:none;font-size:.7rem;color:#6b7280;margin-left:.25rem">✓</span>
     <span style="margin:0 .4rem;color:var(--muted);font-size:.75rem">·</span>
     <a href="javascript:void(0)" onclick="openPrivacyPolicy()" style="font-size:.75rem;color:var(--muted);text-decoration:underline">Privacy Policy</a>
     <span style="margin:0 .4rem;color:var(--muted);font-size:.75rem">·</span>
