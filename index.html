@@ -733,6 +733,20 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 }
 #postTextInput:focus{border-color:var(--gold);}
 .post-create-box{contain:none;}
+
+/* ── VIDEO LINK EMBED ── */
+.post-link-preview{border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:.5rem 0;background:rgba(0,0,0,.3);}
+.post-link-preview iframe{width:100%;aspect-ratio:16/9;border:none;display:block;}
+.post-link-preview .plp-thumb{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;cursor:pointer;}
+.post-link-preview .plp-info{padding:.6rem .8rem;}
+.post-link-preview .plp-title{font-size:.82rem;font-weight:600;color:var(--ivory);margin-bottom:.2rem;}
+.post-link-preview .plp-src{font-size:.7rem;color:var(--muted);}
+.post-link-preview .plp-play{position:relative;}
+.post-link-preview .plp-play::after{content:'▶';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,0,0,.85);color:#fff;width:52px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;pointer-events:none;}
+.post-link-input-row{display:flex;gap:.5rem;margin-top:.4rem;align-items:center;}
+.post-link-input-row input{flex:1;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:.45rem .8rem;color:var(--ivory);font-size:.82rem;outline:none;font-family:'Inter',sans-serif;}
+.post-link-input-row input:focus{border-color:var(--gold);}
+.post-link-input-row button{padding:.4rem .8rem;border-radius:8px;background:var(--gold);border:none;color:var(--navy);font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap;}
 </style>
 
 <script defer>
@@ -2790,6 +2804,7 @@ async function submitPost(){
       user_id:CU.id,text:text,
       image_url:imageUrl||videoUrl||null,
       media_type:mediaType||null,
+      link_url:postLinkData?postLinkData.url:null,
       visibility:visibility,created_at:new Date().toISOString()
     }).select().single();
     if(res.error)throw new Error(res.error.message);
@@ -2995,6 +3010,7 @@ function renderPostCard(p){
       h+='<img src="'+p.image_url+'" style="width:100%;max-height:360px;object-fit:cover;display:block;cursor:zoom-in" loading="lazy" onclick="openLightbox(this.src,\'\');" title="Tap to enlarge">';
     }
   }
+  if(p.link_url){h+=renderPostLinkEmbed(p);}
   h+='<div class="post-actions">';
   // Build reaction summary
   var allReactions=getPostReactions(pid);
@@ -4874,6 +4890,182 @@ function startPresenceHeartbeat(){
   }, 30000);
 }
 
+
+// ═══════════════════════════════════════════════════════════
+// VIDEO LINK EMBED SYSTEM
+// ═══════════════════════════════════════════════════════════
+var postLinkData = null; // {url, embedUrl, type, title}
+var _linkPreviewTimer = null;
+
+function toggleLinkInput(){
+  var row=document.getElementById('postLinkRow');
+  if(!row)return;
+  var isVisible=row.style.display!=='none';
+  row.style.display=isVisible?'none':'block';
+  if(!isVisible){
+    var inp=document.getElementById('postLinkInput');
+    if(inp)setTimeout(function(){inp.focus();},100);
+  } else {
+    clearPostLink();
+  }
+}
+
+function previewLinkDebounced(){
+  clearTimeout(_linkPreviewTimer);
+  _linkPreviewTimer=setTimeout(previewLink, 600);
+}
+
+function previewLink(){
+  var inp=document.getElementById('postLinkInput');
+  if(!inp)return;
+  var url=inp.value.trim();
+  if(!url)return;
+  var info=parseLinkUrl(url);
+  if(info){
+    postLinkData=info;
+    renderLinkPreview(info);
+  } else {
+    // Unknown link - show as plain link
+    postLinkData={url:url,type:'link',title:url,embedUrl:null};
+    document.getElementById('postLinkPreview').innerHTML=
+      '<div style="padding:.5rem .8rem;background:rgba(255,255,255,.05);border-radius:8px;font-size:.78rem;color:var(--lavender)">🔗 '+url+'</div>';
+  }
+}
+
+function parseLinkUrl(url){
+  // YouTube
+  var ytMatch=url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+  if(ytMatch){
+    var vid=ytMatch[1];
+    return {
+      type:'youtube',
+      url:url,
+      videoId:vid,
+      embedUrl:'https://www.youtube.com/embed/'+vid+'?autoplay=0&rel=0',
+      thumbUrl:'https://img.youtube.com/vi/'+vid+'/hqdefault.jpg',
+      title:'YouTube Video'
+    };
+  }
+  // YouTube Shorts
+  var ytShort=url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+  if(ytShort){
+    var vid2=ytShort[1];
+    return {
+      type:'youtube',
+      url:url,
+      videoId:vid2,
+      embedUrl:'https://www.youtube.com/embed/'+vid2+'?autoplay=0',
+      thumbUrl:'https://img.youtube.com/vi/'+vid2+'/hqdefault.jpg',
+      title:'YouTube Shorts'
+    };
+  }
+  // Vimeo
+  var vimeoMatch=url.match(/vimeo\.com\/(\d+)/);
+  if(vimeoMatch){
+    return {
+      type:'vimeo',
+      url:url,
+      videoId:vimeoMatch[1],
+      embedUrl:'https://player.vimeo.com/video/'+vimeoMatch[1],
+      thumbUrl:null,
+      title:'Vimeo Video'
+    };
+  }
+  // TikTok - can't embed directly but show as link
+  if(url.includes('tiktok.com')){
+    return {
+      type:'tiktok',
+      url:url,
+      embedUrl:null,
+      title:'TikTok Video'
+    };
+  }
+  // Facebook video
+  if(url.includes('facebook.com')&&(url.includes('/videos/')||url.includes('fb.watch'))){
+    return {
+      type:'facebook',
+      url:url,
+      embedUrl:'https://www.facebook.com/plugins/video.php?href='+encodeURIComponent(url)+'&show_text=false',
+      title:'Facebook Video'
+    };
+  }
+  // Generic URL
+  if(url.startsWith('http')){
+    return {type:'link',url:url,embedUrl:null,title:url};
+  }
+  return null;
+}
+
+function renderLinkPreview(info){
+  var el=document.getElementById('postLinkPreview');
+  if(!el)return;
+  if(info.type==='youtube'){
+    el.innerHTML='<div class="post-link-preview">'
+      +'<div class="plp-play" data-embed="'+info.embedUrl+'" onclick="expandEmbed(this,this.dataset.embed)" style="cursor:pointer">'
+      +'<img class="plp-thumb" src="'+info.thumbUrl+'" alt="YouTube thumbnail" loading="lazy">'
+      +'</div>'
+      +'<div class="plp-info">'
+      +'<div class="plp-title">▶ '+info.title+'</div>'
+      +'<div class="plp-src">🎬 YouTube · Tap thumbnail to play</div>'
+      +'</div></div>';
+  } else if(info.type==='vimeo'){
+    el.innerHTML='<div class="post-link-preview">'
+      +'<iframe src="'+info.embedUrl+'" allowfullscreen allow="autoplay; fullscreen"></iframe>'
+      +'<div class="plp-info"><div class="plp-src">🎬 Vimeo</div></div>'
+      +'</div>';
+  } else if(info.type==='facebook'){
+    el.innerHTML='<div class="post-link-preview">'
+      +'<iframe src="'+info.embedUrl+'" allowfullscreen scrolling="no" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>'
+      +'<div class="plp-info"><div class="plp-src">🎬 Facebook Video</div></div>'
+      +'</div>';
+  } else if(info.type==='tiktok'){
+    el.innerHTML='<div class="post-link-preview">'
+      +'<div class="plp-info">'
+      +'<div class="plp-title">🎵 TikTok Video</div>'
+      +'<div class="plp-src"><a href="'+info.url+'" target="_blank" style="color:var(--gold)">Open in TikTok →</a></div>'
+      +'</div></div>';
+  } else {
+    el.innerHTML='<div style="padding:.5rem .8rem;background:rgba(255,255,255,.05);border-radius:8px;font-size:.78rem;color:var(--lavender)">🔗 <a href="'+info.url+'" target="_blank" style="color:var(--gold)">'+info.url+'</a></div>';
+  }
+}
+
+function expandEmbed(el, embedUrl){
+  // Replace thumbnail with actual player when tapped
+  el.innerHTML='<iframe src="'+embedUrl+'?autoplay=1" style="width:100%;aspect-ratio:16/9;border:none;display:block" allowfullscreen allow="autoplay; fullscreen"></iframe>';
+}
+
+function clearPostLink(){
+  postLinkData=null;
+  var inp=document.getElementById('postLinkInput');
+  if(inp)inp.value='';
+  var prev=document.getElementById('postLinkPreview');
+  if(prev)prev.innerHTML='';
+  var row=document.getElementById('postLinkRow');
+  if(row)row.style.display='none';
+}
+
+// Render link preview in feed post
+function renderPostLinkEmbed(p){
+  if(!p.link_url)return'';
+  var info=parseLinkUrl(p.link_url);
+  if(!info)return'<div style="padding:.5rem .8rem;background:rgba(255,255,255,.05);border-radius:8px;font-size:.78rem"><a href="'+p.link_url+'" target="_blank" style="color:var(--gold)">🔗 '+p.link_url+'</a></div>';
+  if(info.type==='youtube'){
+    return'<div class="post-link-preview">'
+      +'<div class="plp-play" data-embed="'+info.embedUrl+'" onclick="expandEmbed(this,this.dataset.embed)" style="cursor:pointer">'
+      +'<img class="plp-thumb" src="'+info.thumbUrl+'" alt="YouTube" loading="lazy">'
+      +'</div>'
+      +'<div class="plp-info"><div class="plp-title">▶ YouTube Video</div><div class="plp-src">Tap to play</div></div>'
+      +'</div>';
+  }
+  if(info.type==='vimeo'){
+    return'<div class="post-link-preview"><iframe src="'+info.embedUrl+'" allowfullscreen allow="autoplay;fullscreen"></iframe></div>';
+  }
+  if(info.type==='tiktok'){
+    return'<div class="post-link-preview"><div class="plp-info"><div class="plp-title">🎵 TikTok</div><div class="plp-src"><a href="'+info.url+'" target="_blank" style="color:var(--gold)">Open in TikTok →</a></div></div></div>';
+  }
+  return'<div style="padding:.5rem;background:rgba(255,255,255,.05);border-radius:8px;font-size:.78rem"><a href="'+info.url+'" target="_blank" style="color:var(--gold)">🔗 '+info.url+'</a></div>';
+}
+
 console.log('Post + Friend functions loaded ✓');
 
 // ═══════════════════════════════════════════════════════════
@@ -5588,6 +5780,9 @@ function guestBrowse(){showPage('appPage');}
                   🎬 Video
                   <input type="file" id="postVideoFile" accept="video/mp4,video/webm,video/quicktime,video/mov" style="display:none" onchange="previewPostMedia(this,'video')">
                 </label>
+                <button type="button" class="post-extra-btn" onclick="toggleLinkInput()">
+                  🔗 Link
+                </button>
                 <select class="visibility-select" id="postVisibility" title="Who can see this?">
                   <option value="public">🌍 Everyone</option>
                   <option value="friends">👥 Friends</option>
