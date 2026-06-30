@@ -774,6 +774,16 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .tag-picker-item.tagged .tag-picker-check{background:var(--gold);border-color:var(--gold);color:var(--navy);}
 .tagged-chip{display:inline-flex;align-items:center;gap:.3rem;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.3);border-radius:14px;padding:.2rem .6rem;font-size:.74rem;color:var(--gold);margin:.2rem .3rem .2rem 0;}
 .tagged-chip button{background:none;border:none;color:var(--gold);cursor:pointer;font-size:.8rem;padding:0;line-height:1;margin-left:.1rem;}
+
+/* ── LEGAL PAGES (Privacy/Terms) ── */
+.legal-modal .modal{max-width:560px;}
+.legal-body{font-size:.82rem;color:var(--lavender);line-height:1.7;max-height:60vh;overflow-y:auto;padding-right:.3rem;}
+.legal-body h4{font-size:.9rem;color:var(--gold);margin:1.1rem 0 .4rem;font-weight:700;}
+.legal-body h4:first-child{margin-top:0;}
+.legal-body p{margin-bottom:.6rem;}
+.legal-body ul{margin:.4rem 0 .8rem 1.2rem;}
+.legal-body li{margin-bottom:.3rem;}
+.legal-updated{font-size:.7rem;color:var(--muted);margin-bottom:1rem;font-style:italic;}
 </style>
 
 <script defer>
@@ -2071,7 +2081,8 @@ async function openUserProfile(uid){
     var isAdm=(CU.email==='desmond@cttsb.com.my'||CU.email==='deswatson.semarak@gmail.com');
     acts.innerHTML='<button type="button" class="btn btn-o btn-sm" onclick="openEditProfile()">✏️ Edit Profile</button>'
       +(isAdm?'<button type="button" class="btn btn-g btn-sm" onclick="openAdminDashboard()">📊 Admin</button>':'')
-      +'<button type="button" class="btn btn-o btn-sm" onclick="doLogout()">Sign Out</button>';
+      +'<button type="button" class="btn btn-o btn-sm" onclick="doLogout()">Sign Out</button>'
+      +'<button type="button" class="btn btn-o btn-sm" style="color:#ff5252;border-color:rgba(255,82,82,.3)" onclick="confirmDeleteAccount()">🗑️ Delete Account</button>';
   }else if(CU){
     const ex=CACHE.friends.find(f=>(f.from_id===CU.id&&f.to_id===uid)||(f.from_id===uid&&f.to_id===CU.id));
     const st=ex?ex.status:null;
@@ -5181,8 +5192,10 @@ function renderPostLinkEmbed(p){
 function openGuidelines(){
   var checkbox=document.getElementById('glAgreeCheck');
   var btn=document.getElementById('glContinueBtn');
+  var row=document.getElementById('glCheckboxRow');
   if(checkbox)checkbox.checked=false;
   if(btn)btn.disabled=true;
+  if(row)row.style.background='rgba(255,255,255,.03)';
   applyGuidelinesTranslation();
   openModal('guidelinesModal');
 }
@@ -5198,14 +5211,27 @@ function closeGuidelines(agreed){
 }
 
 // Enable continue button only when checkbox is ticked
+// Uses a single tap handler on the whole row for reliable mobile touch support
 document.addEventListener('DOMContentLoaded',function(){
+  var row=document.getElementById('glCheckboxRow');
   var checkbox=document.getElementById('glAgreeCheck');
   var btn=document.getElementById('glContinueBtn');
-  if(checkbox&&btn){
-    checkbox.addEventListener('change',function(){
-      btn.disabled=!checkbox.checked;
-    });
+  if(!row||!checkbox||!btn)return;
+
+  function toggleCheck(e){
+    if(e)e.preventDefault();
+    checkbox.checked=!checkbox.checked;
+    btn.disabled=!checkbox.checked;
+    row.style.background=checkbox.checked?'rgba(201,168,76,.08)':'rgba(255,255,255,.03)';
   }
+
+  // Use click (works for both mouse and touch on modern browsers via the 300ms-free fast click)
+  row.addEventListener('click',toggleCheck);
+  // Belt-and-braces: also handle touchend directly for older mobile browsers
+  row.addEventListener('touchend',function(e){
+    e.preventDefault();
+    toggleCheck();
+  },{passive:false});
 });
 
 // Show guidelines once after first registration
@@ -5768,6 +5794,59 @@ async function saveEditPostVisibility(){
     renderFeed();
   }catch(e){
     toast('❌ '+e.message);
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// LEGAL PAGES
+// ═══════════════════════════════════════════════════════════
+function openPrivacyPolicy(){ openModal('privacyModal'); }
+function openTermsOfService(){ openModal('termsModal'); }
+
+
+// ═══════════════════════════════════════════════════════════
+// DELETE MY ACCOUNT (PDPA Right to Erasure)
+// ═══════════════════════════════════════════════════════════
+function confirmDeleteAccount(){
+  if(!CU){toast('Please sign in.');return;}
+  var step1=confirm('This will PERMANENTLY delete your Remembered account, including your profile, posts, memorials, and messages.\n\nThis cannot be undone. Continue?');
+  if(!step1)return;
+  var step2=confirm('Are you absolutely sure? Type OK to confirm final deletion of your account.');
+  if(!step2)return;
+  deleteMyAccount();
+}
+
+async function deleteMyAccount(){
+  if(!CU||!sb)return;
+  showLoader(true);
+  try{
+    var uid=CU.id;
+    // Delete user's content across tables
+    await sb.from('posts').delete().eq('user_id',uid);
+    await sb.from('comments').delete().eq('user_id',uid);
+    await sb.from('post_reactions').delete().eq('user_id',uid);
+    await sb.from('wall_posts').delete().eq('user_id',uid);
+    await sb.from('messages').delete().or('from_id.eq.'+uid+',to_id.eq.'+uid);
+    await sb.from('notifications').delete().eq('user_id',uid);
+    await sb.from('friends').delete().or('from_id.eq.'+uid+',to_id.eq.'+uid);
+    await sb.from('connections').delete().eq('user_id',uid);
+    await sb.from('prayers').delete().eq('user_id',uid);
+    // Note: memorials they created are kept for family history but ownership is anonymised
+    await sb.from('deceased').update({created_by:null}).eq('created_by',uid);
+    // Delete profile
+    await sb.from('profiles').delete().eq('id',uid);
+    // Delete auth account
+    try{await sb.auth.admin?.deleteUser?.(uid);}catch(e){}
+    // Clear local data
+    localStorage.clear();
+    showLoader(false);
+    toast('Your account has been deleted. Goodbye 🌻');
+    setTimeout(function(){window.location.reload();},2000);
+  }catch(e){
+    showLoader(false);
+    console.error('deleteMyAccount:',e);
+    toast('❌ Could not fully delete account: '+e.message+'. Please contact desmond@cttsb.com.my for manual deletion.');
   }
 }
 
@@ -7020,6 +7099,10 @@ function guestBrowse(){showPage('appPage');}
     <span style="font-size:.78rem;font-weight:600;color:var(--gold);letter-spacing:.03em" id="footerCredit">Created by DW Labs</span>
     <span style="margin:0 .5rem;color:var(--muted)">·</span>
     <a href="javascript:void(0)" onclick="openGuidelines()" style="font-size:.75rem;color:var(--muted);text-decoration:underline">Community Guidelines</a>
+    <span style="margin:0 .4rem;color:var(--muted);font-size:.75rem">·</span>
+    <a href="javascript:void(0)" onclick="openPrivacyPolicy()" style="font-size:.75rem;color:var(--muted);text-decoration:underline">Privacy Policy</a>
+    <span style="margin:0 .4rem;color:var(--muted);font-size:.75rem">·</span>
+    <a href="javascript:void(0)" onclick="openTermsOfService()" style="font-size:.75rem;color:var(--muted);text-decoration:underline">Terms of Service</a>
   </div>
   <div style="margin-top:.8rem;font-size:.68rem;color:var(--muted)" id="footerRights">© 2025 DW Labs · All rights reserved</div>
 </footer>
@@ -7276,9 +7359,9 @@ function guestBrowse(){showPage('appPage');}
         </div>
       </div>
 
-      <div class="gl-checkbox-row" onclick="document.getElementById('glAgreeCheck').click()">
-        <input type="checkbox" id="glAgreeCheck" onclick="event.stopPropagation()">
-        <label>I have read and agree to follow the Remembered Community Guidelines</label>
+      <div class="gl-checkbox-row" id="glCheckboxRow">
+        <input type="checkbox" id="glAgreeCheck" style="pointer-events:none">
+        <label style="pointer-events:none">I have read and agree to follow the Remembered Community Guidelines</label>
       </div>
     </div>
     <div class="mftr">
@@ -7330,6 +7413,133 @@ function guestBrowse(){showPage('appPage');}
     <div class="mftr">
       <button type="button" class="btn btn-o" onclick="closeModal('editPostVisModal')">Cancel</button>
       <button type="button" class="btn btn-g" onclick="saveEditPostVisibility()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- PRIVACY POLICY MODAL -->
+<div class="ov legal-modal" id="privacyModal">
+  <div class="modal">
+    <div class="mhdr">
+      <p class="mhdr-title">🔒 Privacy Policy</p>
+      <button type="button" class="mclose" onclick="closeModal('privacyModal')">×</button>
+    </div>
+    <div class="mbody">
+      <div class="legal-updated">Last updated: 30 June 2026</div>
+      <div class="legal-body">
+        <p>Remembered ("we", "us", "our") is operated by DW Labs, based in Sabah, Malaysia. This Privacy Policy explains how we collect, use, store, and protect your personal data when you use Remembered, in accordance with Malaysia's Personal Data Protection Act 2010 (PDPA).</p>
+
+        <h4>1. What Information We Collect</h4>
+        <p>When you register and use Remembered, we collect:</p>
+        <ul>
+          <li>Your name, email address, and country</li>
+          <li>Profile photo, cover photo, and bio (if provided)</li>
+          <li>Posts, comments, reactions, and messages you create</li>
+          <li>Memorial information you create (names, dates, relationships)</li>
+          <li>Friend connections and relationship labels</li>
+          <li>Technical data such as IP address and device type (for security purposes)</li>
+        </ul>
+
+        <h4>2. How We Use Your Information</h4>
+        <p>We use your data solely to operate Remembered, including:</p>
+        <ul>
+          <li>Creating and managing your account</li>
+          <li>Displaying your posts, memorials, and profile to other users as per your privacy settings</li>
+          <li>Enabling chat and notifications between connected friends</li>
+          <li>Improving the platform and fixing technical issues</li>
+        </ul>
+        <p>We do not sell your personal data to third parties.</p>
+
+        <h4>3. Data Storage & Security</h4>
+        <p>Your data is stored securely using Supabase, a cloud database provider with industry-standard encryption (HTTPS) and access controls (Row Level Security). We take reasonable technical measures to protect your data from unauthorised access, loss, or misuse.</p>
+
+        <h4>4. Who Can See Your Information</h4>
+        <p>You control the visibility of your posts and memorials through privacy settings: Public, Friends, Family Only, or Specific People. Information you mark as private is not accessible to other users outside your selected audience.</p>
+
+        <h4>5. Your Rights Under PDPA</h4>
+        <p>You have the right to:</p>
+        <ul>
+          <li>Access the personal data we hold about you</li>
+          <li>Request correction of inaccurate data</li>
+          <li>Request deletion of your account and associated data</li>
+          <li>Withdraw consent for data processing (which may limit your ability to use Remembered)</li>
+        </ul>
+        <p>To exercise these rights, use the "Delete My Account" option in your profile settings, or contact us directly.</p>
+
+        <h4>6. Cookies & Local Storage</h4>
+        <p>We use browser local storage to keep you signed in and remember your preferences (such as language). We do not use third-party advertising trackers or sell browsing data.</p>
+
+        <h4>7. Third-Party Services</h4>
+        <p>Remembered may display affiliate links to third-party retailers (such as Watsons or Guardian). Clicking these links may share limited browsing data with those retailers under their own privacy policies. We are not responsible for third-party data practices.</p>
+
+        <h4>8. Children's Privacy</h4>
+        <p>Remembered is not intended for children under 13. We do not knowingly collect data from children under this age.</p>
+
+        <h4>9. Changes to This Policy</h4>
+        <p>We may update this Privacy Policy from time to time. Continued use of Remembered after changes constitutes acceptance of the updated policy.</p>
+
+        <h4>10. Contact Us</h4>
+        <p>For privacy-related questions or data requests, contact DW Labs at desmond@cttsb.com.my.</p>
+      </div>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-g" style="width:100%" onclick="closeModal('privacyModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- TERMS OF SERVICE MODAL -->
+<div class="ov legal-modal" id="termsModal">
+  <div class="modal">
+    <div class="mhdr">
+      <p class="mhdr-title">📜 Terms of Service</p>
+      <button type="button" class="mclose" onclick="closeModal('termsModal')">×</button>
+    </div>
+    <div class="mbody">
+      <div class="legal-updated">Last updated: 30 June 2026</div>
+      <div class="legal-body">
+        <p>By accessing or using Remembered ("the Platform"), operated by DW Labs, you agree to these Terms of Service. If you do not agree, please do not use the Platform.</p>
+
+        <h4>1. Eligibility</h4>
+        <p>You must be at least 13 years old to use Remembered. By registering, you confirm the information you provide is accurate.</p>
+
+        <h4>2. Your Account</h4>
+        <p>You are responsible for maintaining the confidentiality of your account credentials and for all activity under your account. Notify us immediately if you suspect unauthorised access.</p>
+
+        <h4>3. Acceptable Use</h4>
+        <p>You agree to use Remembered in accordance with our Community Guidelines, including not posting spam, inappropriate content, or content that violates others' privacy or dignity. We reserve the right to remove content or suspend accounts that violate these terms.</p>
+
+        <h4>4. Content Ownership</h4>
+        <p>You retain ownership of the content you post (photos, text, videos). By posting on Remembered, you grant us a limited licence to display, store, and distribute that content within the Platform as necessary to provide the service.</p>
+
+        <h4>5. Memorial Content</h4>
+        <p>Memorials created on Remembered are intended to honour deceased individuals. We ask that all memorial content be created respectfully and with appropriate consideration for surviving family members. We reserve the right to remove memorials that violate our Community Guidelines.</p>
+
+        <h4>6. Privacy Settings</h4>
+        <p>You are responsible for selecting appropriate visibility settings for your content. Remembered provides tools (Public, Friends, Family, Specific People) to help you control your audience, but cannot guarantee against misuse by users you have granted access to.</p>
+
+        <h4>7. Third-Party Links & Affiliate Content</h4>
+        <p>Remembered may include links to third-party websites or affiliate offers. We are not responsible for the content, accuracy, or practices of these external sites.</p>
+
+        <h4>8. Limitation of Liability</h4>
+        <p>Remembered is provided "as is" without warranties of any kind. DW Labs is not liable for any indirect, incidental, or consequential damages arising from your use of the Platform, including but not limited to data loss, service interruptions, or user-generated content.</p>
+
+        <h4>9. Account Termination</h4>
+        <p>We reserve the right to suspend or terminate accounts that violate these Terms or our Community Guidelines, with or without notice, at our discretion.</p>
+
+        <h4>10. Changes to These Terms</h4>
+        <p>We may update these Terms from time to time. Continued use of Remembered after changes constitutes acceptance of the updated Terms.</p>
+
+        <h4>11. Governing Law</h4>
+        <p>These Terms are governed by the laws of Malaysia. Any disputes shall be subject to the jurisdiction of Malaysian courts.</p>
+
+        <h4>12. Contact Us</h4>
+        <p>For questions about these Terms, contact DW Labs at desmond@cttsb.com.my.</p>
+      </div>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-g" style="width:100%" onclick="closeModal('termsModal')">Close</button>
     </div>
   </div>
 </div>
