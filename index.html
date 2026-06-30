@@ -779,6 +779,13 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 // SUPABASE CLIENT
 // ═══════════════════════════════════════════════════════════
 var SUPABASE_URL = 'https://bemukaghdzqqjszwtfrk.supabase.co';
+// Identifies which website/app this registration came from
+var SITE_SOURCE = (function(){
+  var host = window.location.hostname;
+  if(host.includes('pinet.com') || host.includes('pirememb')) return 'piRemembered';
+  if(host.includes('remembered.asia') || host.includes('deswats.github.io')) return 'Remembered';
+  return 'Remembered'; // default
+})();
 var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJlbXVrYWdoZHpxcWpzend0ZnJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MzA1NDgsImV4cCI6MjA5ODAwNjU0OH0.QF4eOTvHu418VCRH599SuEErkLbnEtCbi7pNMhIWb6U';
 // Initialize Supabase immediately — it's bundled inline so always available
 var sb = (typeof supabase !== 'undefined') ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
@@ -1136,7 +1143,8 @@ async function doRegister(){
       sb.from('profiles').upsert({
         id:data.user.id,
         first_name:first,last_name:last,country,
-        invite_code:'INV'+Math.random().toString(36).slice(2,8).toUpperCase()
+        invite_code:'INV'+Math.random().toString(36).slice(2,8).toUpperCase(),
+        source:SITE_SOURCE
       }).then(()=>{}).catch(e=>console.warn('Profile save:',e));
     }
 
@@ -1216,7 +1224,8 @@ async function afterAuth(user){
         first_name:meta.first_name||'Friend',
         last_name:meta.last_name||'',
         country:meta.country||'',
-        invite_code:'INV'+Math.random().toString(36).slice(2,8).toUpperCase()
+        invite_code:'INV'+Math.random().toString(36).slice(2,8).toUpperCase(),
+        source:SITE_SOURCE
       });
       const {data:np}=await sb.from('profiles').select('*').eq('id',user.id).single();
       profile=np;
@@ -3030,7 +3039,15 @@ function renderPostCard(p){
   var comments=CACHE.comments.filter(function(c){return c.post_id===p.id;});
   var likeCount=p.like_count||0;
   var isLiked=!!(CU&&p.liked_by&&p.liked_by.indexOf(CU.id)>=0);
-  var vis=p.visibility==='public'?'🌍':'👥';
+  var visLabel=p.visibility==='public'?'🌍 Everyone'
+    :p.visibility==='friends'?'👥 Friends'
+    :p.visibility==='family'?'🔒 Family Only'
+    :p.visibility==='specific'?'🎯 Specific People'
+    :'🌍 Everyone';
+  var isOwnPost=CU&&p.user_id===CU.id;
+  var vis=isOwnPost
+    ?'<span data-pid="'+p.id+'" data-vis="'+(p.visibility||'public')+'" onclick="openEditPostVisibility(this.dataset.pid,this.dataset.vis)" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted">'+visLabel+' ✏️</span>'
+    :visLabel;
   var pid=p.id;
   var uid=u?u.id:'';
   // Build card HTML safely
@@ -4057,6 +4074,22 @@ function openAdminDashboard(){
       +'</div>';
   }).join('');
 
+  // Source breakdown (Remembered vs piRemembered)
+  var sourceMap={};
+  CACHE.users.forEach(function(u){
+    var s=u.source||'Remembered';
+    sourceMap[s]=(sourceMap[s]||0)+1;
+  });
+  var sources=Object.keys(sourceMap).sort(function(a,b){return sourceMap[b]-sourceMap[a];});
+  var sourceHTML=sources.map(function(s){
+    var pct=Math.round((sourceMap[s]/total)*100);
+    var icon=s==='piRemembered'?'π':'🌻';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid rgba(255,255,255,.06)">'
+      +'<span style="font-size:.8rem;color:var(--lavender)">'+icon+' '+s+'</span>'
+      +'<span style="font-size:.8rem;font-weight:600;color:var(--gold)">'+sourceMap[s]+' ('+pct+'%)</span>'
+      +'</div>';
+  }).join('');
+
   // All members sorted by join date
   var allMembers=[...CACHE.users].sort(function(a,b){return new Date(b.created_at||0)-new Date(a.created_at||0);});
   var membersHTML=allMembers.map(function(u,i){
@@ -4067,7 +4100,7 @@ function openAdminDashboard(){
       +'<span style="font-size:.7rem;color:var(--muted);width:20px">'+(i+1)+'</span>'
       +'<div style="flex:1;min-width:0">'
       +'<div style="font-size:.8rem;color:var(--ivory);font-weight:500">'+(u.first_name||'')+(u.last_name?' '+u.last_name:'')+(isNew?' <span style="color:#4caf7b;font-size:.65rem">NEW</span>':'')+'</div>'
-      +'<div style="font-size:.68rem;color:var(--muted)">'+(u.country||'-')+' · '+joinDate+(memCount?' · 🌻'+memCount:'')+'</div>'
+      +'<div style="font-size:.68rem;color:var(--muted)">'+(u.country||'-')+' · '+joinDate+' · '+(u.source==='piRemembered'?'π piRemembered':'🌻 Remembered')+(memCount?' · 🌻'+memCount:'')+'</div>'
       +'</div>'
       +'</div>';
   }).join('');
@@ -4117,6 +4150,8 @@ function openAdminDashboard(){
       // Countries
       +'<div style="font-size:.72rem;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">🌍 Members by Country</div>'
       +countryHTML
+      +'<div style="font-size:.72rem;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;margin:1rem 0 .4rem">📱 Members by Platform</div>'
+      +sourceHTML
       // Members list
       +'<div style="font-size:.72rem;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;margin:1rem 0 .4rem">👥 All Members ('+total+')</div>'
       +membersHTML;
@@ -5089,18 +5124,19 @@ function expandEmbed(el, embedUrl){
   iframe.allowFullscreen = true;
   iframe.setAttribute('allow','autoplay; fullscreen');
 
-  el.innerHTML = '';
-  el.appendChild(iframe);
-
-  // Detect if YouTube blocks embedding (age-restricted/private/region-locked)
-  // YouTube doesn't throw a JS error - instead shows its own error page in the iframe
-  // We show a fallback link after a short delay as a safety net
-  setTimeout(function(){
+  // Replace the entire post-link-preview container (thumbnail + caption together)
+  var container = el.closest('.post-link-preview');
+  if(container){
+    container.innerHTML = '';
+    container.appendChild(iframe);
     var fallback = document.createElement('div');
-    fallback.style.cssText = 'padding:.6rem .8rem;background:rgba(255,255,255,.04);font-size:.74rem;color:var(--muted);text-align:center;border-top:1px solid var(--border)';
+    fallback.style.cssText = 'padding:.5rem .8rem;background:rgba(255,255,255,.04);font-size:.7rem;color:var(--muted);text-align:center;border-top:1px solid var(--border)';
     fallback.innerHTML = 'Video not playing? <a href="'+watchUrl+'" target="_blank" style="color:var(--gold);font-weight:600">Watch on YouTube →</a>';
-    el.appendChild(fallback);
-  }, 800);
+    container.appendChild(fallback);
+  }else{
+    el.innerHTML = '';
+    el.appendChild(iframe);
+  }
 }
 
 function clearPostLink(){
@@ -5239,7 +5275,12 @@ function toggleTagUser(uid){
 
 function confirmTagFriends(){
   closeModal('tagFriendsModal');
-  if(window._pickingForVisibility){
+  if(window._pickingForEditVis){
+    window._pickingForEditVis=false;
+    document.querySelector('#tagFriendsModal .mhdr-title').textContent='🏷️ Tag Friends & Family';
+    renderEditVisChips();
+    openModal('editPostVisModal');
+  }else if(window._pickingForVisibility){
     window._pickingForVisibility=false;
     document.querySelector('#tagFriendsModal .mhdr-title').textContent='🏷️ Tag Friends & Family';
     renderSpecificPeopleChips();
@@ -5592,6 +5633,140 @@ function applyGuidelinesTranslation(){
 
   var btnEl = document.getElementById('glContinueBtn');
   if(btnEl) btnEl.textContent = t.agreeBtn;
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// EDIT POST VISIBILITY AFTER POSTING
+// ═══════════════════════════════════════════════════════════
+var _editVisSelected = 'public';
+var editVisSpecificIds = [];
+
+function openEditPostVisibility(postId, currentVis){
+  document.getElementById('editVisPostId').value = postId;
+  _editVisSelected = currentVis || 'public';
+  var p = CACHE.posts.find(function(x){return x.id===postId;});
+  editVisSpecificIds = (p && p.specific_viewers) ? p.specific_viewers.slice() : [];
+
+  document.querySelectorAll('.vis-opt-btn').forEach(function(btn){
+    var isSel = btn.dataset.val === _editVisSelected;
+    btn.style.borderColor = isSel ? 'var(--gold)' : 'var(--border)';
+    btn.style.background = isSel ? 'rgba(201,168,76,.12)' : 'var(--navy-m)';
+    btn.style.color = isSel ? 'var(--gold)' : 'var(--lavender)';
+  });
+
+  var specRow = document.getElementById('editVisSpecificRow');
+  if(specRow) specRow.style.display = _editVisSelected==='specific' ? 'block' : 'none';
+  renderEditVisChips();
+
+  openModal('editPostVisModal');
+}
+
+function selectEditVis(btn){
+  _editVisSelected = btn.dataset.val;
+  document.querySelectorAll('.vis-opt-btn').forEach(function(b){
+    var isSel = b===btn;
+    b.style.borderColor = isSel ? 'var(--gold)' : 'var(--border)';
+    b.style.background = isSel ? 'rgba(201,168,76,.12)' : 'var(--navy-m)';
+    b.style.color = isSel ? 'var(--gold)' : 'var(--lavender)';
+  });
+  var specRow = document.getElementById('editVisSpecificRow');
+  if(specRow){
+    specRow.style.display = _editVisSelected==='specific' ? 'block' : 'none';
+    if(_editVisSelected==='specific' && !editVisSpecificIds.length){
+      openEditVisPeoplePicker();
+    }
+  }
+}
+
+function openEditVisPeoplePicker(){
+  window._pickingForEditVis = true;
+  var search = document.getElementById('tagSearchInput');
+  if(search) search.value = '';
+  renderEditVisPickerList('');
+  document.querySelector('#tagFriendsModal .mhdr-title').textContent = '🎯 Choose Who Can See This';
+  openModal('tagFriendsModal');
+}
+
+function renderEditVisPickerList(query){
+  var listEl = document.getElementById('tagPickerList');
+  if(!listEl || !CU) return;
+  var fids = getMyFriendIds();
+  var friends = CACHE.users.filter(function(u){
+    return fids.indexOf(u.id)>=0 && (!query || uName(u).toLowerCase().includes(query.toLowerCase()));
+  });
+  friends.sort(function(a,b){
+    var aFam = isFamily(getMyFriendRelationship(a.id))?1:0;
+    var bFam = isFamily(getMyFriendRelationship(b.id))?1:0;
+    return bFam-aFam;
+  });
+  if(!friends.length){
+    listEl.innerHTML='<div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:.82rem">No friends found</div>';
+    return;
+  }
+  listEl.innerHTML = friends.map(function(u){
+    var rel = getMyFriendRelationship(u.id)||'Friend';
+    var isSelected = editVisSpecificIds.indexOf(u.id)>=0;
+    return '<div class="tag-picker-item'+(isSelected?' tagged':'')+'" data-uid="'+u.id+'" onclick="toggleEditVisPerson(this.dataset.uid)">'
+      +uAvHtml(u,38,false)
+      +'<div><div class="tag-picker-name">'+uName(u)+'</div><div class="tag-picker-rel">'+rel+'</div></div>'
+      +'<div class="tag-picker-check">✓</div></div>';
+  }).join('');
+}
+
+function toggleEditVisPerson(uid){
+  var idx = editVisSpecificIds.indexOf(uid);
+  if(idx>=0) editVisSpecificIds.splice(idx,1);
+  else editVisSpecificIds.push(uid);
+  var search = document.getElementById('tagSearchInput');
+  renderEditVisPickerList(search?search.value:'');
+}
+
+function renderEditVisChips(){
+  var el = document.getElementById('editVisSpecificChips');
+  if(!el) return;
+  if(!editVisSpecificIds.length){
+    el.innerHTML = '<span style="font-size:.74rem;color:var(--muted)">No one selected yet</span>';
+    return;
+  }
+  el.innerHTML = editVisSpecificIds.map(function(uid){
+    var u = CACHE.users.find(function(x){return x.id===uid;});
+    if(!u) return '';
+    return '<span class="tagged-chip">'+uName(u)
+      +'<button type="button" data-uid="'+uid+'" onclick="removeEditVisPerson(this.dataset.uid)">✕</button></span>';
+  }).join('');
+}
+
+function removeEditVisPerson(uid){
+  editVisSpecificIds = editVisSpecificIds.filter(function(x){return x!==uid;});
+  renderEditVisChips();
+}
+
+async function saveEditPostVisibility(){
+  var postId = document.getElementById('editVisPostId').value;
+  if(!postId || !sb) return;
+  if(_editVisSelected==='specific' && !editVisSpecificIds.length){
+    toast('Please choose at least one person.');
+    return;
+  }
+  try{
+    var updates = {
+      visibility: _editVisSelected,
+      specific_viewers: _editVisSelected==='specific' ? editVisSpecificIds : null
+    };
+    var res = await sb.from('posts').update(updates).eq('id',postId);
+    if(res.error) throw new Error(res.error.message);
+    var p = CACHE.posts.find(function(x){return x.id===postId;});
+    if(p){
+      p.visibility = _editVisSelected;
+      p.specific_viewers = updates.specific_viewers;
+    }
+    closeModal('editPostVisModal');
+    toast('✅ Post visibility updated!');
+    renderFeed();
+  }catch(e){
+    toast('❌ '+e.message);
+  }
 }
 
 console.log('Post + Friend functions loaded ✓');
@@ -7119,11 +7294,40 @@ function guestBrowse(){showPage('appPage');}
       <button type="button" class="mclose" onclick="closeModal('tagFriendsModal')">×</button>
     </div>
     <div class="mbody">
-      <input type="text" id="tagSearchInput" placeholder="Search friends…" oninput="window._pickingForVisibility?renderSpecificPeoplePickerList(this.value):renderTagPickerList(this.value)" style="width:100%;margin-bottom:.7rem;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:.5rem .8rem;color:var(--ivory);font-size:.85rem;outline:none">
+      <input type="text" id="tagSearchInput" placeholder="Search friends…" oninput="window._pickingForEditVis?renderEditVisPickerList(this.value):(window._pickingForVisibility?renderSpecificPeoplePickerList(this.value):renderTagPickerList(this.value))" style="width:100%;margin-bottom:.7rem;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:.5rem .8rem;color:var(--ivory);font-size:.85rem;outline:none">
       <div class="tag-picker-list" id="tagPickerList"></div>
     </div>
     <div class="mftr">
       <button type="button" class="btn btn-g" style="width:100%" onclick="confirmTagFriends()">Done</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- EDIT POST VISIBILITY MODAL -->
+<div class="ov" id="editPostVisModal">
+  <div class="modal" style="max-width:380px">
+    <div class="mhdr">
+      <p class="mhdr-title">👁️ Who Can See This Post?</p>
+      <button type="button" class="mclose" onclick="closeModal('editPostVisModal')">×</button>
+    </div>
+    <div class="mbody">
+      <input type="hidden" id="editVisPostId">
+      <div class="font-picker" style="flex-direction:column;gap:.5rem" id="editVisOptions">
+        <button type="button" class="vis-opt-btn" data-val="public" onclick="selectEditVis(this)" style="width:100%;text-align:left;padding:.7rem .9rem;border-radius:10px;border:1.5px solid var(--border);background:var(--navy-m);color:var(--lavender);cursor:pointer;font-size:.85rem">🌍 Everyone</button>
+        <button type="button" class="vis-opt-btn" data-val="friends" onclick="selectEditVis(this)" style="width:100%;text-align:left;padding:.7rem .9rem;border-radius:10px;border:1.5px solid var(--border);background:var(--navy-m);color:var(--lavender);cursor:pointer;font-size:.85rem">👥 Friends</button>
+        <button type="button" class="vis-opt-btn" data-val="family" onclick="selectEditVis(this)" style="width:100%;text-align:left;padding:.7rem .9rem;border-radius:10px;border:1.5px solid var(--border);background:var(--navy-m);color:var(--lavender);cursor:pointer;font-size:.85rem">🔒 Family Only</button>
+        <button type="button" class="vis-opt-btn" data-val="specific" onclick="selectEditVis(this)" style="width:100%;text-align:left;padding:.7rem .9rem;border-radius:10px;border:1.5px solid var(--border);background:var(--navy-m);color:var(--lavender);cursor:pointer;font-size:.85rem">🎯 Specific People</button>
+      </div>
+      <div id="editVisSpecificRow" style="display:none;margin-top:.7rem;padding:.6rem .7rem;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:8px">
+        <div style="font-size:.72rem;color:var(--gold);margin-bottom:.3rem">🎯 Only visible to:</div>
+        <div id="editVisSpecificChips"></div>
+        <button type="button" onclick="openEditVisPeoplePicker()" style="margin-top:.3rem;font-size:.72rem;background:none;border:1px dashed rgba(201,168,76,.4);color:var(--gold);border-radius:6px;padding:.2rem .6rem;cursor:pointer">+ Choose people</button>
+      </div>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-o" onclick="closeModal('editPostVisModal')">Cancel</button>
+      <button type="button" class="btn btn-g" onclick="saveEditPostVisibility()">💾 Save</button>
     </div>
   </div>
 </div>
