@@ -5209,28 +5209,26 @@ function closeGuidelines(agreed){
 }
 
 // Enable continue button only when checkbox is ticked
-// Uses a single tap handler on the whole row for reliable mobile touch support
-document.addEventListener('DOMContentLoaded',function(){
-  var row=document.getElementById('glCheckboxRow');
-  var checkbox=document.getElementById('glAgreeCheck');
-  var btn=document.getElementById('glContinueBtn');
-  if(!row||!checkbox||!btn)return;
-
-  function toggleCheck(e){
-    if(e)e.preventDefault();
-    checkbox.checked=!checkbox.checked;
-    btn.disabled=!checkbox.checked;
-    row.style.background=checkbox.checked?'rgba(201,168,76,.08)':'rgba(255,255,255,.03)';
-  }
-
-  // Use click (works for both mouse and touch on modern browsers via the 300ms-free fast click)
-  row.addEventListener('click',toggleCheck);
-  // Belt-and-braces: also handle touchend directly for older mobile browsers
-  row.addEventListener('touchend',function(e){
-    e.preventDefault();
-    toggleCheck();
-  },{passive:false});
-});
+// Uses event delegation on document - works regardless of when the modal
+// HTML was inserted or whether DOMContentLoaded already fired
+var _glLastToggle = 0;
+function handleGlRowActivate(e){
+  var row = e.target.closest('#glCheckboxRow');
+  if(!row)return;
+  // Debounce: prevent both touchend AND click firing for the same tap (causes double-toggle = stays unchecked)
+  var now = Date.now();
+  if(now - _glLastToggle < 350)return;
+  _glLastToggle = now;
+  if(e.cancelable) e.preventDefault();
+  var checkbox = document.getElementById('glAgreeCheck');
+  var btn = document.getElementById('glContinueBtn');
+  if(!checkbox||!btn)return;
+  checkbox.checked = !checkbox.checked;
+  btn.disabled = !checkbox.checked;
+  row.style.background = checkbox.checked ? 'rgba(201,168,76,.08)' : 'rgba(255,255,255,.03)';
+}
+document.addEventListener('click', handleGlRowActivate);
+document.addEventListener('touchend', handleGlRowActivate, {passive:false});
 
 // Show guidelines once after first registration
 function maybeShowGuidelines(){
