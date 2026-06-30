@@ -6,7 +6,7 @@
 <meta http-equiv="pragma" content="no-cache">
 <meta http-equiv="expires" content="0">
 <!-- v3.0 SUPABASE BUILD -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=3.0">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -733,6 +733,33 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 }
 #postTextInput:focus{border-color:var(--gold);}
 .post-create-box{contain:none;}
+
+/* ── VIDEO LINK EMBED ── */
+.post-link-preview{border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:.5rem 0;background:rgba(0,0,0,.3);}
+.post-link-preview iframe{width:100%;aspect-ratio:16/9;border:none;display:block;}
+.post-link-preview .plp-thumb{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;cursor:pointer;}
+.post-link-preview .plp-info{padding:.6rem .8rem;}
+.post-link-preview .plp-title{font-size:.82rem;font-weight:600;color:var(--ivory);margin-bottom:.2rem;}
+.post-link-preview .plp-src{font-size:.7rem;color:var(--muted);}
+.post-link-preview .plp-play{position:relative;}
+.post-link-preview .plp-play::after{content:'▶';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,0,0,.85);color:#fff;width:52px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;pointer-events:none;}
+.post-link-input-row{display:flex;gap:.5rem;margin-top:.4rem;align-items:center;}
+.post-link-input-row input{flex:1;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:.45rem .8rem;color:var(--ivory);font-size:.82rem;outline:none;font-family:'Inter',sans-serif;}
+.post-link-input-row input:focus{border-color:var(--gold);}
+.post-link-input-row button{padding:.4rem .8rem;border-radius:8px;background:var(--gold);border:none;color:var(--navy);font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap;}
+
+/* ── COMMUNITY GUIDELINES MODAL ── */
+.guidelines-modal .modal{max-width:480px;}
+.gl-icon{width:56px;height:56px;border-radius:50%;background:rgba(201,168,76,.12);display:flex;align-items:center;justify-content:center;font-size:1.6rem;margin:0 auto .8rem;}
+.gl-rule{display:flex;gap:.7rem;align-items:flex-start;padding:.7rem 0;border-bottom:1px solid rgba(255,255,255,.06);}
+.gl-rule:last-child{border-bottom:none;}
+.gl-rule-icon{width:34px;height:34px;border-radius:10px;background:rgba(201,168,76,.1);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;}
+.gl-rule-text{flex:1;}
+.gl-rule-title{font-size:.85rem;font-weight:600;color:var(--ivory);margin-bottom:.15rem;}
+.gl-rule-desc{font-size:.76rem;color:var(--muted);line-height:1.5;}
+.gl-checkbox-row{display:flex;align-items:center;gap:.6rem;margin-top:1rem;padding:.7rem;background:rgba(255,255,255,.03);border-radius:10px;cursor:pointer;}
+.gl-checkbox-row input{width:18px;height:18px;accent-color:var(--gold);cursor:pointer;}
+.gl-checkbox-row label{font-size:.78rem;color:var(--lavender);cursor:pointer;flex:1;}
 </style>
 
 <script defer>
@@ -1076,7 +1103,7 @@ async function doRegister(){
       email,password:pass,
       options:{
         data:{first_name:first,last_name:last,country},
-        emailRedirectTo:'https://deswats.github.io/remembered/'
+        emailRedirectTo:'https://remembered.asia/'
       }
     });
 
@@ -1107,6 +1134,7 @@ async function doRegister(){
     // Step 3: If session = no email confirmation needed
     if(data.session){
       toast('✅ Account created! Welcome 🌻');
+      maybeShowGuidelines();
       if(createBtn){createBtn.disabled=false;createBtn.textContent='Create Account';}
       await afterAuth(data.user);
       return;
@@ -1138,7 +1166,7 @@ async function resendConfirmation(email){
   try{
     const {error}=await sb.auth.resend({
       type:'signup',email,
-      options:{emailRedirectTo:'https://deswats.github.io/remembered/'}
+      options:{emailRedirectTo:'https://remembered.asia/'}
     });
     showLoader(false);
     if(error)toast('❌ '+error.message);
@@ -1206,6 +1234,7 @@ async function afterAuth(user){
     setTimeout(refreshPostData, 2000);
     setTimeout(function(){
       initChat();
+      startPresenceHeartbeat();
       // Show FAB immediately as fallback
       setTimeout(function(){
         var fab=document.getElementById('chatFab');
@@ -1333,7 +1362,7 @@ function renderApp(){
     const feedAv=document.getElementById('feedAvatar');
     if(feedAv)feedAv.innerHTML=CU.avatar?`<img src="${CU.avatar}">`:(CU.firstName.charAt(0)+(CU.lastName?.charAt(0)||''));
     const invLink=document.getElementById('inviteLink');
-    if(invLink)invLink.textContent=`deswats.github.io/remembered?ref=${CU.inviteCode||CU.id}`;
+    if(invLink)invLink.textContent=`remembered.asia?ref=${CU.inviteCode||CU.id}`;
   }
 }
 
@@ -1867,7 +1896,7 @@ function renderPendingRequests(){
 // ═══════════════════════════════════════════════════════════
 function openInviteModal(){
   if(!CU){toast('Please sign in.');showPageDirect('authPage');setAuthMode('login');return;}
-  const il=document.getElementById('inviteLink');if(il)il.textContent=`deswats.github.io/remembered?ref=${CU.inviteCode||CU.id}`;
+  const il=document.getElementById('inviteLink');if(il)il.textContent=`remembered.asia?ref=${CU.inviteCode||CU.id}`;
   document.getElementById('inviteEmail').value='';
   document.getElementById('friendSearch').value='';
   document.getElementById('friendSearchResults').innerHTML='';
@@ -2175,23 +2204,52 @@ async function addNotif(userId,text,icon){
 }
 function updateNotifBadge(){
   if(!CU)return;
-  const unread=CACHE.notifications.filter(n=>!n.read).length;
+  const unread=CACHE.notifications.filter(function(n){return !n.read;}).length;
   const badge=document.getElementById('notifCount');
-  if(badge){badge.textContent=unread;badge.style.display=unread?'block':'none';}
+  if(badge){
+    badge.textContent=unread>99?'99+':String(unread);
+    badge.style.display=unread>0?'flex':'none';
+  }
+  // Update mobile nav badge
+  var mb=document.getElementById('mnavNotifBadge');
+  if(mb){mb.textContent=unread>0?String(unread):'0';mb.style.display=unread>0?'flex':'none';}
   if(typeof updateMobileNav==="function")updateMobileNav();
 }
-function renderNotifications(){
-  const el=document.getElementById('notifList');if(!el||!CU)return;
-  const notifs=CACHE.notifications.slice(0,8);
-  notifs.filter(n=>!n.read).forEach(n=>{
-    n.read=true;sb.from('notifications').update({read:true}).eq('id',n.id);
-  });
+async function renderNotifications(){
+  var el=document.getElementById('notifList');
+  if(!el||!CU)return;
+  var notifs=CACHE.notifications.slice(0,20);
+  // Mark all unread as read in Supabase
+  var unread=notifs.filter(function(n){return !n.read;});
+  if(unread.length>0&&sb){
+    try{
+      await sb.from('notifications').update({read:true}).eq('user_id',CU.id).eq('read',false);
+      unread.forEach(function(n){n.read=true;});
+    }catch(e){console.warn('Mark read:',e);}
+  }
   updateNotifBadge();
-  el.innerHTML=notifs.length?notifs.map(n=>`<div class="notif-item">
-    <div class="ni-icon">${n.icon||'🔔'}</div>
-    <div><div class="ni-text">${n.text}</div><div class="ni-time">${timeSince(n.created_at)}</div></div>
-  </div>`).join(''):'<div class="txt-m txt-sm" style="padding:.3rem">No notifications yet.</div>';
+  // Header
+  var header='<div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .8rem;border-bottom:1px solid var(--border)">'
+    +'<span style="font-size:.78rem;font-weight:600;color:var(--ivory)">Notifications</span>'
+    +'<div style="display:flex;gap:.4rem">'
+    +'<button type="button" onclick="markAllNotifsRead()" style="font-size:.68rem;background:none;border:none;color:var(--gold);cursor:pointer;padding:.2rem .4rem">Mark all read</button>'
+    +'<button type="button" onclick="clearAllNotifs()" style="font-size:.68rem;background:none;border:none;color:#ff5252;cursor:pointer;padding:.2rem .4rem">Clear all</button>'
+    +'</div></div>';
+  if(!notifs.length){
+    el.innerHTML=header+'<div style="padding:1.5rem;text-align:center;color:var(--muted);font-size:.82rem">No notifications yet</div>';
+    return;
+  }
+  var items=notifs.map(function(n){
+    return '<div class="notif-item'+(n.read?'':' unread')+'">'
+      +'<div class="ni-icon">'+(n.icon||'🔔')+'</div>'
+      +'<div><div class="ni-text">'+n.text+'</div>'
+      +'<div class="ni-time">'+timeSince(n.created_at)+'</div></div>'
+      +'</div>';
+  }).join('');
+  el.innerHTML=header+items;
 }
+
+
 function showNotifs(){renderNotifications();}
 
 // ═══════════════════════════════════════════════════════════
@@ -2349,7 +2407,7 @@ function openShare(id){
   shareTargetId=id;
   const d=CACHE.deceased.find(x=>x.id===id);if(!d)return;
   document.getElementById('shareMemName').textContent=d.name;
-  const baseUrl=`https://deswats.github.io/remembered/#${id}`;
+  const baseUrl=`https://remembered.asia/#${id}`;
   window._shareUrl=baseUrl;
   window._shareMsg=encodeURIComponent(`🌻 Remember ${d.name} (${fmtD(d.dob)} – ${fmtD(d.dod)}) on Remembered — a place to celebrate those we have lost. Come share a smile or leave a prayer. ${baseUrl}`);
   document.getElementById('shareLink').textContent=baseUrl;
@@ -2760,6 +2818,7 @@ async function submitPost(){
       user_id:CU.id,text:text,
       image_url:imageUrl||videoUrl||null,
       media_type:mediaType||null,
+      link_url:postLinkData?postLinkData.url:null,
       visibility:visibility,created_at:new Date().toISOString()
     }).select().single();
     if(res.error)throw new Error(res.error.message);
@@ -2965,6 +3024,7 @@ function renderPostCard(p){
       h+='<img src="'+p.image_url+'" style="width:100%;max-height:360px;object-fit:cover;display:block;cursor:zoom-in" loading="lazy" onclick="openLightbox(this.src,\'\');" title="Tap to enlarge">';
     }
   }
+  if(p.link_url){h+=renderPostLinkEmbed(p);}
   h+='<div class="post-actions">';
   // Build reaction summary
   var allReactions=getPostReactions(pid);
@@ -3481,9 +3541,9 @@ async function deletePost(postId){
   if(!('serviceWorker' in navigator))return;
 
   // Register sw.js from the GitHub Pages path
-  var swPath = '/remembered/sw.js';
+  var swPath = '/sw.js';
 
-  navigator.serviceWorker.register(swPath, {scope: '/remembered/'})
+  navigator.serviceWorker.register(swPath, {scope: '/'})
     .then(function(reg){
       console.log('[SW] Registered ✓ scope:', reg.scope);
       reg.addEventListener('updatefound', function(){
@@ -3930,8 +3990,7 @@ function sanitize(str){
     .replace(/</g,'&lt;')
     .replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;')
-    .replace(/'/g,'&#x27;')
-    .replace(/\//g,'&#x2F;');
+    ;
 }
 
 // Sanitize but allow basic line breaks
@@ -4329,32 +4388,53 @@ function initChat(){
 
   // Supabase Realtime channel for presence + broadcast
   chatChannel = sb.channel('remembered-presence-v2',{
-    config:{presence:{key:CU.id}}
+    config:{
+      presence:{key:CU.id},
+      broadcast:{self:false}
+    }
   });
 
   chatChannel
     .on('presence','sync',function(){
       var state=chatChannel.presenceState();
       onlineUsers={};
+      // Parse presence state - key is the presence key (user id)
       Object.keys(state).forEach(function(k){
-        var p=state[k];
-        if(p&&p.length)onlineUsers[p[0].uid]=Date.now();
+        var presences=state[k];
+        if(presences&&presences.length){
+          // The key itself is the uid (since we set key:CU.id)
+          var uid=presences[0].uid||k;
+          onlineUsers[uid]=Date.now();
+          console.log('Online user detected:',uid);
+        }
       });
+      console.log('Online users:',Object.keys(onlineUsers).length);
       renderOnlineDots();
       renderChatList();
+      renderMyFriends();
     })
     .on('presence','join',function(payload){
       if(payload.newPresences&&payload.newPresences.length){
-        onlineUsers[payload.newPresences[0].uid]=Date.now();
-        renderOnlineDots();
-        renderChatList();
+        var uid=payload.newPresences[0].uid||payload.key;
+        if(uid){
+          onlineUsers[uid]=Date.now();
+          console.log('User joined:',uid);
+          renderOnlineDots();
+          renderChatList();
+          renderMyFriends();
+        }
       }
     })
     .on('presence','leave',function(payload){
       if(payload.leftPresences&&payload.leftPresences.length){
-        delete onlineUsers[payload.leftPresences[0].uid];
-        renderOnlineDots();
-        renderChatList();
+        var uid=payload.leftPresences[0].uid||payload.key;
+        if(uid){
+          delete onlineUsers[uid];
+          console.log('User left:',uid);
+          renderOnlineDots();
+          renderChatList();
+          renderMyFriends();
+        }
       }
     })
     .on('broadcast',{event:'msg'},function(payload){
@@ -4388,10 +4468,27 @@ function initChat(){
     .subscribe(async function(status){
       console.log('Chat channel status:',status);
       if(status==='SUBSCRIBED'){
-        await chatChannel.track({uid:CU.id,name:uName(CU)});
-        console.log('Chat ready ✓');
+        // Track presence with all identifying info
+        try{
+          await chatChannel.track({
+            uid:CU.id,
+            name:uName(CU),
+            online_at:new Date().toISOString()
+          });
+          console.log('Presence tracked ✓ uid:',CU.id);
+        }catch(e){
+          console.warn('Track error:',e);
+          // Retry once after 2 seconds
+          setTimeout(async function(){
+            try{await chatChannel.track({uid:CU.id,name:uName(CU)});}catch(e2){}
+          },2000);
+        }
+      } else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        console.warn('Channel error:',status,', retrying...');
+        setTimeout(function(){initChat();},5000);
+        return;
       }
-      // Show FAB regardless of realtime status
+      // Show FAB regardless
       var fab=document.getElementById('chatFab');
       if(fab)fab.classList.add('show');
       loadUnreadCounts();
@@ -4404,13 +4501,36 @@ function getUserName(uid){
   return u?uName(u):'Someone';
 }
 
-function isOnline(uid){return !!onlineUsers[uid];}
+function isOnline(uid){
+  if(!uid)return false;
+  // Consider online if seen within last 2 minutes
+  var ts=onlineUsers[uid];
+  if(!ts)return false;
+  return (Date.now()-ts) < 2*60*1000;
+}
 
 function renderOnlineDots(){
+  // Update all online dot elements in the DOM
   document.querySelectorAll('[data-online-uid]').forEach(function(el){
     var uid=el.dataset.onlineUid;
-    el.classList.toggle('online',isOnline(uid));
+    var online=isOnline(uid);
+    if(online){
+      el.style.background='#4caf7b';
+      el.style.boxShadow='0 0 4px rgba(76,175,123,.6)';
+    }else{
+      el.style.background='#555';
+      el.style.boxShadow='none';
+    }
   });
+  // Update chat window status if open
+  if(activeChatUid){
+    var st=document.getElementById('cwStatus');
+    if(st){
+      var online=isOnline(activeChatUid);
+      st.textContent=online?'● Online':'○ Offline';
+      st.style.color=online?'#4caf7b':'var(--muted)';
+    }
+  }
 }
 
 // ── Chat Panel ──
@@ -4716,6 +4836,290 @@ function updateChatBadge(){
   if(!badge)return;
   badge.textContent=total>9?'9+':String(total);
   badge.classList.toggle('show',total>0);
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// NOTIFICATION MANAGEMENT
+// ═══════════════════════════════════════════════════════════
+
+async function markAllNotifsRead(){
+  if(!CU||!sb)return;
+  try{
+    await sb.from('notifications').update({read:true}).eq('user_id',CU.id);
+    CACHE.notifications.forEach(function(n){n.read=true;});
+    updateNotifBadge();
+    renderNotifications();
+    toast('✓ All notifications marked as read');
+  }catch(e){
+    // Even if DB fails, clear locally
+    CACHE.notifications.forEach(function(n){n.read=true;});
+    updateNotifBadge();
+    toast('✓ Cleared');
+  }
+}
+
+async function clearAllNotifs(){
+  if(!CU||!sb)return;
+  var ok=confirm('Clear all notifications?');
+  if(!ok)return;
+  try{
+    await sb.from('notifications').delete().eq('user_id',CU.id);
+    CACHE.notifications=[];
+    updateNotifBadge();
+    renderNotifications();
+    toast('🗑️ Notifications cleared');
+  }catch(e){
+    // Clear locally even if DB fails
+    CACHE.notifications=[];
+    updateNotifBadge();
+    renderNotifications();
+    toast('🗑️ Cleared locally');
+  }
+}
+
+// Force-clear the badge (for stuck badges)
+function forceClearBadge(){
+  CACHE.notifications.forEach(function(n){n.read=true;});
+  updateNotifBadge();
+  if(sb&&CU){
+    sb.from('notifications').update({read:true}).eq('user_id',CU.id)
+      .then(function(){}).catch(function(){});
+  }
+}
+
+
+// ── Presence heartbeat - re-track every 30s ──
+function startPresenceHeartbeat(){
+  setInterval(async function(){
+    if(chatChannel&&CU){
+      try{
+        await chatChannel.track({
+          uid:CU.id,
+          name:uName(CU),
+          online_at:new Date().toISOString()
+        });
+      }catch(e){}
+    }
+  }, 30000);
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// VIDEO LINK EMBED SYSTEM
+// ═══════════════════════════════════════════════════════════
+var postLinkData = null; // {url, embedUrl, type, title}
+var _linkPreviewTimer = null;
+
+function toggleLinkInput(){
+  var row=document.getElementById('postLinkRow');
+  if(!row)return;
+  var isVisible=row.style.display!=='none';
+  row.style.display=isVisible?'none':'block';
+  if(!isVisible){
+    var inp=document.getElementById('postLinkInput');
+    if(inp)setTimeout(function(){inp.focus();},100);
+  } else {
+    clearPostLink();
+  }
+}
+
+function previewLinkDebounced(){
+  clearTimeout(_linkPreviewTimer);
+  _linkPreviewTimer=setTimeout(previewLink, 600);
+}
+
+function previewLink(){
+  var inp=document.getElementById('postLinkInput');
+  if(!inp)return;
+  var url=inp.value.trim();
+  if(!url)return;
+  var info=parseLinkUrl(url);
+  if(info){
+    postLinkData=info;
+    renderLinkPreview(info);
+  } else {
+    // Unknown link - show as plain link
+    postLinkData={url:url,type:'link',title:url,embedUrl:null};
+    document.getElementById('postLinkPreview').innerHTML=
+      '<div style="padding:.5rem .8rem;background:rgba(255,255,255,.05);border-radius:8px;font-size:.78rem;color:var(--lavender)">🔗 '+url+'</div>';
+  }
+}
+
+function parseLinkUrl(url){
+  // YouTube
+  var ytMatch=url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+  if(ytMatch){
+    var vid=ytMatch[1];
+    return {
+      type:'youtube',
+      url:url,
+      videoId:vid,
+      embedUrl:'https://www.youtube.com/embed/'+vid+'?autoplay=0&rel=0',
+      thumbUrl:'https://img.youtube.com/vi/'+vid+'/hqdefault.jpg',
+      title:'YouTube Video'
+    };
+  }
+  // YouTube Shorts
+  var ytShort=url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+  if(ytShort){
+    var vid2=ytShort[1];
+    return {
+      type:'youtube',
+      url:url,
+      videoId:vid2,
+      embedUrl:'https://www.youtube.com/embed/'+vid2+'?autoplay=0',
+      thumbUrl:'https://img.youtube.com/vi/'+vid2+'/hqdefault.jpg',
+      title:'YouTube Shorts'
+    };
+  }
+  // Vimeo
+  var vimeoMatch=url.match(/vimeo\.com\/(\d+)/);
+  if(vimeoMatch){
+    return {
+      type:'vimeo',
+      url:url,
+      videoId:vimeoMatch[1],
+      embedUrl:'https://player.vimeo.com/video/'+vimeoMatch[1],
+      thumbUrl:null,
+      title:'Vimeo Video'
+    };
+  }
+  // TikTok - can't embed directly but show as link
+  if(url.includes('tiktok.com')){
+    return {
+      type:'tiktok',
+      url:url,
+      embedUrl:null,
+      title:'TikTok Video'
+    };
+  }
+  // Facebook video
+  if(url.includes('facebook.com')&&(url.includes('/videos/')||url.includes('fb.watch'))){
+    return {
+      type:'facebook',
+      url:url,
+      embedUrl:'https://www.facebook.com/plugins/video.php?href='+encodeURIComponent(url)+'&show_text=false',
+      title:'Facebook Video'
+    };
+  }
+  // Generic URL
+  if(url.startsWith('http')){
+    return {type:'link',url:url,embedUrl:null,title:url};
+  }
+  return null;
+}
+
+function renderLinkPreview(info){
+  var el=document.getElementById('postLinkPreview');
+  if(!el)return;
+  if(info.type==='youtube'){
+    el.innerHTML='<div class="post-link-preview">'
+      +'<div class="plp-play" data-embed="'+info.embedUrl+'" onclick="expandEmbed(this,this.dataset.embed)" style="cursor:pointer">'
+      +'<img class="plp-thumb" src="'+info.thumbUrl+'" alt="YouTube thumbnail" loading="lazy">'
+      +'</div>'
+      +'<div class="plp-info">'
+      +'<div class="plp-title">▶ '+info.title+'</div>'
+      +'<div class="plp-src">🎬 YouTube · Tap thumbnail to play</div>'
+      +'</div></div>';
+  } else if(info.type==='vimeo'){
+    el.innerHTML='<div class="post-link-preview">'
+      +'<iframe src="'+info.embedUrl+'" allowfullscreen allow="autoplay; fullscreen"></iframe>'
+      +'<div class="plp-info"><div class="plp-src">🎬 Vimeo</div></div>'
+      +'</div>';
+  } else if(info.type==='facebook'){
+    el.innerHTML='<div class="post-link-preview">'
+      +'<iframe src="'+info.embedUrl+'" allowfullscreen scrolling="no" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>'
+      +'<div class="plp-info"><div class="plp-src">🎬 Facebook Video</div></div>'
+      +'</div>';
+  } else if(info.type==='tiktok'){
+    el.innerHTML='<div class="post-link-preview">'
+      +'<div class="plp-info">'
+      +'<div class="plp-title">🎵 TikTok Video</div>'
+      +'<div class="plp-src"><a href="'+info.url+'" target="_blank" style="color:var(--gold)">Open in TikTok →</a></div>'
+      +'</div></div>';
+  } else {
+    el.innerHTML='<div style="padding:.5rem .8rem;background:rgba(255,255,255,.05);border-radius:8px;font-size:.78rem;color:var(--lavender)">🔗 <a href="'+info.url+'" target="_blank" style="color:var(--gold)">'+info.url+'</a></div>';
+  }
+}
+
+function expandEmbed(el, embedUrl){
+  // Replace thumbnail with actual player when tapped
+  el.innerHTML='<iframe src="'+embedUrl+'?autoplay=1" style="width:100%;aspect-ratio:16/9;border:none;display:block" allowfullscreen allow="autoplay; fullscreen"></iframe>';
+}
+
+function clearPostLink(){
+  postLinkData=null;
+  var inp=document.getElementById('postLinkInput');
+  if(inp)inp.value='';
+  var prev=document.getElementById('postLinkPreview');
+  if(prev)prev.innerHTML='';
+  var row=document.getElementById('postLinkRow');
+  if(row)row.style.display='none';
+}
+
+// Render link preview in feed post
+function renderPostLinkEmbed(p){
+  if(!p.link_url)return'';
+  var info=parseLinkUrl(p.link_url);
+  if(!info)return'<div style="padding:.5rem .8rem;background:rgba(255,255,255,.05);border-radius:8px;font-size:.78rem"><a href="'+p.link_url+'" target="_blank" style="color:var(--gold)">🔗 '+p.link_url+'</a></div>';
+  if(info.type==='youtube'){
+    return'<div class="post-link-preview">'
+      +'<div class="plp-play" data-embed="'+info.embedUrl+'" onclick="expandEmbed(this,this.dataset.embed)" style="cursor:pointer">'
+      +'<img class="plp-thumb" src="'+info.thumbUrl+'" alt="YouTube" loading="lazy">'
+      +'</div>'
+      +'<div class="plp-info"><div class="plp-title">▶ YouTube Video</div><div class="plp-src">Tap to play</div></div>'
+      +'</div>';
+  }
+  if(info.type==='vimeo'){
+    return'<div class="post-link-preview"><iframe src="'+info.embedUrl+'" allowfullscreen allow="autoplay;fullscreen"></iframe></div>';
+  }
+  if(info.type==='tiktok'){
+    return'<div class="post-link-preview"><div class="plp-info"><div class="plp-title">🎵 TikTok</div><div class="plp-src"><a href="'+info.url+'" target="_blank" style="color:var(--gold)">Open in TikTok →</a></div></div></div>';
+  }
+  return'<div style="padding:.5rem;background:rgba(255,255,255,.05);border-radius:8px;font-size:.78rem"><a href="'+info.url+'" target="_blank" style="color:var(--gold)">🔗 '+info.url+'</a></div>';
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// COMMUNITY GUIDELINES
+// ═══════════════════════════════════════════════════════════
+
+function openGuidelines(){
+  var checkbox=document.getElementById('glAgreeCheck');
+  var btn=document.getElementById('glContinueBtn');
+  if(checkbox)checkbox.checked=false;
+  if(btn)btn.disabled=true;
+  openModal('guidelinesModal');
+}
+
+function closeGuidelines(agreed){
+  if(agreed){
+    localStorage.setItem('rb_guidelines_agreed','1');
+    if(CU){
+      try{sb.from('profiles').update({guidelines_agreed:true}).eq('id',CU.id);}catch(e){}
+    }
+  }
+  closeModal('guidelinesModal');
+}
+
+// Enable continue button only when checkbox is ticked
+document.addEventListener('DOMContentLoaded',function(){
+  var checkbox=document.getElementById('glAgreeCheck');
+  var btn=document.getElementById('glContinueBtn');
+  if(checkbox&&btn){
+    checkbox.addEventListener('change',function(){
+      btn.disabled=!checkbox.checked;
+    });
+  }
+});
+
+// Show guidelines once after first registration
+function maybeShowGuidelines(){
+  var agreed=localStorage.getItem('rb_guidelines_agreed');
+  if(!agreed){
+    setTimeout(function(){openGuidelines();},800);
+  }
 }
 
 console.log('Post + Friend functions loaded ✓');
@@ -5420,6 +5824,14 @@ function guestBrowse(){showPage('appPage');}
               <div style="flex:1">
                 <textarea id="postTextInput" placeholder="What's on your mind? Share a memory, thought or message with your friends…" rows="3" autocomplete="off" autocorrect="on" autocapitalize="sentences" spellcheck="true"></textarea>
                 <div id="postImagePreview" style="display:none;margin-top:.4rem"></div>
+                <div id="postLinkRow" style="display:none;margin-top:.4rem">
+                  <div class="post-link-input-row">
+                    <input type="text" id="postLinkInput" placeholder="Paste YouTube, TikTok or any video link…" oninput="previewLinkDebounced()" onpaste="setTimeout(previewLinkDebounced,100)">
+                    <button onclick="previewLink()">Preview</button>
+                    <button onclick="clearPostLink()" style="background:rgba(255,82,82,.2);color:#ff5252">✕</button>
+                  </div>
+                  <div id="postLinkPreview" style="margin-top:.4rem"></div>
+                </div>
               </div>
             </div>
             <div class="post-actions-row">
@@ -5432,6 +5844,9 @@ function guestBrowse(){showPage('appPage');}
                   🎬 Video
                   <input type="file" id="postVideoFile" accept="video/mp4,video/webm,video/quicktime,video/mov" style="display:none" onchange="previewPostMedia(this,'video')">
                 </label>
+                <button type="button" class="post-extra-btn" onclick="toggleLinkInput()">
+                  🔗 Link
+                </button>
                 <select class="visibility-select" id="postVisibility" title="Who can see this?">
                   <option value="public">🌍 Everyone</option>
                   <option value="friends">👥 Friends</option>
@@ -5682,7 +6097,7 @@ function guestBrowse(){showPage('appPage');}
       <div class="divider"></div>
       <p style="font-size:.78rem;color:var(--lavender)">Or share your personal invite link:</p>
       <div class="invite-link-box">
-        <span id="inviteLink">deswats.github.io/remembered?ref=…</span>
+        <span id="inviteLink">remembered.asia?ref=…</span>
         <button type="button" class="btn btn-o btn-sm" onclick="copyInvite()">Copy</button>
       </div>
       <div class="divider"></div>
@@ -5821,7 +6236,7 @@ function guestBrowse(){showPage('appPage');}
 
       <!-- Copy link row -->
       <div class="share-link-row">
-        <span id="shareLink">deswats.github.io/remembered#…</span>
+        <span id="shareLink">remembered.asia#…</span>
         <button type="button" class="btn btn-o btn-sm" onclick="copyShareLink()" style="white-space:nowrap">📋 Copy</button>
       </div>
 
@@ -5944,6 +6359,8 @@ function guestBrowse(){showPage('appPage');}
       <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
     <span style="font-size:.78rem;font-weight:600;color:var(--gold);letter-spacing:.03em" id="footerCredit">Created by DW Labs</span>
+    <span style="margin:0 .5rem;color:var(--muted)">·</span>
+    <a href="javascript:void(0)" onclick="openGuidelines()" style="font-size:.75rem;color:var(--muted);text-decoration:underline">Community Guidelines</a>
   </div>
   <div style="margin-top:.8rem;font-size:.68rem;color:var(--muted)" id="footerRights">© 2025 DW Labs · All rights reserved</div>
 </footer>
@@ -6143,6 +6560,71 @@ function guestBrowse(){showPage('appPage');}
       onkeydown="if(event.key==='Enter')sendChatMsg()"
       oninput="sendTyping()" style="touch-action:manipulation;-webkit-user-select:text;user-select:text;">
     <button onclick="sendChatMsg()">➤</button>
+  </div>
+</div>
+
+
+<!-- COMMUNITY GUIDELINES MODAL -->
+<div class="ov guidelines-modal" id="guidelinesModal">
+  <div class="modal">
+    <div class="mhdr">
+      <p class="mhdr-title">🌻 Community Guidelines</p>
+      <button type="button" class="mclose" onclick="closeGuidelines(false)">×</button>
+    </div>
+    <div class="mbody">
+      <div class="gl-icon">🕊️</div>
+      <p style="text-align:center;font-size:.85rem;color:var(--lavender);line-height:1.6;margin-bottom:1rem">
+        Remembered is a sacred space to honour those we've lost. To keep it respectful and safe for every family, we ask all members to follow these guidelines.
+      </p>
+
+      <div class="gl-rule">
+        <div class="gl-rule-icon">🚫</div>
+        <div class="gl-rule-text">
+          <div class="gl-rule-title">No Spam or Self-Promotion</div>
+          <div class="gl-rule-desc">Please do not post repetitive content, advertisements, or unrelated promotional material. This space is reserved for genuine memories and tributes.</div>
+        </div>
+      </div>
+
+      <div class="gl-rule">
+        <div class="gl-rule-icon">🔞</div>
+        <div class="gl-rule-text">
+          <div class="gl-rule-title">No Inappropriate Content</div>
+          <div class="gl-rule-desc">Nudity, sexually explicit material, vulgar language, and graphic violence are strictly prohibited. Content that violates this rule will be removed immediately.</div>
+        </div>
+      </div>
+
+      <div class="gl-rule">
+        <div class="gl-rule-icon">🔒</div>
+        <div class="gl-rule-text">
+          <div class="gl-rule-title">Respect Privacy</div>
+          <div class="gl-rule-desc">Only share photos, videos, and information with the consent of those involved. Be mindful of grieving families and their wish for privacy where requested.</div>
+        </div>
+      </div>
+
+      <div class="gl-rule">
+        <div class="gl-rule-icon">🤝</div>
+        <div class="gl-rule-text">
+          <div class="gl-rule-title">Respect All Faiths & Backgrounds</div>
+          <div class="gl-rule-desc">Our community welcomes people of every religion, ethnicity, and culture. Comments that mock, demean, or discriminate against any belief or background will not be tolerated.</div>
+        </div>
+      </div>
+
+      <div class="gl-rule">
+        <div class="gl-rule-icon">💬</div>
+        <div class="gl-rule-text">
+          <div class="gl-rule-title">Be Kind & Compassionate</div>
+          <div class="gl-rule-desc">Every memorial represents a life and a grieving family. Please engage with empathy, and report any content that breaches these guidelines.</div>
+        </div>
+      </div>
+
+      <div class="gl-checkbox-row" onclick="document.getElementById('glAgreeCheck').click()">
+        <input type="checkbox" id="glAgreeCheck" onclick="event.stopPropagation()">
+        <label>I have read and agree to follow the Remembered Community Guidelines</label>
+      </div>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-g" id="glContinueBtn" onclick="closeGuidelines(true)" style="width:100%" disabled>I Understand & Agree</button>
+    </div>
   </div>
 </div>
 
