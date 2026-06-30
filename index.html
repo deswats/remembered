@@ -761,6 +761,9 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .gl-rule-desc{font-size:.76rem;color:var(--muted);line-height:1.5;}
 .gl-checkbox-row{display:flex;align-items:center;gap:.6rem;margin-top:1rem;padding:.7rem;background:rgba(255,255,255,.03);border-radius:10px;cursor:pointer;}
 .gl-checkbox-row input{width:18px;height:18px;accent-color:var(--gold);cursor:pointer;}
+.gl-checkbox-custom{width:20px;height:20px;border:2px solid var(--border);border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.15s;background:rgba(255,255,255,.04);}
+.gl-checkbox-custom.checked{background:var(--gold);border-color:var(--gold);}
+.gl-checkbox-custom.checked::after{content:'✓';color:var(--navy);font-size:13px;font-weight:900;line-height:1;}
 .gl-checkbox-row label{font-size:.78rem;color:var(--lavender);cursor:pointer;flex:1;}
 
 /* ── TAG PICKER ── */
@@ -5191,9 +5194,11 @@ function openGuidelines(){
   var checkbox=document.getElementById('glAgreeCheck');
   var btn=document.getElementById('glContinueBtn');
   var row=document.getElementById('glCheckboxRow');
+  var visual=document.getElementById('glCheckboxVisual');
   if(checkbox)checkbox.checked=false;
   if(btn)btn.disabled=true;
   if(row)row.style.background='rgba(255,255,255,.03)';
+  if(visual)visual.classList.remove('checked');
   applyGuidelinesTranslation();
   openModal('guidelinesModal');
   attachGlCheckboxHandler();
@@ -5220,10 +5225,12 @@ function toggleGlCheckbox(){
   var checkbox = document.getElementById('glAgreeCheck');
   var btn = document.getElementById('glContinueBtn');
   var row = document.getElementById('glCheckboxRow');
+  var visual = document.getElementById('glCheckboxVisual');
   if(!checkbox||!btn)return;
   checkbox.checked = !checkbox.checked;
   btn.disabled = !checkbox.checked;
   if(row)row.style.background = checkbox.checked ? 'rgba(201,168,76,.08)' : 'rgba(255,255,255,.03)';
+  if(visual)visual.classList.toggle('checked', checkbox.checked);
   console.log('Guidelines checkbox toggled:', checkbox.checked);
 }
 
@@ -7369,7 +7376,8 @@ function guestBrowse(){showPage('appPage');}
       </div>
 
       <div class="gl-checkbox-row" id="glCheckboxRow">
-        <input type="checkbox" id="glAgreeCheck" style="pointer-events:none">
+        <input type="checkbox" id="glAgreeCheck" style="display:none">
+        <div class="gl-checkbox-custom" id="glCheckboxVisual"></div>
         <label style="pointer-events:none">I have read and agree to follow the Remembered Community Guidelines</label>
       </div>
     </div>
