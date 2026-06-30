@@ -788,6 +788,17 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .legal-body ul{margin:.4rem 0 .8rem 1.2rem;}
 .legal-body li{margin-bottom:.3rem;}
 .legal-updated{font-size:.7rem;color:var(--muted);margin-bottom:1rem;font-style:italic;}
+
+/* ── AFFILIATE / SUPPORT & RESOURCES ── */
+.affiliate-item{display:flex;align-items:center;gap:.6rem;padding:.55rem;border-radius:10px;text-decoration:none;transition:.15s;border:1px solid transparent;}
+.affiliate-item:hover{background:rgba(201,168,76,.07);border-color:rgba(201,168,76,.2);}
+.affiliate-logo{width:34px;height:34px;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.85rem;flex-shrink:0;overflow:hidden;}
+.affiliate-info{flex:1;min-width:0;}
+.affiliate-name{font-size:.8rem;font-weight:600;color:var(--ivory);}
+.affiliate-tag{font-size:.68rem;color:var(--gold);}
+.affiliate-arrow{font-size:.85rem;color:var(--muted);flex-shrink:0;}
+.affiliate-disclosure{font-size:.65rem;color:var(--muted);line-height:1.5;margin-top:.6rem;padding-top:.5rem;border-top:1px solid var(--border);}
+.affiliate-disclosure a{color:var(--gold);text-decoration:underline;cursor:pointer;}
 </style>
 
 <script defer>
@@ -6665,6 +6676,37 @@ function guestBrowse(){showPage('appPage');}
         <div id="topMemorials" style="display:flex;flex-direction:column;gap:.5rem"></div>
       </div>
       <div class="w">
+        <p class="wt">🌸 Support Remembered</p>
+        <p style="font-size:.72rem;color:var(--muted);line-height:1.5;margin-bottom:.6rem">Shopping through these links helps keep Remembered running — ad-light and free for every family. 💛</p>
+        <a href="https://invl.me/clnlfmi" target="_blank" rel="noopener sponsored" class="affiliate-item">
+          <div class="affiliate-logo" style="background:#fff;color:#e53935">W</div>
+          <div class="affiliate-info">
+            <div class="affiliate-name">Watsons</div>
+            <div class="affiliate-tag">Health & Wellness</div>
+          </div>
+          <div class="affiliate-arrow">↗</div>
+        </a>
+        <a href="https://invl.me/clnlfqb" target="_blank" rel="noopener sponsored" class="affiliate-item">
+          <div class="affiliate-logo" style="background:#ee4d2d;color:#fff">S</div>
+          <div class="affiliate-info">
+            <div class="affiliate-name">Shopee</div>
+            <div class="affiliate-tag">Everyday Essentials</div>
+          </div>
+          <div class="affiliate-arrow">↗</div>
+        </a>
+        <a href="https://invl.me/clnlfrr" target="_blank" rel="noopener sponsored" class="affiliate-item">
+          <div class="affiliate-logo" style="background:#1a2a6c;color:#fff;font-size:.7rem">R+</div>
+          <div class="affiliate-info">
+            <div class="affiliate-name">RinggitPlus</div>
+            <div class="affiliate-tag">Financial Planning</div>
+          </div>
+          <div class="affiliate-arrow">↗</div>
+        </a>
+        <div class="affiliate-disclosure">
+          We may earn a small commission from purchases made through these links, at no extra cost to you. <a onclick="openPrivacyPolicy()">Learn more</a>
+        </div>
+      </div>
+      <div class="w">
         <p class="wt" id="sidebarSuggestTitle">💡 People You May Know</p>
         <div class="suggest-row" id="suggestList"></div>
         <button type="button" class="btn btn-o btn-sm" style="width:100%;margin-top:.6rem" onclick="openPeoplePage()" id="sidebarBrowseAll">Browse All Members →</button>
@@ -7506,7 +7548,7 @@ function guestBrowse(){showPage('appPage');}
         <p>We use browser local storage to keep you signed in and remember your preferences (such as language). We do not use third-party advertising trackers or sell browsing data.</p>
 
         <h4>7. Third-Party Services</h4>
-        <p>Remembered may display affiliate links to third-party retailers (such as Watsons or Guardian). Clicking these links may share limited browsing data with those retailers under their own privacy policies. We are not responsible for third-party data practices.</p>
+        <p>Remembered may display affiliate links to third-party retailers (such as Watsons, Shopee, or RinggitPlus). We may earn a commission on purchases made through these links, at no extra cost to you. Clicking these links may share limited browsing data with those retailers under their own privacy policies. We are not responsible for third-party data practices.</p>
 
         <h4>8. Children's Privacy</h4>
         <p>Remembered is not intended for children under 13. We do not knowingly collect data from children under this age.</p>
