@@ -2831,7 +2831,9 @@ async function submitPost(){
       image_url:imageUrl||videoUrl||null,
       media_type:mediaType||null,
       link_url:postLinkData?postLinkData.url:null,
-      visibility:visibility,created_at:new Date().toISOString()
+      visibility:visibility,
+      specific_viewers:visibility==='specific'?specificPeopleIds:null,
+      created_at:new Date().toISOString()
     }).select().single();
     if(res.error)throw new Error(res.error.message);
     CACHE.posts.unshift(res.data);
@@ -2845,7 +2847,13 @@ async function submitPost(){
     // Process @mentions
     processMentions(text, res.data.id, null);
     renderFeed();
-    getMyFriendIds().forEach(function(fid){addNotif(fid,uName(CU)+' shared a post','📝');});
+    if(visibility==='specific'&&specificPeopleIds.length){
+      specificPeopleIds.forEach(function(uid){
+        addNotif(uid,uName(CU)+' shared a private post with you 🎯','🎯');
+      });
+    }else{
+      getMyFriendIds().forEach(function(fid){addNotif(fid,uName(CU)+' shared a post','📝');});
+    }
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='Share Post';}
     console.error('Post error:',e);
@@ -2855,10 +2863,15 @@ async function submitPost(){
 
 var _postInputTimer = null;
 function handlePostInput(){
-  // Legacy - now handled by event listener
-  // Kept for compatibility
+  // Auto-expand textarea
+  var input=document.getElementById('postTextInput');
+  if(input){
+    input.style.height='auto';
+    input.style.height=Math.min(input.scrollHeight,180)+'px';
+  }
+  // Debounced mention check
   clearTimeout(_postInputTimer);
-  _postInputTimer = setTimeout(handlePostInputMentions, 400);
+  _postInputTimer = setTimeout(handlePostInputMentions, 250);
 }
 
 function handlePostInputMentions(){
@@ -3062,7 +3075,7 @@ function renderPostCard(p){
   h+='<div class="comments-list" id="postCommentsList-'+pid+'"></div>';
   h+='<div class="comment-input-row">';
   h+=(CU?uAvHtml(CU,28):'<div style="width:28px;height:28px;border-radius:50%;background:var(--navy-m);display:flex;align-items:center;justify-content:center">👤</div>');
-  h+='<input type="text" id="postCommentInput-'+pid+'" placeholder="Write a comment…" style="flex:1;touch-action:manipulation;-webkit-user-select:text;user-select:text">';
+  h+='<input type="text" id="postCommentInput-'+pid+'" data-pid="'+pid+'" placeholder="Write a comment…" style="flex:1;touch-action:manipulation;-webkit-user-select:text;user-select:text" oninput="handleCommentInputMention(this)">';
   h+='<button type="button" id="postCommentBtn-'+pid+'" data-pid="'+pid+'" onclick="submitPostComment(this.dataset.pid)" style="padding:.4rem .8rem;border-radius:8px;background:var(--gold);border:none;color:var(--navy);font-weight:600;font-size:.78rem;cursor:pointer">Post</button>';
   h+='</div></div></div>';
   return h;
@@ -3264,13 +3277,16 @@ function canSeeDeceased(d){
 function canSeePost(p){
   if(!p)return false;
   var vis=p.visibility||'public';
+  if(!CU)return vis==='public';
+  if(p.user_id===CU.id)return true; // always see your own posts
   if(vis==='public')return true;
-  if(!CU)return false;
-  if(p.user_id===CU.id)return true;
   var fids=getMyFriendIds();
   if(vis==='friends')return fids.indexOf(p.user_id)>=0;
   if(vis==='family'){
     return amIFamilyOf(p.user_id);
+  }
+  if(vis==='specific'){
+    return (p.specific_viewers||[]).indexOf(CU.id)>=0;
   }
   return false;
 }
@@ -5196,8 +5212,15 @@ function toggleTagUser(uid){
 
 function confirmTagFriends(){
   closeModal('tagFriendsModal');
-  renderTaggedChips();
-  toast(taggedUserIds.length?'🏷️ '+taggedUserIds.length+' tagged':'Tags cleared');
+  if(window._pickingForVisibility){
+    window._pickingForVisibility=false;
+    document.querySelector('#tagFriendsModal .mhdr-title').textContent='🏷️ Tag Friends & Family';
+    renderSpecificPeopleChips();
+    toast(specificPeopleIds.length?'🎯 Post will be visible to '+specificPeopleIds.length+' people':'No one selected');
+  }else{
+    renderTaggedChips();
+    toast(taggedUserIds.length?'🏷️ '+taggedUserIds.length+' tagged':'Tags cleared');
+  }
 }
 
 function renderTaggedChips(){
@@ -5227,6 +5250,169 @@ function removeTaggedUser(uid){
 function clearTaggedUsers(){
   taggedUserIds=[];
   renderTaggedChips();
+}
+
+
+// ── @ Mention support for comment inputs ──
+var _commentMentionTimer=null;
+var _activeCommentInput=null;
+
+function handleCommentInputMention(input){
+  _activeCommentInput=input;
+  clearTimeout(_commentMentionTimer);
+  _commentMentionTimer=setTimeout(function(){
+    var text=input.value;
+    var pos=input.selectionStart||text.length;
+    var before=text.slice(0,pos);
+    var atIdx=before.lastIndexOf('@');
+    if(atIdx>=0&&(atIdx===0||/\s/.test(before[atIdx-1]))){
+      var q=before.slice(atIdx+1);
+      if(!q.includes(' ')){
+        _mentionStart=atIdx;
+        showMentionDropdownFor(input,q);
+        return;
+      }
+    }
+    hideMentionDropdown();
+  },250);
+}
+
+function showMentionDropdownFor(inputEl,q){
+  var dd=document.getElementById('mentionDropdown');
+  if(!dd){
+    dd=document.createElement('div');
+    dd.id='mentionDropdown';
+    dd.style.cssText='position:absolute;bottom:100%;left:0;right:0;background:var(--navy-l);border:1px solid var(--border);border-radius:10px;z-index:500;max-height:180px;overflow-y:auto;box-shadow:0 -4px 20px rgba(0,0,0,.5);';
+    inputEl.parentElement.style.position='relative';
+    inputEl.parentElement.appendChild(dd);
+  } else if(dd.parentElement!==inputEl.parentElement){
+    inputEl.parentElement.style.position='relative';
+    inputEl.parentElement.appendChild(dd);
+  }
+  var fids=CU?getMyFriendIds():[];
+  if(CU)fids.push(CU.id);
+  var matches=CACHE.users.filter(function(u){
+    return fids.indexOf(u.id)>=0&&uName(u).toLowerCase().includes(q.toLowerCase());
+  }).slice(0,5);
+  if(!matches.length){dd.style.display='none';return;}
+  dd.style.display='block';
+  dd.innerHTML=matches.map(function(u){
+    return '<div data-uid="'+u.id+'" data-name="'+uName(u)+'" onclick="insertMentionInto(this)" style="padding:.5rem .7rem;display:flex;align-items:center;gap:.5rem;cursor:pointer" onmouseover="this.style.background=\'rgba(255,255,255,.06)\'" onmouseout="this.style.background=\'none\'">'
+      +uAvHtml(u,26,false)
+      +'<span style="font-size:.8rem;color:var(--ivory)">'+uName(u)+'</span>'
+      +'</div>';
+  }).join('');
+}
+
+function insertMentionInto(el){
+  var name=el.dataset.name;
+  var input=_activeCommentInput;
+  if(!input)return;
+  var text=input.value;
+  var pos=input.selectionStart||text.length;
+  var before=text.slice(0,_mentionStart);
+  var after=text.slice(pos);
+  input.value=before+'@'+name+' '+after;
+  hideMentionDropdown();
+  input.focus();
+  var newPos=before.length+name.length+2;
+  input.setSelectionRange(newPos,newPos);
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// SPECIFIC PEOPLE / PRIVATE POST VISIBILITY
+// ═══════════════════════════════════════════════════════════
+var specificPeopleIds = [];
+
+function handleVisibilityChange(val){
+  var row=document.getElementById('specificPeopleRow');
+  if(!row)return;
+  if(val==='specific'){
+    row.style.display='block';
+    if(!specificPeopleIds.length){
+      openSpecificPeoplePicker();
+    }
+  }else{
+    row.style.display='none';
+  }
+}
+
+function openSpecificPeoplePicker(){
+  if(!CU){toast('Please sign in.');return;}
+  var fids=getMyFriendIds();
+  if(!fids.length){toast('Add some friends first!');return;}
+  // Reuse the tag picker UI but for visibility targeting
+  window._pickingForVisibility=true;
+  var search=document.getElementById('tagSearchInput');
+  if(search)search.value='';
+  renderSpecificPeoplePickerList('');
+  document.querySelector('#tagFriendsModal .mhdr-title').textContent='🎯 Choose Who Can See This';
+  openModal('tagFriendsModal');
+}
+
+function renderSpecificPeoplePickerList(query){
+  var listEl=document.getElementById('tagPickerList');
+  if(!listEl||!CU)return;
+  var fids=getMyFriendIds();
+  var friends=CACHE.users.filter(function(u){
+    return fids.indexOf(u.id)>=0 &&
+      (!query||uName(u).toLowerCase().includes(query.toLowerCase()));
+  });
+  friends.sort(function(a,b){
+    var aFam=isFamily(getMyFriendRelationship(a.id))?1:0;
+    var bFam=isFamily(getMyFriendRelationship(b.id))?1:0;
+    return bFam-aFam;
+  });
+  if(!friends.length){
+    listEl.innerHTML='<div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:.82rem">No friends found</div>';
+    return;
+  }
+  listEl.innerHTML=friends.map(function(u){
+    var rel=getMyFriendRelationship(u.id)||'Friend';
+    var isSelected=specificPeopleIds.indexOf(u.id)>=0;
+    return '<div class="tag-picker-item'+(isSelected?' tagged':'')+'" data-uid="'+u.id+'" onclick="toggleSpecificPerson(this.dataset.uid)">'
+      +uAvHtml(u,38,false)
+      +'<div><div class="tag-picker-name">'+uName(u)+'</div><div class="tag-picker-rel">'+rel+'</div></div>'
+      +'<div class="tag-picker-check">✓</div>'
+      +'</div>';
+  }).join('');
+}
+
+function toggleSpecificPerson(uid){
+  var idx=specificPeopleIds.indexOf(uid);
+  if(idx>=0)specificPeopleIds.splice(idx,1);
+  else specificPeopleIds.push(uid);
+  var search=document.getElementById('tagSearchInput');
+  renderSpecificPeoplePickerList(search?search.value:'');
+}
+
+function renderSpecificPeopleChips(){
+  var el=document.getElementById('specificPeopleChips');
+  if(!el)return;
+  if(!specificPeopleIds.length){
+    el.innerHTML='<span style="font-size:.74rem;color:var(--muted)">No one selected yet</span>';
+    return;
+  }
+  el.innerHTML=specificPeopleIds.map(function(uid){
+    var u=CACHE.users.find(function(x){return x.id===uid;});
+    if(!u)return'';
+    return '<span class="tagged-chip">'+uName(u)
+      +'<button type="button" data-uid="'+uid+'" onclick="removeSpecificPerson(this.dataset.uid)">✕</button></span>';
+  }).join('');
+}
+
+function removeSpecificPerson(uid){
+  specificPeopleIds=specificPeopleIds.filter(function(x){return x!==uid;});
+  renderSpecificPeopleChips();
+}
+
+function clearSpecificPeople(){
+  specificPeopleIds=[];
+  var row=document.getElementById('specificPeopleRow');
+  if(row)row.style.display='none';
+  var vis=document.getElementById('postVisibility');
+  if(vis)vis.value='public';
 }
 
 console.log('Post + Friend functions loaded ✓');
@@ -5929,9 +6115,14 @@ function guestBrowse(){showPage('appPage');}
             <div style="display:flex;gap:.7rem;align-items:flex-start">
               <div class="ua" id="feedAvatar" onclick="openMyProfile()">🌻</div>
               <div style="flex:1">
-                <textarea id="postTextInput" placeholder="What's on your mind? Share a memory, thought or message with your friends…" rows="3" autocomplete="off" autocorrect="on" autocapitalize="sentences" spellcheck="true"></textarea>
+                <textarea id="postTextInput" placeholder="What's on your mind? Share a memory, thought or message with your friends…" rows="3" autocomplete="off" autocorrect="on" autocapitalize="sentences" spellcheck="true" oninput="handlePostInput()"></textarea>
                 <div id="postImagePreview" style="display:none;margin-top:.4rem"></div>
                 <div id="taggedChipsRow" style="display:none;margin-top:.4rem"></div>
+                <div id="specificPeopleRow" style="display:none;margin-top:.4rem;padding:.5rem .7rem;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:8px">
+                  <div style="font-size:.72rem;color:var(--gold);margin-bottom:.3rem">🎯 Only visible to:</div>
+                  <div id="specificPeopleChips"></div>
+                  <button type="button" onclick="openSpecificPeoplePicker()" style="margin-top:.3rem;font-size:.72rem;background:none;border:1px dashed rgba(201,168,76,.4);color:var(--gold);border-radius:6px;padding:.2rem .6rem;cursor:pointer">+ Choose people</button>
+                </div>
                 <div id="postLinkRow" style="display:none;margin-top:.4rem">
                   <div class="post-link-input-row">
                     <input type="text" id="postLinkInput" placeholder="Paste YouTube, TikTok or any video link…" oninput="previewLinkDebounced()" onpaste="setTimeout(previewLinkDebounced,100)">
@@ -5958,10 +6149,11 @@ function guestBrowse(){showPage('appPage');}
                 <button type="button" class="post-extra-btn" onclick="openTagFriends()">
                   🏷️ Tag
                 </button>
-                <select class="visibility-select" id="postVisibility" title="Who can see this?">
+                <select class="visibility-select" id="postVisibility" title="Who can see this?" onchange="handleVisibilityChange(this.value)">
                   <option value="public">🌍 Everyone</option>
                   <option value="friends">👥 Friends</option>
                   <option value="family">🔒 Family Only</option>
+                  <option value="specific">🎯 Specific People</option>
                 </select>
               </div>
               <button type="button" class="btn btn-g btn-sm" onclick="submitPost()" id="postSubmitBtn" >Share Post</button>
@@ -6748,7 +6940,7 @@ function guestBrowse(){showPage('appPage');}
       <button type="button" class="mclose" onclick="closeModal('tagFriendsModal')">×</button>
     </div>
     <div class="mbody">
-      <input type="text" id="tagSearchInput" placeholder="Search friends…" oninput="renderTagPickerList(this.value)" style="width:100%;margin-bottom:.7rem;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:.5rem .8rem;color:var(--ivory);font-size:.85rem;outline:none">
+      <input type="text" id="tagSearchInput" placeholder="Search friends…" oninput="window._pickingForVisibility?renderSpecificPeoplePickerList(this.value):renderTagPickerList(this.value)" style="width:100%;margin-bottom:.7rem;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:.5rem .8rem;color:var(--ivory);font-size:.85rem;outline:none">
       <div class="tag-picker-list" id="tagPickerList"></div>
     </div>
     <div class="mftr">
