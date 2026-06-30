@@ -92,7 +92,9 @@ nav{position:sticky;top:0;z-index:200;background:rgba(13,27,42,.97);backdrop-fil
 #heroPage.active{display:flex;}
 .three-col{display:grid;grid-template-columns:240px 1fr 260px;gap:1.2rem;max-width:1180px;margin:0 auto;padding:1.2rem;}
 @media(max-width:960px){.three-col{grid-template-columns:1fr;}.side-l,.side-r{display:none;}}
-.side-l,.side-r{display:flex;flex-direction:column;gap:1rem;}
+.side-l,.side-r{display:flex;flex-direction:column;gap:1rem;position:sticky;top:74px;align-self:start;max-height:calc(100vh - 90px);overflow-y:auto;scrollbar-width:thin;}
+.side-l::-webkit-scrollbar,.side-r::-webkit-scrollbar{width:5px;}
+.side-l::-webkit-scrollbar-thumb,.side-r::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px;}
 
 /* CARDS / WIDGETS */
 .w{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem;}
