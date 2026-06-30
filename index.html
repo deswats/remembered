@@ -1574,9 +1574,12 @@ async function toggleSmile(deceasedId){
 function openDeceasedModal(){
   if(!CU){toast('Please sign in.');showPageDirect('authPage');setAuthMode('login');return;}
   dPhotoData='';dMediaData=[];selectedRel='';
+  memorialSpecificIds=[];
   const pp=document.getElementById('dPhotoP');if(pp)pp.style.display='none';
   const mg=document.getElementById('dMediaGrid');if(mg)mg.innerHTML='';
   ['dName','dNick','dDob','dDod','dPob','dBurial'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const visEl=document.getElementById('dVis');if(visEl)visEl.value='public';
+  const specRow=document.getElementById('memorialSpecificRow');if(specRow)specRow.style.display='none';
   renderRelGrid('relGrid','selectedRel');
   openModal('deceasedModal');
 }
@@ -1666,6 +1669,11 @@ async function saveDeceased(){
   if(!dob){toast('Please enter date of birth.');return;}
   if(!dod){toast('Please enter date of passing.');return;}
   if(!selectedRel){toast('Please select your relationship to them.');return;}
+  var visibility=v('dVis')||'public';
+  if(visibility==='specific'&&!memorialSpecificIds.length){
+    toast('Please choose at least one person who can see this memorial.');
+    return;
+  }
   var btn=document.querySelector('#deceasedModal .mftr .btn-g');
   if(btn){btn.disabled=true;btn.textContent='Publishing…';}
   showLoader(true);
@@ -1683,8 +1691,9 @@ async function saveDeceased(){
       burial:v('dBurial')||null,
       country:v('dCountry')||null,
       religion:v('dRel')||'General',
-      visibility:v('dVis')||'public',
+      visibility:visibility,
       tagged_users:[],
+      specific_viewers:visibility==='specific'?memorialSpecificIds:null,
       photo_url:photoUrl||null,
       created_by:CU.id
     };
@@ -1705,6 +1714,12 @@ async function saveDeceased(){
       var cres=await sb.from('connections').insert({user_id:CU.id,deceased_id:dec.id,relationship:selectedRel,smiled:true}).select().single();
       if(cres.data)CACHE.connections.push(cres.data);
     }catch(e){console.warn('Connection',e);}
+    // Notify specific people if targeted visibility
+    if(visibility==='specific'&&memorialSpecificIds.length){
+      memorialSpecificIds.forEach(function(uid){
+        addNotif(uid,uName(CU)+' shared a private memorial with you 🎯','🎯');
+      });
+    }
     showLoader(false);
     if(btn){btn.disabled=false;btn.textContent='🌻 Publish Memorial';}
     closeModal('deceasedModal');
@@ -3315,6 +3330,9 @@ function canSeeDeceased(d){
   if(vis==='family'){
     return amIFamilyOf(d.created_by)||hasConnection;
     // connected people can also see family memorials if they "I Knew Them"
+  }
+  if(vis==='specific'){
+    return (d.specific_viewers||[]).indexOf(CU.id)>=0;
   }
   return false;
 }
@@ -5360,6 +5378,11 @@ function confirmTagFriends(){
     document.querySelector('#tagFriendsModal .mhdr-title').textContent='🏷️ Tag Friends & Family';
     renderEditVisChips();
     openModal('editPostVisModal');
+  }else if(window._pickingForMemorial){
+    window._pickingForMemorial=false;
+    document.querySelector('#tagFriendsModal .mhdr-title').textContent='🏷️ Tag Friends & Family';
+    renderMemorialSpecificChips();
+    toast(memorialSpecificIds.length?'🎯 Memorial will be visible to '+memorialSpecificIds.length+' people':'No one selected');
   }else if(window._pickingForVisibility){
     window._pickingForVisibility=false;
     document.querySelector('#tagFriendsModal .mhdr-title').textContent='🏷️ Tag Friends & Family';
@@ -5560,6 +5583,101 @@ function clearSpecificPeople(){
   var row=document.getElementById('specificPeopleRow');
   if(row)row.style.display='none';
   var vis=document.getElementById('postVisibility');
+  if(vis)vis.value='public';
+}
+
+// ═══════════════════════════════════════════════════════════
+// SPECIFIC PEOPLE TARGETING — MEMORIALS
+// Reuses the same #tagFriendsModal picker as posts
+// ═══════════════════════════════════════════════════════════
+var memorialSpecificIds = [];
+
+function handleMemorialVisChange(val){
+  var row=document.getElementById('memorialSpecificRow');
+  if(!row)return;
+  if(val==='specific'){
+    row.style.display='block';
+    if(!memorialSpecificIds.length){
+      openMemorialSpecificPicker();
+    }
+  }else{
+    row.style.display='none';
+  }
+}
+
+function openMemorialSpecificPicker(){
+  if(!CU){toast('Please sign in.');return;}
+  var fids=getMyFriendIds();
+  if(!fids.length){toast('Add some friends first!');return;}
+  window._pickingForMemorial=true;
+  var search=document.getElementById('tagSearchInput');
+  if(search)search.value='';
+  renderMemorialSpecificPickerList('');
+  document.querySelector('#tagFriendsModal .mhdr-title').textContent='🎯 Choose Who Can See This';
+  openModal('tagFriendsModal');
+}
+
+function renderMemorialSpecificPickerList(query){
+  var listEl=document.getElementById('tagPickerList');
+  if(!listEl||!CU)return;
+  var fids=getMyFriendIds();
+  var friends=CACHE.users.filter(function(u){
+    return fids.indexOf(u.id)>=0 &&
+      (!query||uName(u).toLowerCase().includes(query.toLowerCase()));
+  });
+  friends.sort(function(a,b){
+    var aFam=isFamily(getMyFriendRelationship(a.id))?1:0;
+    var bFam=isFamily(getMyFriendRelationship(b.id))?1:0;
+    return bFam-aFam;
+  });
+  if(!friends.length){
+    listEl.innerHTML='<div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:.82rem">No friends found</div>';
+    return;
+  }
+  listEl.innerHTML=friends.map(function(u){
+    var rel=getMyFriendRelationship(u.id)||'Friend';
+    var isSelected=memorialSpecificIds.indexOf(u.id)>=0;
+    return '<div class="tag-picker-item'+(isSelected?' tagged':'')+'" data-uid="'+u.id+'" onclick="toggleMemorialSpecificPerson(this.dataset.uid)">'
+      +uAvHtml(u,38,false)
+      +'<div><div class="tag-picker-name">'+uName(u)+'</div><div class="tag-picker-rel">'+rel+'</div></div>'
+      +'<div class="tag-picker-check">✓</div>'
+      +'</div>';
+  }).join('');
+}
+
+function toggleMemorialSpecificPerson(uid){
+  var idx=memorialSpecificIds.indexOf(uid);
+  if(idx>=0)memorialSpecificIds.splice(idx,1);
+  else memorialSpecificIds.push(uid);
+  var search=document.getElementById('tagSearchInput');
+  renderMemorialSpecificPickerList(search?search.value:'');
+}
+
+function renderMemorialSpecificChips(){
+  var el=document.getElementById('memorialSpecificChips');
+  if(!el)return;
+  if(!memorialSpecificIds.length){
+    el.innerHTML='<span style="font-size:.74rem;color:var(--muted)">No one selected yet</span>';
+    return;
+  }
+  el.innerHTML=memorialSpecificIds.map(function(uid){
+    var u=CACHE.users.find(function(x){return x.id===uid;});
+    if(!u)return'';
+    return '<span class="tagged-chip">'+uName(u)
+      +'<button type="button" data-uid="'+uid+'" onclick="removeMemorialSpecificPerson(this.dataset.uid)">✕</button></span>';
+  }).join('');
+}
+
+function removeMemorialSpecificPerson(uid){
+  memorialSpecificIds=memorialSpecificIds.filter(function(x){return x!==uid;});
+  renderMemorialSpecificChips();
+}
+
+function clearMemorialSpecificPeople(){
+  memorialSpecificIds=[];
+  var row=document.getElementById('memorialSpecificRow');
+  if(row)row.style.display='none';
+  var vis=document.getElementById('dVis');
   if(vis)vis.value='public';
 }
 
@@ -6831,12 +6949,18 @@ function guestBrowse(){showPage('appPage');}
         </div>
         <div class="fg">
           <label style="font-size:.78rem;color:var(--muted)">🔒 Who Can See This Memorial?</label>
-          <select id="dVis" style="width:100%;margin-top:.3rem">
+          <select id="dVis" style="width:100%;margin-top:.3rem" onchange="handleMemorialVisChange(this.value)">
             <option value="public">🌍 Public — Everyone can see</option>
             <option value="connected">🤝 Connected — People who knew them + tagged</option>
             <option value="family">🔒 Family Only — Family-relationship friends only</option>
+            <option value="specific">🎯 Specific People — Only people you choose</option>
           </select>
           <div style="font-size:.7rem;color:var(--muted);margin-top:.3rem;line-height:1.5">💡 People you @tag can always see this memorial</div>
+          <div id="memorialSpecificRow" style="display:none;margin-top:.6rem;padding:.6rem .7rem;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:8px">
+            <div style="font-size:.72rem;color:var(--gold);margin-bottom:.3rem">🎯 Only visible to:</div>
+            <div id="memorialSpecificChips"></div>
+            <button type="button" onclick="openMemorialSpecificPicker()" style="margin-top:.3rem;font-size:.72rem;background:none;border:1px dashed rgba(201,168,76,.4);color:var(--gold);border-radius:6px;padding:.2rem .6rem;cursor:pointer">+ Choose people</button>
+          </div>
         </div>
         <div class="fg"><label>Faith / Religion</label>
           <select id="dRel"><option value="General">General</option><option value="Christian">Christian</option><option value="Muslim">Muslim</option><option value="Buddhist">Buddhist</option></select>
@@ -7456,7 +7580,7 @@ function guestBrowse(){showPage('appPage');}
       <button type="button" class="mclose" onclick="closeModal('tagFriendsModal')">×</button>
     </div>
     <div class="mbody">
-      <input type="text" id="tagSearchInput" placeholder="Search friends…" oninput="window._pickingForEditVis?renderEditVisPickerList(this.value):(window._pickingForVisibility?renderSpecificPeoplePickerList(this.value):renderTagPickerList(this.value))" style="width:100%;margin-bottom:.7rem;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:.5rem .8rem;color:var(--ivory);font-size:.85rem;outline:none">
+      <input type="text" id="tagSearchInput" placeholder="Search friends…" oninput="window._pickingForEditVis?renderEditVisPickerList(this.value):(window._pickingForMemorial?renderMemorialSpecificPickerList(this.value):(window._pickingForVisibility?renderSpecificPeoplePickerList(this.value):renderTagPickerList(this.value)))" style="width:100%;margin-bottom:.7rem;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:.5rem .8rem;color:var(--ivory);font-size:.85rem;outline:none">
       <div class="tag-picker-list" id="tagPickerList"></div>
     </div>
     <div class="mftr">
