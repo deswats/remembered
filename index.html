@@ -747,6 +747,19 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .post-link-input-row input{flex:1;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:.45rem .8rem;color:var(--ivory);font-size:.82rem;outline:none;font-family:'Inter',sans-serif;}
 .post-link-input-row input:focus{border-color:var(--gold);}
 .post-link-input-row button{padding:.4rem .8rem;border-radius:8px;background:var(--gold);border:none;color:var(--navy);font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap;}
+
+/* ── COMMUNITY GUIDELINES MODAL ── */
+.guidelines-modal .modal{max-width:480px;}
+.gl-icon{width:56px;height:56px;border-radius:50%;background:rgba(201,168,76,.12);display:flex;align-items:center;justify-content:center;font-size:1.6rem;margin:0 auto .8rem;}
+.gl-rule{display:flex;gap:.7rem;align-items:flex-start;padding:.7rem 0;border-bottom:1px solid rgba(255,255,255,.06);}
+.gl-rule:last-child{border-bottom:none;}
+.gl-rule-icon{width:34px;height:34px;border-radius:10px;background:rgba(201,168,76,.1);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;}
+.gl-rule-text{flex:1;}
+.gl-rule-title{font-size:.85rem;font-weight:600;color:var(--ivory);margin-bottom:.15rem;}
+.gl-rule-desc{font-size:.76rem;color:var(--muted);line-height:1.5;}
+.gl-checkbox-row{display:flex;align-items:center;gap:.6rem;margin-top:1rem;padding:.7rem;background:rgba(255,255,255,.03);border-radius:10px;cursor:pointer;}
+.gl-checkbox-row input{width:18px;height:18px;accent-color:var(--gold);cursor:pointer;}
+.gl-checkbox-row label{font-size:.78rem;color:var(--lavender);cursor:pointer;flex:1;}
 </style>
 
 <script defer>
@@ -1121,6 +1134,7 @@ async function doRegister(){
     // Step 3: If session = no email confirmation needed
     if(data.session){
       toast('✅ Account created! Welcome 🌻');
+      maybeShowGuidelines();
       if(createBtn){createBtn.disabled=false;createBtn.textContent='Create Account';}
       await afterAuth(data.user);
       return;
@@ -5066,6 +5080,48 @@ function renderPostLinkEmbed(p){
   return'<div style="padding:.5rem;background:rgba(255,255,255,.05);border-radius:8px;font-size:.78rem"><a href="'+info.url+'" target="_blank" style="color:var(--gold)">🔗 '+info.url+'</a></div>';
 }
 
+
+// ═══════════════════════════════════════════════════════════
+// COMMUNITY GUIDELINES
+// ═══════════════════════════════════════════════════════════
+
+function openGuidelines(){
+  var checkbox=document.getElementById('glAgreeCheck');
+  var btn=document.getElementById('glContinueBtn');
+  if(checkbox)checkbox.checked=false;
+  if(btn)btn.disabled=true;
+  openModal('guidelinesModal');
+}
+
+function closeGuidelines(agreed){
+  if(agreed){
+    localStorage.setItem('rb_guidelines_agreed','1');
+    if(CU){
+      try{sb.from('profiles').update({guidelines_agreed:true}).eq('id',CU.id);}catch(e){}
+    }
+  }
+  closeModal('guidelinesModal');
+}
+
+// Enable continue button only when checkbox is ticked
+document.addEventListener('DOMContentLoaded',function(){
+  var checkbox=document.getElementById('glAgreeCheck');
+  var btn=document.getElementById('glContinueBtn');
+  if(checkbox&&btn){
+    checkbox.addEventListener('change',function(){
+      btn.disabled=!checkbox.checked;
+    });
+  }
+});
+
+// Show guidelines once after first registration
+function maybeShowGuidelines(){
+  var agreed=localStorage.getItem('rb_guidelines_agreed');
+  if(!agreed){
+    setTimeout(function(){openGuidelines();},800);
+  }
+}
+
 console.log('Post + Friend functions loaded ✓');
 
 // ═══════════════════════════════════════════════════════════
@@ -5768,6 +5824,14 @@ function guestBrowse(){showPage('appPage');}
               <div style="flex:1">
                 <textarea id="postTextInput" placeholder="What's on your mind? Share a memory, thought or message with your friends…" rows="3" autocomplete="off" autocorrect="on" autocapitalize="sentences" spellcheck="true"></textarea>
                 <div id="postImagePreview" style="display:none;margin-top:.4rem"></div>
+                <div id="postLinkRow" style="display:none;margin-top:.4rem">
+                  <div class="post-link-input-row">
+                    <input type="text" id="postLinkInput" placeholder="Paste YouTube, TikTok or any video link…" oninput="previewLinkDebounced()" onpaste="setTimeout(previewLinkDebounced,100)">
+                    <button onclick="previewLink()">Preview</button>
+                    <button onclick="clearPostLink()" style="background:rgba(255,82,82,.2);color:#ff5252">✕</button>
+                  </div>
+                  <div id="postLinkPreview" style="margin-top:.4rem"></div>
+                </div>
               </div>
             </div>
             <div class="post-actions-row">
@@ -6295,6 +6359,8 @@ function guestBrowse(){showPage('appPage');}
       <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
     <span style="font-size:.78rem;font-weight:600;color:var(--gold);letter-spacing:.03em" id="footerCredit">Created by DW Labs</span>
+    <span style="margin:0 .5rem;color:var(--muted)">·</span>
+    <a href="javascript:void(0)" onclick="openGuidelines()" style="font-size:.75rem;color:var(--muted);text-decoration:underline">Community Guidelines</a>
   </div>
   <div style="margin-top:.8rem;font-size:.68rem;color:var(--muted)" id="footerRights">© 2025 DW Labs · All rights reserved</div>
 </footer>
@@ -6494,6 +6560,71 @@ function guestBrowse(){showPage('appPage');}
       onkeydown="if(event.key==='Enter')sendChatMsg()"
       oninput="sendTyping()" style="touch-action:manipulation;-webkit-user-select:text;user-select:text;">
     <button onclick="sendChatMsg()">➤</button>
+  </div>
+</div>
+
+
+<!-- COMMUNITY GUIDELINES MODAL -->
+<div class="ov guidelines-modal" id="guidelinesModal">
+  <div class="modal">
+    <div class="mhdr">
+      <p class="mhdr-title">🌻 Community Guidelines</p>
+      <button type="button" class="mclose" onclick="closeGuidelines(false)">×</button>
+    </div>
+    <div class="mbody">
+      <div class="gl-icon">🕊️</div>
+      <p style="text-align:center;font-size:.85rem;color:var(--lavender);line-height:1.6;margin-bottom:1rem">
+        Remembered is a sacred space to honour those we've lost. To keep it respectful and safe for every family, we ask all members to follow these guidelines.
+      </p>
+
+      <div class="gl-rule">
+        <div class="gl-rule-icon">🚫</div>
+        <div class="gl-rule-text">
+          <div class="gl-rule-title">No Spam or Self-Promotion</div>
+          <div class="gl-rule-desc">Please do not post repetitive content, advertisements, or unrelated promotional material. This space is reserved for genuine memories and tributes.</div>
+        </div>
+      </div>
+
+      <div class="gl-rule">
+        <div class="gl-rule-icon">🔞</div>
+        <div class="gl-rule-text">
+          <div class="gl-rule-title">No Inappropriate Content</div>
+          <div class="gl-rule-desc">Nudity, sexually explicit material, vulgar language, and graphic violence are strictly prohibited. Content that violates this rule will be removed immediately.</div>
+        </div>
+      </div>
+
+      <div class="gl-rule">
+        <div class="gl-rule-icon">🔒</div>
+        <div class="gl-rule-text">
+          <div class="gl-rule-title">Respect Privacy</div>
+          <div class="gl-rule-desc">Only share photos, videos, and information with the consent of those involved. Be mindful of grieving families and their wish for privacy where requested.</div>
+        </div>
+      </div>
+
+      <div class="gl-rule">
+        <div class="gl-rule-icon">🤝</div>
+        <div class="gl-rule-text">
+          <div class="gl-rule-title">Respect All Faiths & Backgrounds</div>
+          <div class="gl-rule-desc">Our community welcomes people of every religion, ethnicity, and culture. Comments that mock, demean, or discriminate against any belief or background will not be tolerated.</div>
+        </div>
+      </div>
+
+      <div class="gl-rule">
+        <div class="gl-rule-icon">💬</div>
+        <div class="gl-rule-text">
+          <div class="gl-rule-title">Be Kind & Compassionate</div>
+          <div class="gl-rule-desc">Every memorial represents a life and a grieving family. Please engage with empathy, and report any content that breaches these guidelines.</div>
+        </div>
+      </div>
+
+      <div class="gl-checkbox-row" onclick="document.getElementById('glAgreeCheck').click()">
+        <input type="checkbox" id="glAgreeCheck" onclick="event.stopPropagation()">
+        <label>I have read and agree to follow the Remembered Community Guidelines</label>
+      </div>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-g" id="glContinueBtn" onclick="closeGuidelines(true)" style="width:100%" disabled>I Understand & Agree</button>
+    </div>
   </div>
 </div>
 
