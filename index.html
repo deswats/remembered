@@ -5076,8 +5076,31 @@ function renderLinkPreview(info){
 }
 
 function expandEmbed(el, embedUrl){
-  // Replace thumbnail with actual player when tapped
-  el.innerHTML='<iframe src="'+embedUrl+'?autoplay=1" style="width:100%;aspect-ratio:16/9;border:none;display:block" allowfullscreen allow="autoplay; fullscreen"></iframe>';
+  // Get the original video URL for fallback
+  var watchUrl = embedUrl.replace('youtube.com/embed/', 'youtube.com/watch?v=').split('?')[0];
+  if(embedUrl.includes('youtube.com/embed/')){
+    var vidId = embedUrl.match(/embed\/([a-zA-Z0-9_-]{11})/);
+    if(vidId) watchUrl = 'https://www.youtube.com/watch?v='+vidId[1];
+  }
+
+  var iframe = document.createElement('iframe');
+  iframe.src = embedUrl + (embedUrl.includes('?')?'&':'?') + 'autoplay=1';
+  iframe.style.cssText = 'width:100%;aspect-ratio:16/9;border:none;display:block';
+  iframe.allowFullscreen = true;
+  iframe.setAttribute('allow','autoplay; fullscreen');
+
+  el.innerHTML = '';
+  el.appendChild(iframe);
+
+  // Detect if YouTube blocks embedding (age-restricted/private/region-locked)
+  // YouTube doesn't throw a JS error - instead shows its own error page in the iframe
+  // We show a fallback link after a short delay as a safety net
+  setTimeout(function(){
+    var fallback = document.createElement('div');
+    fallback.style.cssText = 'padding:.6rem .8rem;background:rgba(255,255,255,.04);font-size:.74rem;color:var(--muted);text-align:center;border-top:1px solid var(--border)';
+    fallback.innerHTML = 'Video not playing? <a href="'+watchUrl+'" target="_blank" style="color:var(--gold);font-weight:600">Watch on YouTube →</a>';
+    el.appendChild(fallback);
+  }, 800);
 }
 
 function clearPostLink(){
@@ -5100,7 +5123,7 @@ function renderPostLinkEmbed(p){
       +'<div class="plp-play" data-embed="'+info.embedUrl+'" onclick="expandEmbed(this,this.dataset.embed)" style="cursor:pointer">'
       +'<img class="plp-thumb" src="'+info.thumbUrl+'" alt="YouTube" loading="lazy">'
       +'</div>'
-      +'<div class="plp-info"><div class="plp-title">▶ YouTube Video</div><div class="plp-src">Tap to play</div></div>'
+      +'<div class="plp-info"><div class="plp-title">▶ YouTube Video</div><div class="plp-src">Tap to play, or <a href="'+info.url+'" target="_blank" style="color:var(--gold)">watch on YouTube →</a></div></div>'
       +'</div>';
   }
   if(info.type==='vimeo'){
