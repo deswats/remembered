@@ -64,7 +64,7 @@ body{font-family:'Inter',sans-serif;background:var(--navy);color:var(--ivory);mi
 #bgCanvas{position:fixed;inset:0;pointer-events:none;z-index:0;}
 
 /* NAV */
-nav{position:sticky;top:0;z-index:200;background:rgba(13,27,42,.97);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);height:58px;display:flex;align-items:center;padding:0 1.2rem;gap:.8rem;overflow:hidden;}
+nav{position:sticky;top:0;z-index:200;background:rgba(13,27,42,.97);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);height:58px;display:flex;align-items:center;padding:0 1.2rem;gap:.8rem;overflow:visible;}
 .brand{font-family:'Cormorant Garant',serif;font-size:1.5rem;font-weight:300;color:var(--gold);cursor:pointer;display:flex;align-items:center;gap:.4rem;white-space:nowrap;flex-shrink:1;min-width:0;}
 .nav-search{flex:1;max-width:380px;position:relative;}
 .nav-search input{width:100%;background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:22px;padding:.4rem 1rem .4rem 2.2rem;color:var(--ivory);font-size:.83rem;outline:none;font-family:'Inter',sans-serif;}
@@ -381,7 +381,7 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
   /* But keep top nav visible on hero/auth pages (no bottom nav) */
 
   /* Mobile nav adjustments — top nav only, all buttons visible */
-  nav{padding:0 .6rem;gap:.25rem;height:52px;overflow:hidden;}
+  nav{padding:0 .6rem;gap:.25rem;height:52px;overflow:visible;}
   .brand{font-size:1rem;flex-shrink:1;min-width:0;max-width:30%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .nav-search{max-width:none;flex:1;min-width:0;}
   .nav-actions{gap:.2rem;flex-shrink:0;margin-left:auto;}
@@ -553,7 +553,7 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .lang-btn{display:flex;align-items:center;gap:.3rem;padding:.32rem .7rem;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--ivory);font-size:.75rem;cursor:pointer;transition:.2s;font-family:'Inter',sans-serif;white-space:nowrap;}
 .lang-btn:hover{border-color:var(--gold);color:var(--gold);}
 .lang-flag{font-size:.95rem;line-height:1;}
-.lang-dropdown{position:absolute;top:calc(100% + 6px);right:0;background:var(--navy-l);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:none;z-index:9000;min-width:180px;box-shadow:0 8px 32px rgba(0,0,0,.6);}
+.lang-dropdown{position:fixed;top:52px;right:.5rem;background:var(--navy-l);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:none;z-index:9999;min-width:180px;box-shadow:0 8px 32px rgba(0,0,0,.6);}
 /* lang-dropdown uses JS display toggle now */
 .lang-wrap{position:relative;}
 .lang-option{padding:.85rem 1.1rem;cursor:pointer;display:flex;align-items:center;gap:.65rem;font-size:.88rem;color:var(--lavender);transition:.15s;font-family:'Inter',sans-serif;border:none;background:transparent;width:100%;text-align:left;min-height:48px;}
@@ -998,11 +998,13 @@ async function loadAllData(){
       sb.from('media').select('*').limit(200),
       sb.from('posts').select('*').order('created_at',{ascending:false}).limit(100),
       sb.from('post_reactions').select('*').limit(1000),
+      sb.from('wall_posts').select('*').order('created_at',{ascending:false}).limit(100),
     ]);
-    const [dec,conns,fr,pr,cm,us,med,posts,rxns]=await Promise.race([fetchData,timeout]);
+    const [dec,conns,fr,pr,cm,us,med,posts,rxns,wps]=await Promise.race([fetchData,timeout]);
     CACHE.post_reactions=rxns?.data||[];
     console.log('Loaded reactions:',CACHE.post_reactions.length);
     CACHE.posts=posts?.data||[];
+    CACHE.wall_posts=wps?.data||[];
     CACHE.deceased  = dec.data||[];
     CACHE.connections = conns.data||[];
     CACHE.friends   = fr.data||[];
@@ -1469,6 +1471,7 @@ function updateNav(){
     const av=CU.avatar?`<img src="${CU.avatar}">`:(CU.firstName.charAt(0)+(CU.lastName?.charAt(0)||''));
     var isAdminUser=(CU.email==='desmond@cttsb.com.my'||CU.email==='deswatson.semarak@gmail.com');
     na.innerHTML=`
+    <button type="button" class="nb" onclick="goHome()" title="Home">🏠 <span class="nav-label">Home</span></button>
     <button type="button" class="nb notif-btn" onclick="showPageDirect('appPage');renderApp();showNotifs()" title="Notifications">🔔<span class="notif-badge" id="notifCount" style="display:none">0</span></button>
     <button type="button" class="nb" onclick="openPeoplePage()" title="People">👥 <span class="nav-label">People</span></button>
     ${isAdminUser?`<button type="button" class="nb" style="background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.5);color:var(--gold);font-weight:600" onclick="openAdminDashboard()" title="Admin">📊</button>`:''}
@@ -1532,10 +1535,23 @@ function renderFeed(){
     const fids=getMyFriendIds();fids.push(CU.id);
     posts=posts.filter(p=>fids.includes(p.user_id));
   }
-  // Combine and sort by date
+  // Combine memorials, posts and wall posts — sorted by date
   const memItems=all.map(d=>({...d,_type:'memorial',_date:new Date(d.created_at).getTime()}));
   const postItems=posts.map(p=>({...p,_type:'post',_date:new Date(p.created_at).getTime()}));
-  const combined=[...memItems,...postItems].sort((a,b)=>b._date-a._date);
+  // Wall posts — only show if user is signed in and has access
+  let wallItems=[];
+  if(CU&&CACHE.wall_posts&&CACHE.wall_posts.length){
+    wallItems=CACHE.wall_posts.filter(function(wp){
+      // Only show wall posts for memorials the user can see
+      var dec=CACHE.deceased.find(function(d){return d.id===wp.deceased_id;});
+      return dec && canSeeDeceased(dec) && (wp.message||wp.media_url);
+    }).map(function(wp){return {...wp,_type:'wallpost',_date:new Date(wp.created_at).getTime()};});
+    if(feedTab==='friends'&&CU){
+      var fids=getMyFriendIds();fids.push(CU.id);
+      wallItems=wallItems.filter(function(wp){return fids.includes(wp.user_id);});
+    }
+  }
+  const combined=[...memItems,...postItems,...wallItems].sort((a,b)=>b._date-a._date);
   if(!combined.length){
     if(feedTab==='friends'){
       feed.innerHTML='<div class="empty">No posts from friends yet. <a style="color:var(--gold);cursor:pointer" onclick="openPeoplePage()">Find friends →</a></div>';
@@ -1544,7 +1560,11 @@ function renderFeed(){
     }
     return;
   }
-  feed.innerHTML=combined.map(item=>item._type==='post'?renderPostCard(item):renderCard(item)).join('');
+  feed.innerHTML=combined.map(function(item){
+    if(item._type==='post') return renderPostCard(item);
+    if(item._type==='wallpost') return renderWallPostCard(item);
+    return renderCard(item);
+  }).join('');
   if(CU){
     const fids=getMyFriendIds();
     const recent=CACHE.deceased.filter(d=>fids.includes(d.created_by)&&(Date.now()-new Date(d.created_at).getTime())<86400000);
@@ -1552,6 +1572,32 @@ function renderFeed(){
     if(badge)badge.style.display=recent.length&&feedTab!=='friends'?'inline-flex':'none';
   }
 }
+function renderWallPostCard(wp){
+  var dec=CACHE.deceased.find(function(d){return d.id===wp.deceased_id;})||{};
+  var poster=CACHE.users.find(function(u){return u.id===wp.user_id;})||{};
+  var posterName=poster.first_name?(poster.first_name+' '+(poster.last_name||'')).trim():'Someone';
+  var mediaHtml='';
+  if(wp.media_url){
+    if(wp.media_type==='video'){
+      mediaHtml=`<video style="width:100%;max-height:260px;border-radius:10px;margin-top:.6rem;display:block" controls><source src="${wp.media_url}"></video>`;
+    } else {
+      mediaHtml=`<img src="${wp.media_url}" style="width:100%;max-height:260px;object-fit:cover;border-radius:10px;margin-top:.6rem;display:block;cursor:zoom-in" onclick="openLightbox(this.src,'${dec.name||'Memory'}')">`;
+    }
+  }
+  return `<div class="card" style="border-left:3px solid rgba(201,168,76,.3);cursor:pointer" onclick="openDeceased('${dec.id}')">
+    <div style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem .4rem">
+      ${uAvHtml(poster,36)}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.82rem;font-weight:600;color:var(--ivory)">${posterName}</div>
+        <div style="font-size:.72rem;color:var(--muted)">posted on <span style="color:var(--gold)">${dec.name||'a memorial'}</span>'s wall · ${timeSince(wp.created_at)}</div>
+      </div>
+      ${dec.photo_url?`<img src="${dec.photo_url}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid var(--border);flex-shrink:0">`:''}
+    </div>
+    ${wp.message?`<div style="padding:.2rem 1rem .5rem;font-size:.88rem;color:var(--lavender);line-height:1.55">${wp.message}</div>`:''}
+    ${mediaHtml?`<div style="padding:0 1rem .8rem">${mediaHtml}</div>`:''}
+  </div>`;
+}
+
 function renderCard(d){
   const rc=relClass(d.religion);
   const photo=d.photo_url?`<img src="${d.photo_url}" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="event.stopPropagation();openLightbox(this.src,'${d.name}')" title="Tap to enlarge">`:'👤';
@@ -2430,6 +2476,21 @@ function renderSidebarProfile(){
   const av=CU.avatar?`<img src="${CU.avatar}">`:(CU.firstName.charAt(0)+(CU.lastName?.charAt(0)||''));
   const memCount=CACHE.deceased.filter(d=>d.created_by===CU.id).length;
   const friendCount=CACHE.friends.filter(f=>(f.from_id===CU.id||f.to_id===CU.id)&&f.status==='accepted').length;
+  // My wall posts — things I've posted on memorial walls
+  const myWallPosts=(CACHE.wall_posts||[]).filter(function(wp){return wp.user_id===CU.id;}).slice(0,3);
+  const wallHtml=myWallPosts.length?`
+    <div style="margin-top:.8rem;border-top:1px solid var(--border);padding-top:.7rem">
+      <div style="font-size:.74rem;font-weight:600;color:var(--gold);margin-bottom:.5rem">📝 My Wall Posts</div>
+      ${myWallPosts.map(function(wp){
+        var dec=CACHE.deceased.find(function(d){return d.id===wp.deceased_id;})||{};
+        var preview=wp.message?(wp.message.length>60?wp.message.slice(0,60)+'…':wp.message):'📷 Photo/Video';
+        return `<div style="padding:.4rem .5rem;border-radius:8px;background:rgba(255,255,255,.03);margin-bottom:.3rem;cursor:pointer;font-size:.75rem" onclick="openDeceased('${dec.id}')">
+          <div style="color:var(--gold);font-size:.7rem">On ${dec.name||'a memorial'}</div>
+          <div style="color:var(--lavender);line-height:1.4;margin-top:.15rem">${preview}</div>
+          <div style="color:var(--muted);font-size:.67rem;margin-top:.15rem">${timeSince(wp.created_at)}</div>
+        </div>`;
+      }).join('')}
+    </div>`:'';
   el.innerHTML=`<div style="display:flex;align-items:center;gap:.7rem;cursor:pointer;margin-bottom:.7rem" onclick="openMyProfile()">
     <div class="ua" style="width:46px;height:46px;font-size:1.1rem;overflow:hidden">${av}</div>
     <div><div style="font-weight:500">${CU.firstName} ${CU.lastName||''}</div><div class="txt-m txt-sm">${CU.country||'Member'}</div></div>
@@ -2437,7 +2498,7 @@ function renderSidebarProfile(){
   <div class="grid2">
     <div class="stat-box"><div class="stat-n">${memCount}</div><div class="stat-l">Memorials</div></div>
     <div class="stat-box"><div class="stat-n">${friendCount}</div><div class="stat-l">Friends</div></div>
-  </div>`;
+  </div>${wallHtml}`;
 }
 function renderCalendar(){renderAnniversaries();}
 function renderStats(){
@@ -2706,10 +2767,23 @@ function t(k){return LANGS[currentLang]?.[k]||LANGS.en[k]||k;}
 
 // ── LANGUAGE DROPDOWN — clean simple implementation ──
 var _langMenuOpen = false;
-function toggleLangMenu(){
+function toggleLangMenu(e){
+  if(e){e.preventDefault();e.stopPropagation();}
   _langMenuOpen = !_langMenuOpen;
   var d=document.getElementById('langDropdown');
-  if(d)d.style.display=_langMenuOpen?'block':'none';
+  var btn=document.getElementById('langBtn');
+  if(d){
+    if(_langMenuOpen){
+      // Position dropdown below the button
+      var rect=btn?btn.getBoundingClientRect():{top:52,right:window.innerWidth-10};
+      d.style.display='block';
+      d.style.top=(rect.bottom+4)+'px';
+      d.style.right=(window.innerWidth-rect.right)+'px';
+      d.style.left='auto';
+    } else {
+      d.style.display='none';
+    }
+  }
 }
 function closeLangMenu(){
   _langMenuOpen=false;
@@ -6701,7 +6775,7 @@ function guestBrowse(){showPage('appPage');}
     <div id="searchDropdown"></div>
   </div>
   <div class="lang-wrap" id="langWrap">
-    <button type="button" class="lang-btn" onclick="toggleLangMenu()" id="langBtn">
+    <button type="button" class="lang-btn" onclick="toggleLangMenu(event)" ontouchend="toggleLangMenu(event)" id="langBtn">
       <span class="lang-flag" id="currentFlag">🇬🇧</span>
       <span id="currentLangLabel">EN</span> ▾
     </button>
