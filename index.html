@@ -1286,6 +1286,7 @@ async function afterAuth(user){
       lastName:profile?.last_name||user.user_metadata?.last_name||'',
       country:profile?.country||user.user_metadata?.country||'',
       avatar:profile?.avatar_url||'',
+      cover_url:profile?.cover_url||'',
       inviteCode:profile?.invite_code||user.id.slice(0,8),
       joined:new Date(user.created_at).getTime()
     };
@@ -1336,6 +1337,60 @@ async function doLogout(){
   Object.keys(CACHE).forEach(k=>CACHE[k]=[]);
   updateNav(); showPageDirect('heroPage');
   toast('You have been signed out.');
+}
+
+// Quick cover upload from sidebar profile card
+async function quickCoverUpload(input){
+  if(!input.files||!input.files[0]||!CU)return;
+  var file=input.files[0];
+  if(file.size>5*1024*1024){toast('Image too large. Max 5MB.');return;}
+  toast('Uploading cover…');
+  try{
+    var url=await uploadFile(file,'covers');
+    if(!url)throw new Error('Upload failed');
+    await sb.from('profiles').update({cover_url:url}).eq('id',CU.id);
+    CU.cover_url=url;
+    localStorage.setItem('rb_cu',JSON.stringify(CU));
+    var cu=CACHE.users.find(x=>x.id===CU.id);
+    if(cu)cu.cover_url=url;
+    renderSidebarProfile();
+    toast('✅ Cover photo updated!');
+  }catch(e){toast('❌ Failed to upload cover.');}
+}
+
+// Delete account confirmation
+function confirmDeleteAccount(){
+  if(!CU)return;
+  openModal('deleteAccountModal');
+}
+
+async function doDeleteAccount(){
+  if(!CU||!sb)return;
+  var btn=document.getElementById('deleteAccountBtn');
+  if(btn){btn.disabled=true;btn.textContent='Deleting…';}
+  try{
+    // Delete user's data
+    await sb.from('posts').delete().eq('user_id',CU.id);
+    await sb.from('wall_posts').delete().eq('user_id',CU.id);
+    await sb.from('connections').delete().eq('user_id',CU.id);
+    await sb.from('friends').delete().eq('from_id',CU.id);
+    await sb.from('friends').delete().eq('to_id',CU.id);
+    await sb.from('prayers').delete().eq('user_id',CU.id);
+    await sb.from('notifications').delete().eq('user_id',CU.id);
+    await sb.from('profiles').delete().eq('id',CU.id);
+    // Sign out
+    await sb.auth.signOut();
+    CU=null;
+    localStorage.removeItem('rb_cu');
+    Object.keys(CACHE).forEach(k=>CACHE[k]=[]);
+    closeModal('deleteAccountModal');
+    updateNav();
+    showPageDirect('heroPage');
+    toast('Your account has been deleted. Goodbye. 🌻');
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Yes, Delete My Account';}
+    toast('❌ Error deleting account. Please try again.');
+  }
 }
 
 // ── FORGOT PASSWORD ──
@@ -2472,33 +2527,69 @@ function showNotifs(){renderNotifications();}
 // ═══════════════════════════════════════════════════════════
 function renderSidebarProfile(){
   const el=document.getElementById('myProfileCard');if(!el)return;
-  if(!CU){el.innerHTML='<div class="txt-m txt-sm" style="text-align:center">Sign in to see your profile 🌻</div>';return;}
-  const av=CU.avatar?`<img src="${CU.avatar}">`:(CU.firstName.charAt(0)+(CU.lastName?.charAt(0)||''));
+  if(!CU){el.innerHTML='<div class="txt-m txt-sm" style="text-align:center;padding:.5rem">Sign in to see your profile 🌻</div>';return;}
+  const av=CU.avatar?`<img src="${CU.avatar}" style="width:100%;height:100%;object-fit:cover">`:(CU.firstName.charAt(0)+(CU.lastName?.charAt(0)||''));
+  const cover=CU.cover_url||'';
   const memCount=CACHE.deceased.filter(d=>d.created_by===CU.id).length;
   const friendCount=CACHE.friends.filter(f=>(f.from_id===CU.id||f.to_id===CU.id)&&f.status==='accepted').length;
-  // My wall posts — things I've posted on memorial walls
+  // My recent wall posts
   const myWallPosts=(CACHE.wall_posts||[]).filter(function(wp){return wp.user_id===CU.id;}).slice(0,3);
   const wallHtml=myWallPosts.length?`
-    <div style="margin-top:.8rem;border-top:1px solid var(--border);padding-top:.7rem">
-      <div style="font-size:.74rem;font-weight:600;color:var(--gold);margin-bottom:.5rem">📝 My Wall Posts</div>
+    <div style="margin-top:.7rem;border-top:1px solid var(--border);padding-top:.65rem">
+      <div style="font-size:.72rem;font-weight:600;color:var(--gold);margin-bottom:.4rem">📝 My Recent Wall Posts</div>
       ${myWallPosts.map(function(wp){
         var dec=CACHE.deceased.find(function(d){return d.id===wp.deceased_id;})||{};
-        var preview=wp.message?(wp.message.length>60?wp.message.slice(0,60)+'…':wp.message):'📷 Photo/Video';
-        return `<div style="padding:.4rem .5rem;border-radius:8px;background:rgba(255,255,255,.03);margin-bottom:.3rem;cursor:pointer;font-size:.75rem" onclick="openDeceased('${dec.id}')">
-          <div style="color:var(--gold);font-size:.7rem">On ${dec.name||'a memorial'}</div>
-          <div style="color:var(--lavender);line-height:1.4;margin-top:.15rem">${preview}</div>
-          <div style="color:var(--muted);font-size:.67rem;margin-top:.15rem">${timeSince(wp.created_at)}</div>
+        var preview=wp.message?(wp.message.length>55?wp.message.slice(0,55)+'…':wp.message):'📷 Photo/Video';
+        return `<div style="padding:.4rem .5rem;border-radius:8px;background:rgba(255,255,255,.03);margin-bottom:.3rem;cursor:pointer" onclick="openDeceased('${dec.id}')">
+          <div style="color:var(--gold);font-size:.68rem">On ${dec.name||'a memorial'}</div>
+          <div style="color:var(--lavender);font-size:.74rem;line-height:1.4;margin-top:.1rem">${preview}</div>
+          <div style="color:var(--muted);font-size:.65rem;margin-top:.1rem">${timeSince(wp.created_at)}</div>
         </div>`;
       }).join('')}
-    </div>`:'';
-  el.innerHTML=`<div style="display:flex;align-items:center;gap:.7rem;cursor:pointer;margin-bottom:.7rem" onclick="openMyProfile()">
-    <div class="ua" style="width:46px;height:46px;font-size:1.1rem;overflow:hidden">${av}</div>
-    <div><div style="font-weight:500">${CU.firstName} ${CU.lastName||''}</div><div class="txt-m txt-sm">${CU.country||'Member'}</div></div>
-  </div>
-  <div class="grid2">
-    <div class="stat-box"><div class="stat-n">${memCount}</div><div class="stat-l">Memorials</div></div>
-    <div class="stat-box"><div class="stat-n">${friendCount}</div><div class="stat-l">Friends</div></div>
-  </div>${wallHtml}`;
+    </div>`:'' ;
+
+  el.style.padding='0';
+  el.style.overflow='hidden';
+  el.innerHTML=`
+    <!-- Cover photo -->
+    <div style="position:relative;height:90px;background:${cover?'transparent':'linear-gradient(135deg,#0d1b2a,#1a3048)'};border-radius:10px 10px 0 0;overflow:hidden;flex-shrink:0">
+      ${cover?`<img src="${cover}" style="width:100%;height:100%;object-fit:cover;object-position:center 20%">`:''}
+      <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(13,27,42,.7))"></div>
+      ${(CU.id)?`<label title="Change cover" style="position:absolute;top:.4rem;right:.4rem;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:.2rem .45rem;color:#fff;font-size:.6rem;cursor:pointer;display:flex;align-items:center;gap:.25rem">
+        📷 Cover<input type="file" accept="image/*" style="display:none" onchange="quickCoverUpload(this)">
+      </label>`:''}
+    </div>
+    <!-- Avatar overlapping cover -->
+    <div style="padding:0 .9rem .85rem;position:relative">
+      <div style="margin-top:-28px;margin-bottom:.5rem;display:flex;align-items:flex-end;justify-content:space-between">
+        <div style="width:56px;height:56px;border-radius:50%;border:3px solid var(--card);background:var(--navy-m);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700;color:var(--gold);flex-shrink:0;cursor:pointer" onclick="openMyProfile()">${av}</div>
+        <button type="button" onclick="openMyProfile()" style="background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.35);color:var(--gold);border-radius:8px;padding:.22rem .55rem;font-size:.7rem;cursor:pointer;white-space:nowrap">✏️ Edit Profile</button>
+      </div>
+      <!-- Name & info -->
+      <div style="font-weight:600;font-size:.95rem;color:var(--ivory);cursor:pointer" onclick="openMyProfile()">${CU.firstName} ${CU.lastName||''}</div>
+      <div style="font-size:.72rem;color:var(--muted);margin-bottom:.55rem">${CU.country||'Member'}</div>
+      <!-- Stats -->
+      <div style="display:flex;gap:.5rem;margin-bottom:.7rem">
+        <div style="flex:1;background:rgba(255,255,255,.04);border-radius:8px;padding:.4rem;text-align:center">
+          <div style="font-size:1rem;font-weight:700;color:var(--gold)">${memCount}</div>
+          <div style="font-size:.65rem;color:var(--muted)">Memorials</div>
+        </div>
+        <div style="flex:1;background:rgba(255,255,255,.04);border-radius:8px;padding:.4rem;text-align:center">
+          <div style="font-size:1rem;font-weight:700;color:var(--gold)">${friendCount}</div>
+          <div style="font-size:.65rem;color:var(--muted)">Friends</div>
+        </div>
+      </div>
+      <!-- Action buttons -->
+      <div style="display:flex;flex-direction:column;gap:.35rem">
+        <button type="button" onclick="doLogout()" style="width:100%;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--lavender);border-radius:8px;padding:.4rem;font-size:.75rem;cursor:pointer;text-align:left;display:flex;align-items:center;gap:.5rem">
+          ↩️ <span>Sign Out</span>
+        </button>
+        <button type="button" onclick="confirmDeleteAccount()" style="width:100%;background:rgba(255,82,82,.07);border:1px solid rgba(255,82,82,.25);color:#ff8a80;border-radius:8px;padding:.4rem;font-size:.75rem;cursor:pointer;text-align:left;display:flex;align-items:center;gap:.5rem">
+          🗑️ <span>Delete Account</span>
+        </button>
+      </div>
+      ${wallHtml}
+    </div>`;
 }
 function renderCalendar(){renderAnniversaries();}
 function renderStats(){
@@ -7582,6 +7673,25 @@ function guestBrowse(){showPage('appPage');}
 
 <!-- EMAIL CONFIRMATION MODAL -->
 <!-- FORGOT PASSWORD MODAL -->
+<!-- DELETE ACCOUNT MODAL -->
+<div class="ov" id="deleteAccountModal">
+  <div class="modal sm" style="max-width:380px">
+    <div class="mhdr">
+      <p class="mhdr-title">🗑️ Delete Account</p>
+      <button type="button" class="mclose" onclick="closeModal('deleteAccountModal')">×</button>
+    </div>
+    <div class="mbody" style="text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:.6rem">⚠️</div>
+      <p style="font-size:.9rem;font-weight:600;color:var(--ivory);margin-bottom:.4rem">Are you sure?</p>
+      <p style="font-size:.8rem;color:var(--muted);line-height:1.6">This will permanently delete your account, profile, posts and wall posts. Your memorials will remain but will no longer be linked to you.<br><br>This cannot be undone.</p>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-o" onclick="closeModal('deleteAccountModal')">Cancel</button>
+      <button type="button" id="deleteAccountBtn" onclick="doDeleteAccount()" style="background:rgba(255,82,82,.15);border:1px solid rgba(255,82,82,.4);color:#ff6b6b;border-radius:10px;padding:.5rem 1rem;font-size:.82rem;cursor:pointer;font-weight:600">Yes, Delete My Account</button>
+    </div>
+  </div>
+</div>
+
 <div class="ov" id="forgotPasswordModal">
   <div class="modal sm" style="max-width:400px">
     <div class="mhdr">
