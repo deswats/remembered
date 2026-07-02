@@ -380,18 +380,22 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
 
   /* But keep top nav visible on hero/auth pages (no bottom nav) */
 
-  /* Mobile nav adjustments */
+  /* Mobile nav adjustments — top nav only, all buttons visible */
   nav{padding:0 .6rem;gap:.25rem;height:52px;overflow:hidden;}
-  .brand{font-size:1rem;flex-shrink:1;min-width:0;max-width:38%;overflow:hidden;text-overflow:ellipsis;}
+  .brand{font-size:1rem;flex-shrink:1;min-width:0;max-width:30%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .nav-search{max-width:none;flex:1;min-width:0;}
   .nav-actions{gap:.2rem;flex-shrink:0;margin-left:auto;}
   /* Shrink nav buttons on mobile */
   #navActions .nb{padding:.25rem .45rem;font-size:.7rem;white-space:nowrap;}
   #navActions .nb.prim{padding:.25rem .5rem;font-size:.7rem;}
-  /* On mobile: hide People & Sign Out from top nav (they're in bottom nav) */
-  #navActions .nb[onclick*="openPeoplePage"],
-  #navActions .nb[onclick*="doLogout"]{display:none;}
-  /* Lang selector: compact on mobile */
+  /* Hide People text label and Sign Out text on mobile — keep icon/short version */
+  #navActions .nb[onclick*="openPeoplePage"]{font-size:0;padding:.25rem .4rem;}
+  #navActions .nb[onclick*="openPeoplePage"]::before{content:'👥';font-size:.9rem;}
+  #navActions .nb[onclick*="doLogout"]{font-size:0;padding:.25rem .4rem;}
+  #navActions .nb[onclick*="doLogout"]::before{content:'↩';font-size:.9rem;}
+  /* Hide text labels in nav buttons on small screens — icons only */
+  .nav-label{display:none;}
+  /* Lang selector: compact on mobile — flag only */
   .lang-btn{padding:.22rem .35rem;font-size:.66rem;gap:.15rem;flex-shrink:0;}
   #currentLangLabel{display:none;}
   .lang-wrap{flex-shrink:0;}
@@ -1463,23 +1467,22 @@ function guestBrowse(){showPageDirect('appPage');renderApp();}
 
 function updateNav(){
   const na=document.getElementById('navActions');
+  const sw=document.getElementById('navSearchWrap');
   if(CU){
     const av=CU.avatar?`<img src="${CU.avatar}">`:(CU.firstName.charAt(0)+(CU.lastName?.charAt(0)||''));
     var isAdminUser=(CU.email==='desmond@cttsb.com.my'||CU.email==='deswatson.semarak@gmail.com');
-    na.innerHTML=`<div class="avatar-upload-wrap" title="My Profile" style="cursor:pointer" onclick="openMyProfile()">
-      <div class="ua" style="width:36px;height:36px;font-size:.88rem;overflow:hidden">${av}</div>
-      <div class="avatar-edit-badge" style="width:18px;height:18px;font-size:.55rem;bottom:0;right:0;opacity:.85">📷</div>
-    </div>
-    <button type="button" class="nb notif-btn" onclick="showPageDirect('appPage');renderApp();showNotifs()">🔔<span class="notif-badge" id="notifCount" style="display:none">0</span></button>
-    <button type="button" class="nb" onclick="openPeoplePage()">👥 People</button>
-    ${isAdminUser?`<button type="button" class="nb" style="background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.5);color:var(--gold);font-weight:600" onclick="openAdminDashboard()">📊 Admin</button>`:''}
-    <button type="button" class="nb" onclick="doLogout()">Sign Out</button>`;
-    // Show mobile nav only when signed in
-    
+    na.innerHTML=`
+    <button type="button" class="nb notif-btn" onclick="showPageDirect('appPage');renderApp();showNotifs()" title="Notifications">🔔<span class="notif-badge" id="notifCount" style="display:none">0</span></button>
+    <button type="button" class="nb" onclick="openPeoplePage()" title="People">👥 <span class="nav-label">People</span></button>
+    ${isAdminUser?`<button type="button" class="nb" style="background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.5);color:var(--gold);font-weight:600" onclick="openAdminDashboard()" title="Admin">📊</button>`:''}
+    <div class="avatar-upload-wrap" title="My Profile" style="cursor:pointer" onclick="openMyProfile()">
+      <div class="ua" style="width:34px;height:34px;font-size:.85rem;overflow:hidden">${av}</div>
+    </div>`;
+    // Hide search — users can search from People page
+    if(sw)sw.style.display='none';
   }else{
     na.innerHTML=`<button type="button" class="nb" onclick="showPageDirect('authPage');setAuthMode('login')">Sign In</button><button type="button" class="nb prim" onclick="showPageDirect('authPage');setAuthMode('register')">Join Free</button>`;
-    // Hide mobile nav on hero/auth pages
-    
+    if(sw)sw.style.display='none';
   }
   updateNotifBadge();
 }
