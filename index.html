@@ -487,6 +487,9 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
   /* Touch targets — make all buttons minimum 44px tall for iOS */
   .btn,.nb,.act-btn,.feed-tab,.u-tab,.mnav-btn{min-height:36px;}
   input,select,textarea{font-size:16px !important;} /* Prevent iOS auto-zoom */
+
+  /* Show mobile affiliate strip on small screens */
+  #mobileAffiliateStrip{display:block !important;}
 }
 
 /* iPhone notch / Dynamic Island support */
@@ -1232,7 +1235,13 @@ function resetLoginForm(){
     <p class="auth-s" id="loginSub">Sign in to celebrate someone you love</p>
     <div style="display:flex;flex-direction:column;gap:.7rem">
       <div class="fg"><label id="loginEmailLabel">Email</label><input type="email" id="liEmail" placeholder="you@email.com" autocomplete="email"></div>
-      <div class="fg"><label id="loginPassLabel">Password</label><input type="password" id="liPass" placeholder="••••••••" autocomplete="current-password"></div>
+      <div class="fg">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
+          <label id="loginPassLabel">Password</label>
+          <a onclick="openForgotPassword()" style="font-size:.72rem;color:var(--gold);cursor:pointer;text-decoration:underline" id="forgotPassLink">Forgot password?</a>
+        </div>
+        <input type="password" id="liPass" placeholder="••••••••" autocomplete="current-password">
+      </div>
       <button type="button" class="btn btn-g" style="width:100%;margin-top:.2rem" onclick="doLogin()" id="loginBtn">Sign In</button>
     </div>
     <div class="auth-sw"><span id="loginNoAccount">New here?</span> <a onclick="setAuthMode('register')" id="loginCreateLink">Create an account →</a></div>`;
@@ -1323,6 +1332,70 @@ async function doLogout(){
   updateNav(); showPageDirect('heroPage');
   toast('You have been signed out.');
 }
+
+// ── FORGOT PASSWORD ──
+function openForgotPassword(){
+  var emailEl=document.getElementById('forgotEmail');
+  if(emailEl){
+    // Pre-fill with whatever is in the login email field
+    var liEmail=document.getElementById('liEmail');
+    emailEl.value=liEmail?liEmail.value:'';
+  }
+  var msg=document.getElementById('forgotMsg');
+  if(msg){msg.style.display='none';msg.textContent='';}
+  var btn=document.getElementById('forgotBtn');
+  if(btn){btn.disabled=false;btn.textContent='📧 Send Reset Link';}
+  openModal('forgotPasswordModal');
+}
+
+async function doForgotPassword(){
+  if(!sb){toast('Not connected. Please refresh.');return;}
+  var email=document.getElementById('forgotEmail').value.trim();
+  if(!email){toast('Please enter your email address.');return;}
+  var btn=document.getElementById('forgotBtn');
+  var msg=document.getElementById('forgotMsg');
+  if(btn){btn.disabled=true;btn.textContent='Sending…';}
+  try{
+    var {error}=await sb.auth.resetPasswordForEmail(email,{
+      redirectTo:'https://remembered.asia/'
+    });
+    if(btn){btn.disabled=false;btn.textContent='📧 Send Reset Link';}
+    if(error){
+      if(msg){
+        msg.style.display='block';
+        msg.style.background='rgba(255,82,82,.1)';
+        msg.style.border='1px solid rgba(255,82,82,.3)';
+        msg.style.color='#ff8a80';
+        msg.textContent='❌ '+error.message;
+      }
+    }else{
+      if(msg){
+        msg.style.display='block';
+        msg.style.background='rgba(76,175,123,.1)';
+        msg.style.border='1px solid rgba(76,175,123,.3)';
+        msg.style.color='#80cbc4';
+        msg.innerHTML='✅ Reset link sent! Check your email inbox.<br><span style="font-size:.76rem;opacity:.8">Can\'t find it? Check your Spam folder.</span>';
+      }
+      if(btn){btn.style.display='none';}
+    }
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='📧 Send Reset Link';}
+    toast('❌ '+e.message);
+  }
+}
+
+// ── iOS INSTALL ROW — show on mobile non-installed browsers ──
+(function(){
+  var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+  var isAndroid=/Android/.test(navigator.userAgent);
+  var isStandalone=window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
+  var isMobile=isIOS||isAndroid;
+  if(isMobile&&!isStandalone){
+    // Show install row every time on auth page — not just once
+    var row=document.getElementById('iosInstallRow');
+    if(row)row.style.display='block';
+  }
+})();
 
 // ═══════════════════════════════════════════════════════════
 // HELPERS
@@ -6662,11 +6735,30 @@ function guestBrowse(){showPage('appPage');}
       <p class="auth-t" id="loginTitle">Welcome back</p>
       <p class="auth-s" id="loginSub">Sign in to celebrate someone you love</p>
       <div style="display:flex;flex-direction:column;gap:.7rem">
-        <div class="fg"><label id="loginEmailLabel">Email</label><input type="email" id="liEmail" placeholder="you@email.com"></div>
-        <div class="fg"><label id="loginPassLabel">Password</label><input type="password" id="liPass" placeholder="••••••••"></div>
+        <div class="fg"><label id="loginEmailLabel">Email</label><input type="email" id="liEmail" placeholder="you@email.com" autocomplete="email"></div>
+        <div class="fg">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
+            <label id="loginPassLabel">Password</label>
+            <a onclick="openForgotPassword()" style="font-size:.72rem;color:var(--gold);cursor:pointer;text-decoration:underline" id="forgotPassLink">Forgot password?</a>
+          </div>
+          <input type="password" id="liPass" placeholder="••••••••" autocomplete="current-password">
+        </div>
         <button type="button" class="btn btn-g" style="width:100%;margin-top:.2rem" onclick="doLogin()" id="loginBtn">Sign In</button>
       </div>
       <div class="auth-sw"><span id="loginNoAccount">New here?</span> <a onclick="setAuthMode('register')" id="loginCreateLink">Create an account →</a></div>
+      <!-- iOS Add to Home Screen button — always visible on mobile -->
+      <div id="iosInstallRow" style="display:none;margin-top:1rem;padding:.8rem;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:12px;text-align:center">
+        <div style="font-size:1.5rem;margin-bottom:.3rem">📲</div>
+        <div style="font-size:.82rem;font-weight:600;color:var(--ivory);margin-bottom:.2rem">Add Remembered to Home Screen</div>
+        <div style="font-size:.72rem;color:var(--muted);line-height:1.6;margin-bottom:.6rem">Tap the button below so you can open Remembered like an app — no browser needed next time!</div>
+        <div style="background:rgba(0,0,0,.3);border-radius:10px;padding:.6rem .8rem;font-size:.78rem;color:var(--lavender);line-height:1.7;text-align:left">
+          <strong style="color:var(--ivory)">iPhone / iPad:</strong><br>
+          1. Tap the <strong style="color:var(--gold)">Share ⬆️</strong> button at the bottom of Safari<br>
+          2. Scroll down and tap <strong style="color:var(--gold)">"Add to Home Screen"</strong><br>
+          3. Tap <strong style="color:var(--gold)">"Add"</strong> — done! 🌻
+        </div>
+        <div style="margin-top:.6rem;font-size:.72rem;color:var(--muted)">Android users: tap the ⋮ menu → "Add to Home screen"</div>
+      </div>
     </div>
     <div id="regF" class="hidden">
       <p class="auth-t" id="regTitle">Join Remembered</p>
@@ -6774,25 +6866,33 @@ function guestBrowse(){showPage('appPage');}
         <div style="display:flex;gap:.5rem;flex-wrap:wrap" id="feedFilters">
 <!-- Religion filters removed -->
         </div>
+        <!-- MOBILE AFFILIATE STRIP — only visible on mobile -->
+        <div id="mobileAffiliateStrip" style="display:none;margin-bottom:.8rem;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:.7rem .8rem;">
+          <div style="font-size:.72rem;color:var(--muted);margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem">
+            🌸 <span style="font-weight:600;color:var(--lavender)">Support Remembered</span>
+            <span style="margin-left:auto;font-size:.65rem;color:var(--muted)">Shopping here keeps us free 💛</span>
+          </div>
+          <div style="display:flex;gap:.5rem;overflow-x:auto;padding-bottom:.3rem;-webkit-overflow-scrolling:touch;">
+            <a href="https://invl.me/clnlfmi" target="_blank" rel="noopener sponsored" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:.3rem;text-decoration:none;padding:.5rem .7rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;min-width:72px;">
+              <div style="width:36px;height:36px;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.9rem;color:#e53935">W</div>
+              <span style="font-size:.68rem;color:var(--lavender);white-space:nowrap">Watsons</span>
+            </a>
+            <a href="https://invl.me/clnlfqb" target="_blank" rel="noopener sponsored" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:.3rem;text-decoration:none;padding:.5rem .7rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;min-width:72px;">
+              <div style="width:36px;height:36px;border-radius:8px;background:#ee4d2d;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.9rem;color:#fff">S</div>
+              <span style="font-size:.68rem;color:var(--lavender);white-space:nowrap">Shopee</span>
+            </a>
+            <a href="https://invl.me/clnlfrr" target="_blank" rel="noopener sponsored" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:.3rem;text-decoration:none;padding:.5rem .7rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;min-width:72px;">
+              <div style="width:36px;height:36px;border-radius:8px;background:#1a2a6c;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.65rem;color:#fff">R+</div>
+              <span style="font-size:.68rem;color:var(--lavender);white-space:nowrap">RinggitPlus</span>
+            </a>
+          </div>
+        </div>
         <div id="mainFeed"></div>
       </div>
     </main>
 
     <!-- RIGHT -->
     <aside class="side-r">
-      <div class="w">
-        <p class="wt" id="sidebarCommunityTitle">📊 Community</p>
-        <div class="grid2" id="statsGrid"></div>
-    <div id="adminPanel" style="display:none;margin-top:.6rem;padding:.7rem;background:rgba(13,27,42,.6);border:1px solid rgba(201,168,76,.2);border-radius:10px;"></div>
-      </div>
-      <div class="w">
-        <p class="wt" id="sidebarNotifTitle">🔔 Notifications</p>
-        <div id="notifList" style="display:flex;flex-direction:column;gap:.5rem;max-height:200px;overflow-y:auto"></div>
-      </div>
-      <div class="w">
-        <p class="wt" id="sidebarTopTitle">😊 Most Celebrated</p>
-        <div id="topMemorials" style="display:flex;flex-direction:column;gap:.5rem"></div>
-      </div>
       <div class="w">
         <p class="wt">🌸 Support Remembered</p>
         <p style="font-size:.72rem;color:var(--muted);line-height:1.5;margin-bottom:.6rem">Shopping through these links helps keep Remembered running — ad-light and free for every family. 💛</p>
@@ -6823,6 +6923,19 @@ function guestBrowse(){showPage('appPage');}
         <div class="affiliate-disclosure">
           We may earn a small commission from purchases made through these links, at no extra cost to you. <a onclick="openPrivacyPolicy()">Learn more</a>
         </div>
+      </div>
+      <div class="w">
+        <p class="wt" id="sidebarCommunityTitle">📊 Community</p>
+        <div class="grid2" id="statsGrid"></div>
+        <div id="adminPanel" style="display:none;margin-top:.6rem;padding:.7rem;background:rgba(13,27,42,.6);border:1px solid rgba(201,168,76,.2);border-radius:10px;"></div>
+      </div>
+      <div class="w">
+        <p class="wt" id="sidebarNotifTitle">🔔 Notifications</p>
+        <div id="notifList" style="display:flex;flex-direction:column;gap:.5rem;max-height:200px;overflow-y:auto"></div>
+      </div>
+      <div class="w">
+        <p class="wt" id="sidebarTopTitle">😊 Most Celebrated</p>
+        <div id="topMemorials" style="display:flex;flex-direction:column;gap:.5rem"></div>
       </div>
       <div class="w">
         <p class="wt" id="sidebarSuggestTitle">💡 People You May Know</p>
@@ -7399,6 +7512,31 @@ function guestBrowse(){showPage('appPage');}
 </div>
 
 <!-- EMAIL CONFIRMATION MODAL -->
+<!-- FORGOT PASSWORD MODAL -->
+<div class="ov" id="forgotPasswordModal">
+  <div class="modal sm" style="max-width:400px">
+    <div class="mhdr">
+      <p class="mhdr-title">🔑 Reset Password</p>
+      <button type="button" class="mclose" onclick="closeModal('forgotPasswordModal')">×</button>
+    </div>
+    <div class="mbody">
+      <div style="text-align:center;margin-bottom:1rem">
+        <div style="font-size:3rem;line-height:1;margin-bottom:.5rem">🔑</div>
+        <p style="font-size:.85rem;color:var(--lavender);line-height:1.6">Enter your email address and we'll send you a link to reset your password.</p>
+      </div>
+      <div class="fg">
+        <label>Email Address</label>
+        <input type="email" id="forgotEmail" placeholder="you@email.com" autocomplete="email">
+      </div>
+      <div id="forgotMsg" style="display:none;margin-top:.6rem;padding:.7rem .9rem;border-radius:10px;font-size:.82rem;line-height:1.5"></div>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-o" onclick="closeModal('forgotPasswordModal')">Cancel</button>
+      <button type="button" class="btn btn-g" id="forgotBtn" onclick="doForgotPassword()">📧 Send Reset Link</button>
+    </div>
+  </div>
+</div>
+
 <div class="ov" id="emailConfirmModal" style="z-index:500">
   <div class="modal sm" style="max-width:400px;border-color:rgba(201,168,76,.4)">
     <div style="padding:2rem 1.5rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:.8rem">
