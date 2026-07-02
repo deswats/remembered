@@ -1308,7 +1308,7 @@ async function afterAuth(user){
     }, 800);  // Refresh reactions after login
     setTimeout(renderStats, 500);  // Re-render stats with admin panel now CU is set
     setTimeout(restoreLocalRelationships, 1500);
-    updateMnavProfileIcon();
+    updateNav(); // Update top nav with profile avatar
 
     // Step 3: Load data in background AFTER app is visible
     setTimeout(async()=>{
@@ -1453,12 +1453,9 @@ function showPageDirect(id){
     el.classList.add('active');
     el.style.display=['authPage','heroPage'].includes(id)?'flex':'block';
   }
+  // Update nav search visibility
   const sw=document.getElementById('navSearchWrap');
-  const showSearch=['appPage','deceasedPage','userPage','peoplePage'].includes(id);
-  if(sw)sw.style.display=showSearch?'flex':'none';
-  // Mobile nav active
-  if(map[id]){const el2=document.getElementById(map[id]);if(el2)el2.classList.add('act');}
-  if(typeof updateMobileNav==="function")updateMobileNav();
+  if(sw)sw.style.display='none'; // search hidden — use People page instead
 }
 // showPage already defined in early script above
 function goHome(){if(CU){showPageDirect('appPage');renderApp();}else{showPageDirect('heroPage');}}
@@ -2632,24 +2629,13 @@ function mnavGo(tab,btn){
     openMyProfile();
   }
 }
-function updateMnavProfileIcon(){
-  const icon=document.getElementById('mnavProfileIcon');
-  if(!icon||!CU)return;
-  if(CU.avatar){
-    icon.innerHTML=`<img src="${CU.avatar}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid var(--gold)">`;
-  } else {
-    icon.textContent=(CU.firstName?.charAt(0)||'👤')+(CU.lastName?.charAt(0)||'');
-    icon.style.cssText='font-size:.9rem;width:28px;height:28px;border-radius:50%;background:var(--navy-m);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;';
-  }
-}
 function updateMobileNav(){
   if(!CU)return;
   const pendingF=CACHE.friends.filter(f=>f.to_id===CU.id&&f.status==='pending').length;
-  const fb=document.getElementById('mnavFriendBadge');
-  if(fb){fb.textContent=pendingF;fb.style.display=pendingF?'block':'none';}
   const unread=CACHE.notifications.filter(n=>!n.read).length;
-  const nb2=document.getElementById('mnavNotifBadge');
-  if(nb2){nb2.textContent=unread;nb2.style.display=unread?'block':'none';}
+  // Update notification badge in top nav
+  var nb=document.getElementById('notifCount');
+  if(nb){nb.textContent=unread>99?'99+':String(unread);nb.style.display=unread>0?'flex':'none';}
 }
 
 // ═══════════════════════════════════════════════════════════
