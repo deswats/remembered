@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Remembered">
 <meta name="theme-color" content="#0D1B2A">
 <meta name="description" content="Remembered — A social platform to celebrate, honour, and hold onto what matters most.">
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><text y='.9em' font-size='90'>🌻</text></svg>">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <title>Remembered — Celebrate Their Story</title>
 <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjogIlJlbWVtYmVyZWQiLCAic2hvcnRfbmFtZSI6ICJSZW1lbWJlcmVkIiwgImRlc2NyaXB0aW9uIjogIkEgc29jaWFsIHBsYXRmb3JtIHRvIGNlbGVicmF0ZSwgaG9ub3VyLCBhbmQgaG9sZCBvbnRvIHdoYXQgbWF0dGVycyBtb3N0LiIsICJzdGFydF91cmwiOiAiaHR0cHM6Ly9yZW1lbWJlcmVkLmFzaWEvIiwgInNjb3BlIjogImh0dHBzOi8vcmVtZW1iZXJlZC5hc2lhLyIsICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLCAiZGlzcGxheV9vdmVycmlkZSI6IFsic3RhbmRhbG9uZSIsICJtaW5pbWFsLXVpIl0sICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMwRDFCMkEiLCAidGhlbWVfY29sb3IiOiAiIzBEMUIyQSIsICJvcmllbnRhdGlvbiI6ICJwb3J0cmFpdC1wcmltYXJ5IiwgImljb25zIjogW3sic3JjIjogIi9pY29uLTE5Mi5wbmciLCAic2l6ZXMiOiAiMTkyeDE5MiIsICJ0eXBlIjogImltYWdlL3BuZyIsICJwdXJwb3NlIjogImFueSJ9LCB7InNyYyI6ICIvaWNvbi01MTIucG5nIiwgInNpemVzIjogIjUxMng1MTIiLCAidHlwZSI6ICJpbWFnZS9wbmciLCAicHVycG9zZSI6ICJhbnkgbWFza2FibGUifV19">
 
@@ -380,19 +380,26 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
   .mobile-nav.active{display:block;}
   body.has-mobile-nav{padding-bottom:calc(64px + env(safe-area-inset-bottom));}
 
+  /* Hide TOP nav on mobile when signed in — bottom nav takes over */
+  body.has-mobile-nav nav{display:none;}
+  /* But keep top nav visible on hero/auth pages (no bottom nav) */
+  body:not(.has-mobile-nav) nav{display:flex;}
+
   /* Mobile nav adjustments */
-  nav{padding:0 .6rem;gap:.3rem;height:52px;overflow:hidden;}
-  .brand{font-size:1.1rem;}
+  nav{padding:0 .6rem;gap:.25rem;height:52px;overflow:hidden;}
+  .brand{font-size:1rem;flex-shrink:1;min-width:0;max-width:38%;overflow:hidden;text-overflow:ellipsis;}
   .nav-search{max-width:none;flex:1;min-width:0;}
-  .nav-actions{gap:.25rem;flex-shrink:0;max-width:50%;overflow:hidden;}
-  /* Shrink nav buttons on mobile so they fit */
-  #navActions .nb{padding:.28rem .55rem;font-size:.72rem;}
-  #navActions .nb.prim{padding:.28rem .6rem;font-size:.72rem;}
+  .nav-actions{gap:.2rem;flex-shrink:0;margin-left:auto;}
+  /* Shrink nav buttons on mobile */
+  #navActions .nb{padding:.25rem .45rem;font-size:.7rem;white-space:nowrap;}
+  #navActions .nb.prim{padding:.25rem .5rem;font-size:.7rem;}
   /* On mobile: hide People & Sign Out from top nav (they're in bottom nav) */
   #navActions .nb[onclick*="openPeoplePage"],
   #navActions .nb[onclick*="doLogout"]{display:none;}
-  /* Lang selector: make smaller on mobile */
-  .lang-btn{padding:.25rem .4rem;font-size:.68rem;}
+  /* Lang selector: compact on mobile */
+  .lang-btn{padding:.22rem .35rem;font-size:.66rem;gap:.15rem;flex-shrink:0;}
+  #currentLangLabel{display:none;}
+  .lang-wrap{flex-shrink:0;}
 
   /* Three col → single col */
   .three-col{padding:.7rem .7rem 0;gap:.8rem;}
@@ -2787,7 +2794,7 @@ function applyTranslations(){
   se('regCountryLabel',L.country);se('regCreateBtn',L.createBtn);
   se('regAlreadyMember',L.alreadyMember);se('regSignInLink',L.signInLink);
   // Feed
-  var gs=document.getElementById('globalSearch');if(gs)gs.placeholder='🔍 Search…';
+  var gs=document.getElementById('globalSearch');if(gs)gs.placeholder='Search…';
   se('feedPlaceholder',L.celebratePlaceholder);se('feedAddBtn',L.addBtn);
   se('feedTabAll',L.allPosts);se('feedTabFriends',L.friendsPosts);
   // Religion filter translation removed
@@ -6715,7 +6722,7 @@ function guestBrowse(){showPage('appPage');}
   <div class="brand" onclick="goHome()" ontouchend="goHome();event.preventDefault()" role="button" tabindex="0">🌻 Remembered</div>
   <div class="nav-search" id="navSearchWrap" style="display:none">
     <span class="si">🔍</span>
-    <input type="text" id="globalSearch" placeholder="Search deceased by name…" oninput="handleSearch(this.value)" autocomplete="off">
+    <input type="text" id="globalSearch" placeholder="Search…" oninput="handleSearch(this.value)" autocomplete="off">
     <div id="searchDropdown"></div>
   </div>
   <div class="lang-wrap" id="langWrap">
@@ -6734,7 +6741,6 @@ function guestBrowse(){showPage('appPage');}
     <button type="button" class="nb" onclick="showPage('authPage');setAuthMode('login')">Sign In</button>
     <button type="button" class="nb prim" onclick="showPage('authPage');setAuthMode('register')">Join Free</button>
   </div>
-</div>
 </nav>
 
 <!-- ═══════════════ HERO ═══════════════ -->
