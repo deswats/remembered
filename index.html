@@ -369,17 +369,16 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
 ═══════════════════════════════════════ */
 
 /* Bottom nav bar for mobile */
-.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:500;background:rgba(13,27,42,.99);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:.5rem 0 calc(.5rem + env(safe-area-inset-bottom));}
-.mobile-nav-inner{display:flex;justify-content:space-around;align-items:center;}
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:500;background:rgba(13,27,42,.99);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:.5rem 0 calc(.5rem + env(safe-area-inset-bottom));}.mobile-nav-inner{display:flex;justify-content:space-around;align-items:center;}
 .mnav-btn{display:flex;flex-direction:column;align-items:center;gap:.18rem;background:none;border:none;color:var(--muted);font-size:.58rem;cursor:pointer;font-family:'Inter',sans-serif;padding:.3rem .6rem;border-radius:10px;transition:.15s;position:relative;min-width:52px;}
 .mnav-btn.act{color:var(--gold);}
 .mnav-btn .mni{font-size:1.35rem;line-height:1;}
 .mnav-badge{position:absolute;top:0;right:6px;background:var(--danger);color:#fff;font-size:.55rem;font-weight:700;border-radius:8px;padding:1px 4px;min-width:14px;text-align:center;display:none;}
 
 @media(max-width:640px){
-  /* Show mobile nav, add bottom padding to content */
-  .mobile-nav{display:block;}
-  body{padding-bottom:calc(64px + env(safe-area-inset-bottom));}
+  /* Show mobile nav only when signed in — controlled by JS via updateNav() */
+  .mobile-nav.active{display:block;}
+  body.has-mobile-nav{padding-bottom:calc(64px + env(safe-area-inset-bottom));}
 
   /* Mobile nav adjustments */
   nav{padding:0 .8rem;gap:.4rem;height:52px;}
@@ -1457,6 +1456,7 @@ function guestBrowse(){showPageDirect('appPage');renderApp();}
 
 function updateNav(){
   const na=document.getElementById('navActions');
+  const mobileNav=document.querySelector('.mobile-nav');
   if(CU){
     const av=CU.avatar?`<img src="${CU.avatar}">`:(CU.firstName.charAt(0)+(CU.lastName?.charAt(0)||''));
     var isAdminUser=(CU.email==='desmond@cttsb.com.my'||CU.email==='deswatson.semarak@gmail.com');
@@ -1468,8 +1468,12 @@ function updateNav(){
     <button type="button" class="nb" onclick="openPeoplePage()">👥 People</button>
     ${isAdminUser?`<button type="button" class="nb" style="background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.5);color:var(--gold);font-weight:600" onclick="openAdminDashboard()">📊 Admin</button>`:''}
     <button type="button" class="nb" onclick="doLogout()">Sign Out</button>`;
+    // Show mobile nav only when signed in
+    if(mobileNav){mobileNav.classList.add('active');document.body.classList.add('has-mobile-nav');}
   }else{
     na.innerHTML=`<button type="button" class="nb" onclick="showPageDirect('authPage');setAuthMode('login')">Sign In</button><button type="button" class="nb prim" onclick="showPageDirect('authPage');setAuthMode('register')">Join Free</button>`;
+    // Hide mobile nav on hero/auth pages
+    if(mobileNav){mobileNav.classList.remove('active');document.body.classList.remove('has-mobile-nav');}
   }
   updateNotifBadge();
 }
