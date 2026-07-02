@@ -418,8 +418,8 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
   .h-acts .btn{width:100%;justify-content:center;}
 
   /* Auth page - full scrollable on mobile */
-  #authPage{padding:0;align-items:stretch;justify-content:flex-end;}
-  .auth-card{border-radius:20px 20px 0 0;padding:1.5rem 1.2rem 2rem;max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  #authPage{padding:.8rem;align-items:flex-start;justify-content:flex-start;overflow-y:auto;padding-top:1rem;}
+  .auth-card{border-radius:16px;padding:1.4rem 1.1rem 1.8rem;max-height:none;overflow-y:visible;width:100%;}
 
   /* Feed */
   .feed{-webkit-overflow-scrolling:touch;will-change:scroll-position;gap:.8rem;}
@@ -1381,16 +1381,23 @@ async function doForgotPassword(){
   }
 }
 
-// ── iOS INSTALL ROW — show on mobile non-installed browsers ──
+// ── iOS/Android INSTALL ROW — always show on mobile non-installed browsers ──
 (function(){
-  var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
-  var isAndroid=/Android/.test(navigator.userAgent);
-  var isStandalone=window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
-  var isMobile=isIOS||isAndroid;
-  if(isMobile&&!isStandalone){
-    // Show install row every time on auth page — not just once
-    var row=document.getElementById('iosInstallRow');
-    if(row)row.style.display='block';
+  function showInstallRow(){
+    var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+    var isAndroid=/Android/.test(navigator.userAgent);
+    var isStandalone=window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
+    var isMobile=isIOS||isAndroid;
+    if(isMobile&&!isStandalone){
+      var row=document.getElementById('iosInstallRow');
+      if(row)row.style.display='block';
+    }
+  }
+  // Run after DOM is ready
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',showInstallRow);
+  } else {
+    showInstallRow();
   }
 })();
 
@@ -6590,25 +6597,6 @@ function dismissIosHint(){
     hint.classList.remove('show');
     setTimeout(function(){hint.style.display='none';}, 400);
   }
-}
-
-// Check if on iOS Safari (not installed)
-(function(){
-  var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
-  var isStandalone=window.navigator.standalone===true;
-  var isInBrowser=!window.matchMedia('(display-mode: standalone)').matches;
-  // Only show once ever
-  var shown=localStorage.getItem('rb_ios_hint_shown');
-  if(isIOS && isInBrowser && !isStandalone && !shown){
-    localStorage.setItem('rb_ios_hint_shown','1');
-    setTimeout(showIosHint, 4000);
-  }
-})();
-
-function dismissIosHint(){
-  var hint=document.getElementById('iosHint');
-  if(hint){hint.classList.remove('show');setTimeout(function(){hint.style.display='none';},400);}
-  localStorage.setItem('rb_ios_hint_dismissed','1');
 }
 
 // ═══════════════════════════════════════════════════════════
