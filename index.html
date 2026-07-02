@@ -369,21 +369,16 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
 ═══════════════════════════════════════ */
 
 /* Bottom nav bar for mobile */
-.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:500;background:rgba(13,27,42,.99);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:.5rem 0 calc(.5rem + env(safe-area-inset-bottom));}.mobile-nav-inner{display:flex;justify-content:space-around;align-items:center;}
-.mnav-btn{display:flex;flex-direction:column;align-items:center;gap:.18rem;background:none;border:none;color:var(--muted);font-size:.58rem;cursor:pointer;font-family:'Inter',sans-serif;padding:.3rem .6rem;border-radius:10px;transition:.15s;position:relative;min-width:52px;}
-.mnav-btn.act{color:var(--gold);}
-.mnav-btn .mni{font-size:1.35rem;line-height:1;}
-.mnav-badge{position:absolute;top:0;right:6px;background:var(--danger);color:#fff;font-size:.55rem;font-weight:700;border-radius:8px;padding:1px 4px;min-width:14px;text-align:center;display:none;}
+/* bottom mobile nav removed — using top nav on all screen sizes */
+
+
+
+
 
 @media(max-width:640px){
   /* Show mobile nav only when signed in — controlled by JS via updateNav() */
-  .mobile-nav.active{display:block;}
-  body.has-mobile-nav{padding-bottom:calc(64px + env(safe-area-inset-bottom));}
 
-  /* Hide TOP nav on mobile when signed in — bottom nav takes over */
-  body.has-mobile-nav nav{display:none;}
   /* But keep top nav visible on hero/auth pages (no bottom nav) */
-  body:not(.has-mobile-nav) nav{display:flex;}
 
   /* Mobile nav adjustments */
   nav{padding:0 .6rem;gap:.25rem;height:52px;overflow:hidden;}
@@ -494,14 +489,13 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
   /* Toast clears mobile nav automatically via base bottom:5rem */
 
   /* Touch targets — make all buttons minimum 44px tall for iOS */
-  .btn,.nb,.act-btn,.feed-tab,.u-tab,.mnav-btn{min-height:36px;}
+  .btn,.nb,.act-btn,.feed-tab,.u-tab{min-height:36px;}
   input,select,textarea{font-size:16px !important;} /* Prevent iOS auto-zoom */
 }
 
 /* iPhone notch / Dynamic Island support */
 @supports(padding:max(0px)){
   nav{padding-left:max(.8rem, env(safe-area-inset-left));padding-right:max(.8rem, env(safe-area-inset-right));}
-  .mobile-nav{padding-bottom:max(.6rem, env(safe-area-inset-bottom));}
   body{padding-bottom:max(64px, calc(64px + env(safe-area-inset-bottom)));}
 }
 /* Prevent iOS elastic bounce causing layout issues */
@@ -527,7 +521,6 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 /* Make sure buttons, anchors are always tappable */
 button,a,[role="button"]{cursor:pointer;-webkit-tap-highlight-color:rgba(0,0,0,0);}
 /* Minimum touch target size for iOS (Apple recommends 44x44pt) */
-.mnav-btn{min-width:44px;min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;}
 button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl{
   cursor:pointer;
   -webkit-tap-highlight-color:rgba(0,0,0,0);
@@ -1460,8 +1453,6 @@ function showPageDirect(id){
   const showSearch=['appPage','deceasedPage','userPage','peoplePage'].includes(id);
   if(sw)sw.style.display=showSearch?'flex':'none';
   // Mobile nav active
-  const map={appPage:'mnav-home',heroPage:'mnav-home',peoplePage:'mnav-people'};
-  document.querySelectorAll('.mnav-btn').forEach(b=>b.classList.remove('act'));
   if(map[id]){const el2=document.getElementById(map[id]);if(el2)el2.classList.add('act');}
   if(typeof updateMobileNav==="function")updateMobileNav();
 }
@@ -1472,7 +1463,6 @@ function guestBrowse(){showPageDirect('appPage');renderApp();}
 
 function updateNav(){
   const na=document.getElementById('navActions');
-  const mobileNav=document.querySelector('.mobile-nav');
   if(CU){
     const av=CU.avatar?`<img src="${CU.avatar}">`:(CU.firstName.charAt(0)+(CU.lastName?.charAt(0)||''));
     var isAdminUser=(CU.email==='desmond@cttsb.com.my'||CU.email==='deswatson.semarak@gmail.com');
@@ -1485,11 +1475,11 @@ function updateNav(){
     ${isAdminUser?`<button type="button" class="nb" style="background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.5);color:var(--gold);font-weight:600" onclick="openAdminDashboard()">📊 Admin</button>`:''}
     <button type="button" class="nb" onclick="doLogout()">Sign Out</button>`;
     // Show mobile nav only when signed in
-    if(mobileNav){mobileNav.classList.add('active');document.body.classList.add('has-mobile-nav');}
+    
   }else{
     na.innerHTML=`<button type="button" class="nb" onclick="showPageDirect('authPage');setAuthMode('login')">Sign In</button><button type="button" class="nb prim" onclick="showPageDirect('authPage');setAuthMode('register')">Join Free</button>`;
     // Hide mobile nav on hero/auth pages
-    if(mobileNav){mobileNav.classList.remove('active');document.body.classList.remove('has-mobile-nav');}
+    
   }
   updateNotifBadge();
 }
@@ -2393,10 +2383,6 @@ function updateNotifBadge(){
   // Update panel header badge
   var pb=document.getElementById('notifPanelBadge');
   if(pb){pb.textContent=String(unread);pb.style.display=unread>0?'inline':'none';}
-  // Update mobile nav badge
-  var mb=document.getElementById('mnavNotifBadge');
-  if(mb){mb.textContent=unread>0?String(unread):'0';mb.style.display=unread>0?'flex':'none';}
-  if(typeof updateMobileNav==="function")updateMobileNav();
 }
 async function renderNotifications(){
   var el=document.getElementById('notifList');
@@ -7419,24 +7405,7 @@ function guestBrowse(){showPage('appPage');}
 </div>
 
 <!-- MOBILE BOTTOM NAV -->
-<nav class="mobile-nav">
-  <div class="mobile-nav-inner">
-    <button type="button" class="mnav-btn act" id="mnav-home" onclick="mnavGo('home',this)" ontouchend="mnavGo('home',this);event.preventDefault()">
-      <span class="mni">🏠</span><span style="font-size:.55rem">Home</span>
-    </button>
-    <button type="button" class="mnav-btn" id="mnav-add" onclick="openDeceasedModal()" ontouchend="openDeceasedModal();event.preventDefault()" style="padding:.2rem .4rem">
-      <span style="width:44px;height:44px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--navy);font-size:1.6rem;line-height:1">+</span>
-    </button>
-    <button type="button" class="mnav-btn" id="mnav-people" onclick="mnavGo('people',this)" ontouchend="mnavGo('people',this);event.preventDefault()">
-      <span class="mni">👥</span><span style="font-size:.55rem">People</span>
-      <span class="mnav-badge" id="mnavFriendBadge">0</span>
-    </button>
-    <button type="button" class="mnav-btn" id="mnav-profile" onclick="mnavGo('profile',this)" ontouchend="mnavGo('profile',this);event.preventDefault()">
-      <span class="mni" id="mnavProfileIcon">👤</span><span style="font-size:.55rem">Me</span>
-      <span class="mnav-badge" id="mnavNotifBadge">0</span>
-    </button>
-  </div>
-</nav>
+
 
 <!-- FOOTER -->
 <footer style="position:relative;z-index:1;text-align:center;padding:2.5rem 1rem 2rem;border-top:1px solid rgba(201,168,76,.12);margin-top:2rem">
