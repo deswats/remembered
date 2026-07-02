@@ -2089,7 +2089,19 @@ function toggleConnectionsPanel(headerEl){
   var isOpen=body.style.display!=='none';
   body.style.display=isOpen?'none':'block';
   if(arrow)arrow.textContent=isOpen?'▸':'▾';
-  if(arrow)arrow.style.transform=isOpen?'rotate(-90deg)':'rotate(0deg)';
+}
+
+function toggleNotifPanel(){
+  var body=document.getElementById('notifPanelBody');
+  var arrow=document.getElementById('notifPanelArrow');
+  if(!body)return;
+  var isOpen=body.style.display!=='none';
+  body.style.display=isOpen?'none':'block';
+  if(arrow)arrow.textContent=isOpen?'▸':'▾';
+  // Load notifications when opening
+  if(!isOpen&&typeof renderNotifications==='function'){
+    renderNotifications();
+  }
 }
 
 function renderMyFriends(){
@@ -2358,6 +2370,9 @@ function updateNotifBadge(){
     badge.textContent=unread>99?'99+':String(unread);
     badge.style.display=unread>0?'flex':'none';
   }
+  // Update panel header badge
+  var pb=document.getElementById('notifPanelBadge');
+  if(pb){pb.textContent=String(unread);pb.style.display=unread>0?'inline':'none';}
   // Update mobile nav badge
   var mb=document.getElementById('mnavNotifBadge');
   if(mb){mb.textContent=unread>0?String(unread):'0';mb.style.display=unread>0?'flex':'none';}
@@ -6758,19 +6773,6 @@ function guestBrowse(){showPage('appPage');}
         <button type="button" class="btn btn-g" style="width:100%;margin-top:.2rem" onclick="doLogin()" id="loginBtn">Sign In</button>
       </div>
       <div class="auth-sw"><span id="loginNoAccount">New here?</span> <a onclick="setAuthMode('register')" id="loginCreateLink">Create an account →</a></div>
-      <!-- iOS Add to Home Screen button — always visible on mobile -->
-      <div id="iosInstallRow" style="display:none;margin-top:1rem;padding:.8rem;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:12px;text-align:center">
-        <div style="font-size:1.5rem;margin-bottom:.3rem">📲</div>
-        <div style="font-size:.82rem;font-weight:600;color:var(--ivory);margin-bottom:.2rem">Add Remembered to Home Screen</div>
-        <div style="font-size:.72rem;color:var(--muted);line-height:1.6;margin-bottom:.6rem">Tap the button below so you can open Remembered like an app — no browser needed next time!</div>
-        <div style="background:rgba(0,0,0,.3);border-radius:10px;padding:.6rem .8rem;font-size:.78rem;color:var(--lavender);line-height:1.7;text-align:left">
-          <strong style="color:var(--ivory)">iPhone / iPad:</strong><br>
-          1. Tap the <strong style="color:var(--gold)">Share ⬆️</strong> button at the bottom of Safari<br>
-          2. Scroll down and tap <strong style="color:var(--gold)">"Add to Home Screen"</strong><br>
-          3. Tap <strong style="color:var(--gold)">"Add"</strong> — done! 🌻
-        </div>
-        <div style="margin-top:.6rem;font-size:.72rem;color:var(--muted)">Android users: tap the ⋮ menu → "Add to Home screen"</div>
-      </div>
     </div>
     <div id="regF" class="hidden">
       <p class="auth-t" id="regTitle">Join Remembered</p>
@@ -6792,6 +6794,20 @@ function guestBrowse(){showPage('appPage');}
       </div>
       <div class="auth-sw"><span id="regAlreadyMember">Already a member?</span> <a onclick="setAuthMode('login')" id="regSignInLink">Sign in →</a></div>
     </div>
+    <!-- 📲 Add to Home Screen — always visible on mobile, outside both forms -->
+    <div id="iosInstallRow" style="display:none;margin-top:1.2rem;padding:.85rem;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.3);border-radius:14px;text-align:center">
+      <div style="font-size:1.6rem;line-height:1;margin-bottom:.4rem">📲</div>
+      <div style="font-size:.84rem;font-weight:700;color:var(--ivory);margin-bottom:.25rem">Add Remembered to Home Screen</div>
+      <div style="font-size:.72rem;color:var(--muted);line-height:1.55;margin-bottom:.7rem">Open Remembered like an app — no browser bar, instant access every time!</div>
+      <div style="background:rgba(0,0,0,.35);border-radius:10px;padding:.65rem .85rem;font-size:.78rem;color:var(--lavender);line-height:1.75;text-align:left">
+        <strong style="color:var(--gold)">📱 iPhone / iPad (Safari only):</strong><br>
+        1. Tap <strong style="color:var(--ivory)">Share ⬆️</strong> at the bottom of Safari<br>
+        2. Scroll down → tap <strong style="color:var(--ivory)">"Add to Home Screen"</strong><br>
+        3. Tap <strong style="color:var(--ivory)">"Add"</strong> — done! 🌻<br><br>
+        <strong style="color:var(--gold)">🤖 Android (Chrome):</strong><br>
+        Tap <strong style="color:var(--ivory)">⋮ menu</strong> → <strong style="color:var(--ivory)">"Add to Home screen"</strong>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -6804,11 +6820,21 @@ function guestBrowse(){showPage('appPage');}
       <div class="w">
         <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleConnectionsPanel(this)">
           <p class="wt" id="sidebarConnectionsTitle" style="margin-bottom:0">👥 My Connections</p>
-          <span id="connPanelArrow" style="color:var(--gold);font-size:.85rem;transition:.2s">▾</span>
+          <span id="connPanelArrow" style="color:var(--gold);font-size:.85rem;transition:.2s">▸</span>
         </div>
-        <div id="connPanelBody" style="margin-top:.6rem">
+        <div id="connPanelBody" style="display:none;margin-top:.6rem">
           <div id="myFriendsList" style="display:flex;flex-direction:column;gap:.5rem"></div>
           <button type="button" class="btn btn-o btn-sm" style="width:100%;margin-top:.6rem" onclick="openInviteModal()" id="sidebarInviteBtn">+ Invite Friends</button>
+        </div>
+      </div>
+      <!-- NOTIFICATIONS — collapsible, below My Connections -->
+      <div class="w">
+        <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleNotifPanel()">
+          <p class="wt" id="sidebarNotifTitle" style="margin-bottom:0">🔔 Notifications <span id="notifPanelBadge" style="display:none;background:var(--danger);color:#fff;font-size:.6rem;font-weight:700;border-radius:8px;padding:1px 5px;margin-left:.3rem;vertical-align:middle"></span></p>
+          <span id="notifPanelArrow" style="color:var(--gold);font-size:.85rem;transition:.2s">▸</span>
+        </div>
+        <div id="notifPanelBody" style="display:none;margin-top:.6rem">
+          <div id="notifList" style="display:flex;flex-direction:column;gap:.5rem;max-height:220px;overflow-y:auto"></div>
         </div>
       </div>
       <div class="w">
@@ -6943,10 +6969,6 @@ function guestBrowse(){showPage('appPage');}
         <p class="wt" id="sidebarCommunityTitle">📊 Community</p>
         <div class="grid2" id="statsGrid"></div>
         <div id="adminPanel" style="display:none;margin-top:.6rem;padding:.7rem;background:rgba(13,27,42,.6);border:1px solid rgba(201,168,76,.2);border-radius:10px;"></div>
-      </div>
-      <div class="w">
-        <p class="wt" id="sidebarNotifTitle">🔔 Notifications</p>
-        <div id="notifList" style="display:flex;flex-direction:column;gap:.5rem;max-height:200px;overflow-y:auto"></div>
       </div>
       <div class="w">
         <p class="wt" id="sidebarTopTitle">😊 Most Celebrated</p>
