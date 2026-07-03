@@ -930,6 +930,9 @@ if(sb){
     } else if(event === 'TOKEN_REFRESHED' && session){
       _sessionValid = true;
       console.log('Token refreshed ✓');
+    } else if(event === 'PASSWORD_RECOVERY' && session){
+      _sessionValid = true;
+      console.log('Password recovery session ✓');
     }
   });
 }
@@ -1441,6 +1444,49 @@ async function doForgotPassword(){
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='📧 Send Reset Link';}
     toast('❌ '+e.message);
+  }
+}
+
+// ── SET NEW PASSWORD (after clicking the recovery link) ──
+function openSetNewPassword(){
+  var p1=document.getElementById('newPass1'); if(p1)p1.value='';
+  var p2=document.getElementById('newPass2'); if(p2)p2.value='';
+  var msg=document.getElementById('setPassMsg'); if(msg)msg.style.display='none';
+  var btn=document.getElementById('setPassBtn');
+  if(btn){btn.disabled=false;btn.textContent='✔️ Update Password';btn.style.display='';}
+  openModal('setNewPasswordModal');
+}
+async function doSetNewPassword(){
+  if(!sb){toast('Not connected. Please refresh.');return;}
+  var p1=(document.getElementById('newPass1')||{}).value||'';
+  var p2=(document.getElementById('newPass2')||{}).value||'';
+  var msg=document.getElementById('setPassMsg');
+  var btn=document.getElementById('setPassBtn');
+  function showMsg(ok,text){
+    if(!msg)return;
+    msg.style.display='block';
+    msg.style.background=ok?'rgba(76,175,123,.1)':'rgba(255,82,82,.1)';
+    msg.style.border=ok?'1px solid rgba(76,175,123,.3)':'1px solid rgba(255,82,82,.3)';
+    msg.style.color=ok?'#80cbc4':'#ff8a80';
+    msg.textContent=text;
+  }
+  if(p1.length<6){showMsg(false,'❌ Password must be at least 6 characters.');return;}
+  if(p1!==p2){showMsg(false,'❌ Passwords do not match.');return;}
+  if(btn){btn.disabled=true;btn.textContent='Updating…';}
+  try{
+    var {error}=await sb.auth.updateUser({password:p1});
+    if(error){
+      if(btn){btn.disabled=false;btn.textContent='✔️ Update Password';}
+      showMsg(false,'❌ '+error.message);
+    }else{
+      showMsg(true,'✅ Password updated! You can now sign in with it anytime.');
+      if(btn)btn.style.display='none';
+      setTimeout(function(){closeModal('setNewPasswordModal');},2500);
+      toast('🔐 Password updated successfully!');
+    }
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='✔️ Update Password';}
+    showMsg(false,'❌ '+e.message);
   }
 }
 
@@ -2740,7 +2786,6 @@ function renderAdminBadge(total, today, week){
   }
   var ADMIN_EMAILS=['desmond@cttsb.com.my','deswatson.semarak@gmail.com'];
   var isAdmin = ADMIN_EMAILS.indexOf(userEmail) >= 0;
-  console.log('Admin check: email='+userEmail+' isAdmin='+isAdmin);
   if(!isAdmin){adminEl.style.display='none';return;}
 
   adminEl.style.display='block';
@@ -3110,7 +3155,11 @@ async function initApp(){
 
     // Listen for auth changes
     sb.auth.onAuthStateChange(async function(event, sess){
-      if(event==='SIGNED_IN' && sess && (!CU || CU.id!==sess.user.id)){
+      if(event==='PASSWORD_RECOVERY' && sess){
+        // User arrived via password reset email link
+        if(!CU || CU.id!==sess.user.id){ await afterAuth(sess.user); }
+        setTimeout(function(){ openSetNewPassword(); }, 700);
+      } else if(event==='SIGNED_IN' && sess && (!CU || CU.id!==sess.user.id)){
         await afterAuth(sess.user);
       } else if(event==='SIGNED_OUT'){
         CU=null;
@@ -3813,11 +3862,12 @@ async function processMentions(text, postId, deceasedId){
           uName(CU)+' mentioned you in '+d.name+"'s memorial. Click to view and connect 🤝",
           '🌻');
         // Add to tagged_users so they can see it even if private
+        // Uses RPC (RLS-safe): non-creators can't update deceased rows directly
         try{
           var currentTagged=d.tagged_users||[];
           if(currentTagged.indexOf(u.id)<0){
             currentTagged.push(u.id);
-            await sb.from('deceased').update({tagged_users:currentTagged}).eq('id',deceasedId);
+            await sb.rpc('tag_user_on_memorial',{p_deceased_id:deceasedId,p_user_id:u.id});
             d.tagged_users=currentTagged;
           }
         }catch(e){console.warn('Tag update:',e);}
@@ -4354,7 +4404,7 @@ async function saveEditDeceased(){
     showLoader(false);
     closeModal('editDeceasedModal');
     toast('✅ Memorial updated!');
-    if(viewingDeceasedId===id)openDeceasedProfile(id);
+    if(viewingDeceasedId===id)openDeceased(id);
     renderFeed();
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='💾 Save Changes';}
@@ -5061,7 +5111,7 @@ function renderAnniversaries(){
       var av=u.photo
         ?'<img src="'+u.photo+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1.5px solid var(--gold)">'
         :'<div style="width:32px;height:32px;border-radius:50%;background:var(--navy-m);display:flex;align-items:center;justify-content:center;font-size:1rem">🌻</div>';
-      return '<div data-did="'+u.id+'" onclick="openDeceasedProfile(this.dataset.did)" style="display:flex;align-items:center;gap:.6rem;padding:.5rem .6rem;border-radius:10px;cursor:pointer;margin-bottom:.3rem;background:'+(isToday?'rgba(201,168,76,.12)':'rgba(255,255,255,.03)')+';border:1px solid '+(isToday?'rgba(201,168,76,.3)':'var(--border)')+';">'
+      return '<div data-did="'+u.id+'" onclick="openDeceased(this.dataset.did)" style="display:flex;align-items:center;gap:.6rem;padding:.5rem .6rem;border-radius:10px;cursor:pointer;margin-bottom:.3rem;background:'+(isToday?'rgba(201,168,76,.12)':'rgba(255,255,255,.03)')+';border:1px solid '+(isToday?'rgba(201,168,76,.3)':'var(--border)')+';">'
         +av
         +'<div style="flex:1;min-width:0">'
         +'<div style="font-size:.78rem;font-weight:600;color:var(--ivory);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+u.name+'</div>'
@@ -8150,6 +8200,35 @@ function guestBrowse(){showPage('appPage');}
     <div class="mftr">
       <button type="button" class="btn btn-o" onclick="closeModal('forgotPasswordModal')">Cancel</button>
       <button type="button" class="btn btn-g" id="forgotBtn" onclick="doForgotPassword()">📧 Send Reset Link</button>
+    </div>
+  </div>
+</div>
+
+<!-- SET NEW PASSWORD MODAL (recovery link landing) -->
+<div class="ov" id="setNewPasswordModal" style="z-index:510">
+  <div class="modal sm" style="max-width:400px">
+    <div class="mhdr">
+      <p class="mhdr-title">🔐 Set New Password</p>
+      <button type="button" class="mclose" onclick="closeModal('setNewPasswordModal')">×</button>
+    </div>
+    <div class="mbody">
+      <div style="text-align:center;margin-bottom:1rem">
+        <div style="font-size:3rem;line-height:1;margin-bottom:.5rem">🔐</div>
+        <p style="font-size:.85rem;color:var(--lavender);line-height:1.6">You're signed in via your reset link. Choose a new password to finish.</p>
+      </div>
+      <div class="fg">
+        <label>New Password</label>
+        <input type="password" id="newPass1" placeholder="At least 6 characters" autocomplete="new-password">
+      </div>
+      <div class="fg">
+        <label>Confirm New Password</label>
+        <input type="password" id="newPass2" placeholder="Repeat new password" autocomplete="new-password">
+      </div>
+      <div id="setPassMsg" style="display:none;margin-top:.6rem;padding:.7rem .9rem;border-radius:10px;font-size:.82rem;line-height:1.5"></div>
+    </div>
+    <div class="mftr">
+      <button type="button" class="btn btn-o" onclick="closeModal('setNewPasswordModal')">Later</button>
+      <button type="button" class="btn btn-g" id="setPassBtn" onclick="doSetNewPassword()">✔️ Update Password</button>
     </div>
   </div>
 </div>
