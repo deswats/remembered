@@ -619,6 +619,17 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 .wall-post-author{font-size:.82rem;font-weight:600;color:var(--ivory);}
 .wall-post-time{font-size:.68rem;color:var(--muted);}
 .wall-post-text{font-size:.85rem;color:var(--lavender);line-height:1.6;margin-bottom:.5rem;white-space:pre-wrap;}
+.wall-comments{margin-top:.6rem;padding-top:.5rem;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:.5rem;}
+.wall-comment{display:flex;gap:.5rem;align-items:flex-start;}
+.wall-comment-av{flex-shrink:0;cursor:pointer;}
+.wall-comment-bubble{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:.4rem .7rem;flex:1;min-width:0;}
+.wall-comment-author{font-size:.75rem;font-weight:600;color:var(--ivory);}
+.wall-comment-text{font-size:.82rem;color:var(--lavender);line-height:1.5;white-space:pre-wrap;word-break:break-word;}
+.wall-comment-time{font-size:.68rem;color:var(--muted);margin-top:.15rem;}
+.wall-comment-add{display:flex;gap:.5rem;align-items:center;margin-top:.2rem;}
+.wall-comment-add input{flex:1;min-width:0;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:20px;padding:.45rem .8rem;color:var(--ivory);font-size:.82rem;font-family:inherit;}
+.wall-comment-add input:focus{outline:none;border-color:rgba(201,168,76,.5);}
+.wall-comment-send{background:var(--gold);color:var(--navy);border:none;border-radius:20px;padding:.45rem .9rem;font-size:.78rem;font-weight:600;cursor:pointer;flex-shrink:0;}
 .wall-post-media{width:100%;max-height:300px;object-fit:cover;border-radius:8px;display:block;margin-bottom:.5rem;}
 .wall-post-video{width:100%;max-height:300px;border-radius:8px;display:block;background:#000;margin-bottom:.5rem;}
 .wall-add-box{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:.9rem;margin-bottom:.8rem;}
@@ -1693,23 +1704,12 @@ function renderFeed(){
     const fids=getMyFriendIds();fids.push(CU.id);
     posts=posts.filter(p=>fids.includes(p.user_id));
   }
-  // Combine memorials, posts and wall posts — sorted by date
+  // Combine memorials and posts — sorted by date
+  // (Wall posts / tributes are intentionally NOT shown in the home feed;
+  //  they live only on their memorial page.)
   const memItems=all.map(d=>({...d,_type:'memorial',_date:new Date(d.created_at).getTime()}));
   const postItems=posts.map(p=>({...p,_type:'post',_date:new Date(p.created_at).getTime()}));
-  // Wall posts — only show if user is signed in and has access
-  let wallItems=[];
-  if(CU&&CACHE.wall_posts&&CACHE.wall_posts.length){
-    wallItems=CACHE.wall_posts.filter(function(wp){
-      // Only show wall posts for memorials the user can see
-      var dec=CACHE.deceased.find(function(d){return d.id===wp.deceased_id;});
-      return dec && canSeeDeceased(dec) && (wp.message||wp.media_url);
-    }).map(function(wp){return {...wp,_type:'wallpost',_date:new Date(wp.created_at).getTime()};});
-    if(feedTab==='friends'&&CU){
-      var fids=getMyFriendIds();fids.push(CU.id);
-      wallItems=wallItems.filter(function(wp){return fids.includes(wp.user_id);});
-    }
-  }
-  const combined=[...memItems,...postItems,...wallItems].sort((a,b)=>b._date-a._date);
+  const combined=[...memItems,...postItems].sort((a,b)=>b._date-a._date);
   if(!combined.length){
     if(feedTab==='friends'){
       feed.innerHTML='<div class="empty">No posts from friends yet. <a style="color:var(--gold);cursor:pointer" onclick="openPeoplePage()">Find friends →</a></div>';
@@ -4482,8 +4482,74 @@ function renderDpWall(deceasedId){
         +'</div>'
         +(p.message?'<div class="wall-post-text">'+sanitizeText(p.message)+'</div>':'')
         +mediaHtml
+        +renderWallComments(p.id)
         +'</div>';
     }).join('');
+  }
+}
+
+// Comments on a wall post (tribute). Stored in the `comments` table with
+// parent_id = wall post id, deceased_id = the memorial. No schema change.
+function renderWallComments(wallPostId){
+  var cs=(CACHE.comments||[]).filter(function(c){return c.parent_id===wallPostId;});
+  cs.sort(function(a,b){return new Date(a.created_at)-new Date(b.created_at);});
+  var list=cs.map(function(c){
+    var cu=CACHE.users.find(function(x){return x.id===c.user_id;});
+    return '<div class="wall-comment">'
+      +'<div class="wall-comment-av" data-uid="'+(cu?cu.id:'')+'" onclick="if(this.dataset.uid)openUserProfile(this.dataset.uid)">'+uAvHtml(cu||{},26)+'</div>'
+      +'<div class="wall-comment-bubble">'
+      +'<div class="wall-comment-author">'+(c.author||'Someone')+'</div>'
+      +'<div class="wall-comment-text">'+sanitizeText(c.text||'')+'</div>'
+      +'<div class="wall-comment-time">'+timeSince(c.created_at)+'</div>'
+      +'</div></div>';
+  }).join('');
+  var inputHtml='';
+  if(CU){
+    inputHtml='<div class="wall-comment-add">'
+      +'<input type="text" id="wallCmt-'+wallPostId+'" placeholder="Write a comment…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();submitWallComment(this.dataset.wid,this.dataset.did);}" data-wid="'+wallPostId+'" data-did="'+viewingDeceasedId+'">'
+      +'<button type="button" class="wall-comment-send" data-wid="'+wallPostId+'" data-did="'+viewingDeceasedId+'" onclick="submitWallComment(this.dataset.wid,this.dataset.did)">Post</button>'
+      +'</div>';
+  }
+  return '<div class="wall-comments">'+list+inputHtml+'</div>';
+}
+
+async function submitWallComment(wallPostId,deceasedId){
+  if(!CU){toast('Please sign in.');showPageDirect('authPage');setAuthMode('login');return;}
+  if(!sb){toast('Not connected. Please refresh.');return;}
+  var input=document.getElementById('wallCmt-'+wallPostId);
+  if(!input)return;
+  var txt=input.value.trim();
+  if(!txt){toast('Please write something.');return;}
+  input.disabled=true;
+  try{
+    var res=await sb.from('comments').insert({
+      deceased_id:deceasedId,
+      parent_id:wallPostId,
+      user_id:CU.id,
+      author:uName(CU),
+      text:txt
+    }).select().single();
+    if(res.error)throw new Error(res.error.message);
+    if(res.data){
+      if(!CACHE.comments)CACHE.comments=[];
+      CACHE.comments.unshift(res.data);
+    }
+    // Re-render just this wall post's comment block
+    var wpEl=document.getElementById('wall-'+wallPostId);
+    if(wpEl){
+      var old=wpEl.querySelector('.wall-comments');
+      if(old)old.outerHTML=renderWallComments(wallPostId);
+    }
+    // Notify the tribute author (not yourself)
+    var wp=(CACHE.wall_posts||[]).find(function(x){return x.id===wallPostId;});
+    if(wp&&wp.user_id!==CU.id){
+      var d=CACHE.deceased.find(function(x){return x.id===deceasedId;});
+      await addNotif(wp.user_id,uName(CU)+' replied to your tribute on '+(d?d.name:'a memorial')+"'s wall",'💬');
+    }
+    toast('💬 Comment posted!');
+  }catch(e){
+    input.disabled=false;
+    toast('❌ '+e.message);
   }
 }
 
@@ -4597,6 +4663,14 @@ async function loadWallPosts(deceasedId){
     // Replace posts for this deceased
     CACHE.wall_posts=CACHE.wall_posts.filter(function(x){return x.deceased_id!==deceasedId;});
     if(res.data)CACHE.wall_posts=CACHE.wall_posts.concat(res.data);
+    // Refresh comments for this memorial too (covers wall-post tribute comments)
+    try{
+      var cres=await sb.from('comments').select('*').eq('deceased_id',deceasedId).order('created_at',{ascending:false}).limit(500);
+      if(cres.data){
+        if(!CACHE.comments)CACHE.comments=[];
+        CACHE.comments=CACHE.comments.filter(function(x){return x.deceased_id!==deceasedId;}).concat(cres.data);
+      }
+    }catch(ce){console.warn('loadWallComments:',ce);}
     renderDpWall(deceasedId);
   }catch(e){
     console.warn('loadWallPosts:',e);
