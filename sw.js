@@ -1,5 +1,5 @@
-// Remembered Service Worker v3.0 — remembered.asia
-var CACHE_NAME = 'remembered-v3';
+// Remembered Service Worker v3.1 — remembered.asia
+var CACHE_NAME = 'remembered-v4';
 var OFFLINE_URL = '/';
 var ASSETS = ['/', '/index.html'];
 
