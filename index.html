@@ -2670,6 +2670,7 @@ function renderSidebarProfile(){
   if(!CU){el.innerHTML='<div class="txt-m txt-sm" style="text-align:center;padding:.5rem">Sign in to see your profile 🌻</div>';return;}
   const av=CU.avatar?`<img src="${CU.avatar}" style="width:100%;height:100%;object-fit:cover">`:(CU.firstName.charAt(0)+(CU.lastName?.charAt(0)||''));
   const cover=CU.cover_url||'';
+  const coverPos=CU.cover_position||'center 20%';
   const memCount=CACHE.deceased.filter(d=>d.created_by===CU.id).length;
   const friendCount=CACHE.friends.filter(f=>(f.from_id===CU.id||f.to_id===CU.id)&&f.status==='accepted').length;
   // My recent wall posts
@@ -2692,16 +2693,16 @@ function renderSidebarProfile(){
   el.style.overflow='hidden';
   el.innerHTML=`
     <!-- Cover photo -->
-    <div style="position:relative;height:90px;background:${cover?'transparent':'linear-gradient(135deg,#0d1b2a,#1a3048)'};border-radius:10px 10px 0 0;overflow:hidden;flex-shrink:0">
-      ${cover?`<img src="${cover}" style="width:100%;height:100%;object-fit:cover;object-position:center 20%">`:''}
+    <div style="position:relative;height:130px;background:${cover?'transparent':'linear-gradient(135deg,#0d1b2a,#1a3048)'};border-radius:10px 10px 0 0;overflow:hidden;flex-shrink:0">
+      ${cover?`<img src="${cover}" style="width:100%;height:100%;object-fit:cover;object-position:${coverPos}">`:''}
       <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(13,27,42,.7))"></div>
       ${(CU.id)?`<label title="Change cover" style="position:absolute;top:.4rem;right:.4rem;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:.2rem .45rem;color:#fff;font-size:.6rem;cursor:pointer;display:flex;align-items:center;gap:.25rem">
         📷 Cover<input type="file" accept="image/*" style="display:none" onchange="quickCoverUpload(this)">
       </label>`:''}
     </div>
     <!-- Avatar overlapping cover -->
-    <div style="padding:0 .9rem .85rem;position:relative">
-      <div style="margin-top:-28px;margin-bottom:.5rem;display:flex;align-items:flex-end;justify-content:space-between">
+    <div style="padding:0 .9rem .85rem;position:relative;z-index:2">
+      <div style="margin-top:-28px;margin-bottom:.5rem;display:flex;align-items:flex-end;justify-content:space-between;position:relative;z-index:2">
         <div style="width:56px;height:56px;border-radius:50%;border:3px solid var(--card);background:var(--navy-m);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700;color:var(--gold);flex-shrink:0;cursor:pointer" onclick="openMyProfile()">${av}</div>
         <button type="button" onclick="openMyProfile()" style="background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.35);color:var(--gold);border-radius:8px;padding:.22rem .55rem;font-size:.7rem;cursor:pointer;white-space:nowrap">✏️ Edit Profile</button>
       </div>
