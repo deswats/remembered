@@ -439,7 +439,7 @@ textarea{resize:vertical;min-height:75px;line-height:1.5;}
 
   /* Profile pages */
   .prof-hero{padding:1.5rem 1rem 1.2rem;}
-  .prof-cover{height:260px;}
+  .prof-cover{height:280px;}
   .ph-photo{width:90px;height:90px;}
   .ph-name{font-size:1.7rem;}
   .ph-actions{gap:.4rem;}
@@ -629,8 +629,9 @@ button,.btn,.nb,.act-btn,.feed-tab,.u-tab,.lang-option,.rel-opt,.tpl-b,.mini-tpl
 
 /* ── COVER PHOTO / WALLPAPER ── */
 .prof-hero{position:relative;padding:0 0 1.2rem 0;text-align:center;border-bottom:1px solid var(--border);}
-.prof-cover{width:100%;height:420px;object-fit:cover;display:block;background:linear-gradient(160deg,var(--navy-m),#1a2a3a);position:relative;}
-.prof-cover img{width:100%;height:100%;object-fit:cover;display:block;}
+.prof-cover{width:100%;height:420px;display:block;background:linear-gradient(160deg,var(--navy-m),#1a2a3a);position:relative;overflow:hidden;}
+.prof-cover img{width:100%;height:100%;object-fit:cover;display:block;position:absolute;top:0;left:0;}
+.prof-cover > div:first-child{width:100%;height:100%;}
 .prof-cover-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 55%,rgba(13,27,42,.9));pointer-events:none;}
 .prof-cover-change{position:absolute;top:.6rem;right:.6rem;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:.3rem .6rem;color:#fff;font-size:.7rem;cursor:pointer;display:flex;align-items:center;gap:.3rem;backdrop-filter:blur(4px);}
 .prof-cover-change:hover{background:rgba(0,0,0,.75);}
@@ -4229,6 +4230,27 @@ function openEditDeceased(id){
   }else{
     img.style.display='none';icon.style.display='block';
   }
+  // Relationship selector (your relationship to them)
+  window._editDSelectedRel = d._myRelationship||'';
+  renderRelGrid('editRelGrid','_editDSelectedRel');
+  // Song preview
+  window._editDSongFile=null;
+  var songRow=document.getElementById('editDSongRow');
+  var songZone=document.getElementById('editDSongZone');
+  var songPreview=document.getElementById('editDSongPreview');
+  var songName=document.getElementById('editDSongName');
+  if(d.song_url){
+    if(songRow)songRow.style.display='block';
+    if(songPreview)songPreview.style.display='flex';
+    if(songZone)songZone.style.display='none';
+    if(songName){
+      var parts=d.song_url.split('/');
+      songName.textContent='🎵 '+decodeURIComponent(parts[parts.length-1]).split('?')[0];
+    }
+  }else{
+    if(songPreview)songPreview.style.display='none';
+    if(songZone)songZone.style.display='';
+  }
   openModal('editDeceasedModal');
 }
 
@@ -4245,6 +4267,28 @@ function previewEditPhoto(input){
     toast('✓ New photo selected');
   };
   r.readAsDataURL(f);
+}
+
+function previewEditSong(input){
+  if(!input.files||!input.files[0])return;
+  var file=input.files[0];
+  if(file.size>15*1024*1024){toast('Audio too large. Max 15MB.');input.value='';return;}
+  window._editDSongFile=file;
+  var preview=document.getElementById('editDSongPreview');
+  var zone=document.getElementById('editDSongZone');
+  var nameEl=document.getElementById('editDSongName');
+  if(preview)preview.style.display='flex';
+  if(zone)zone.style.display='none';
+  if(nameEl)nameEl.textContent=file.name;
+  toast('🎵 Song selected: '+file.name);
+}
+
+function clearEditSong(){
+  window._editDSongFile=null;
+  var preview=document.getElementById('editDSongPreview');
+  var zone=document.getElementById('editDSongZone');
+  if(preview)preview.style.display='none';
+  if(zone)zone.style.display='';
 }
 
 async function saveEditDeceased(){
@@ -4273,16 +4317,31 @@ async function saveEditDeceased(){
         if(photoUrl)updates.photo_url=photoUrl;
       }catch(e){console.warn('Photo upload:',e);}
     }
+    // Upload new song if selected
+    if(window._editDSongFile){
+      try{
+        toast('🎵 Uploading music…');
+        var songUrl=await uploadFile(window._editDSongFile,'songs');
+        if(songUrl)updates.song_url=songUrl;
+      }catch(e){console.warn('Song upload:',e);}
+    }
+    // Update relationship to deceased if changed
+    if(window._editDSelectedRel&&CU){
+      try{
+        await sb.from('connections')
+          .update({relationship:window._editDSelectedRel})
+          .eq('deceased_id',id)
+          .eq('user_id',CU.id);
+      }catch(e){console.warn('Rel update:',e);}
+    }
     var res=await sb.from('deceased').update(updates).eq('id',id).select().single();
     if(res.error)throw new Error(res.error.message);
-    // Update cache
     var idx=CACHE.deceased.findIndex(function(x){return x.id===id;});
     if(idx>=0)CACHE.deceased[idx]=Object.assign(CACHE.deceased[idx],updates);
     if(btn){btn.disabled=false;btn.textContent='💾 Save Changes';}
     showLoader(false);
     closeModal('editDeceasedModal');
     toast('✅ Memorial updated!');
-    // Refresh the deceased profile page
     if(viewingDeceasedId===id)openDeceasedProfile(id);
     renderFeed();
   }catch(e){
@@ -7975,6 +8034,26 @@ function guestBrowse(){showPage('appPage');}
           <option value="connected">🤝 Connected — People who knew them</option>
           <option value="family">🔒 Family Only</option>
         </select>
+      </div>
+      <div class="fg">
+        <label>Your Relationship to Them</label>
+        <div class="rel-grid" id="editRelGrid"></div>
+      </div>
+      <div class="fg">
+        <label>🎵 Background Music <span class="opt">assign a song for this memorial</span></label>
+        <div class="upload-z" id="editDSongZone">
+          <input type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg" onchange="previewEditSong(this)">
+          <div class="ui">🎵</div>
+          <div class="ut"><strong>Upload or replace song</strong> (MP3, max 15MB)</div>
+        </div>
+        <div id="editDSongPreview" style="display:none;margin-top:.5rem;background:rgba(201,168,76,.07);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:.5rem .7rem;align-items:center;gap:.6rem">
+          <span style="font-size:1.2rem">🎵</span>
+          <div style="flex:1;min-width:0">
+            <div id="editDSongName" style="font-size:.78rem;color:var(--ivory);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+            <div style="font-size:.68rem;color:var(--muted)">Plays when visitors open this memorial</div>
+          </div>
+          <button type="button" onclick="clearEditSong()" style="background:none;border:none;color:var(--muted);font-size:1rem;cursor:pointer">✕</button>
+        </div>
       </div>
     </div>
     <div class="mftr">
