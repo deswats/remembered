@@ -4300,6 +4300,7 @@ async function saveEditDeceased(){
   if(btn){btn.disabled=true;btn.textContent='Saving…';}
   showLoader(true);
   try{
+    // Core fields — always safe to update
     var updates={
       name:name,
       nickname:document.getElementById('editDNick').value.trim()||null,
@@ -4317,15 +4318,26 @@ async function saveEditDeceased(){
         if(photoUrl)updates.photo_url=photoUrl;
       }catch(e){console.warn('Photo upload:',e);}
     }
-    // Upload new song if selected
+    // Save core fields first
+    var res=await sb.from('deceased').update(updates).eq('id',id).select().single();
+    if(res.error)throw new Error(res.error.message);
+
+    // Upload & save song separately (column may not exist yet — run SQL below)
     if(window._editDSongFile){
       try{
         toast('🎵 Uploading music…');
         var songUrl=await uploadFile(window._editDSongFile,'songs');
-        if(songUrl)updates.song_url=songUrl;
-      }catch(e){console.warn('Song upload:',e);}
+        if(songUrl){
+          await sb.from('deceased').update({song_url:songUrl}).eq('id',id);
+          updates.song_url=songUrl;
+        }
+      }catch(e){
+        console.warn('Song upload skipped — run SQL to add song_url column:',e);
+        toast('⚠️ Song not saved — please run the SQL migration first');
+      }
     }
-    // Update relationship to deceased if changed
+
+    // Update my relationship to deceased if changed
     if(window._editDSelectedRel&&CU){
       try{
         await sb.from('connections')
@@ -4334,8 +4346,8 @@ async function saveEditDeceased(){
           .eq('user_id',CU.id);
       }catch(e){console.warn('Rel update:',e);}
     }
-    var res=await sb.from('deceased').update(updates).eq('id',id).select().single();
-    if(res.error)throw new Error(res.error.message);
+
+    // Update local cache
     var idx=CACHE.deceased.findIndex(function(x){return x.id===id;});
     if(idx>=0)CACHE.deceased[idx]=Object.assign(CACHE.deceased[idx],updates);
     if(btn){btn.disabled=false;btn.textContent='💾 Save Changes';}
@@ -4348,6 +4360,7 @@ async function saveEditDeceased(){
     if(btn){btn.disabled=false;btn.textContent='💾 Save Changes';}
     showLoader(false);
     toast('❌ '+e.message);
+    console.error('saveEditDeceased error:',e);
   }
 }
 
