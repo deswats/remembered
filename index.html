@@ -2446,11 +2446,50 @@ async function openUserProfile(uid){
   // Set cover photo — use VIEWED USER's cover only, never fall back to my own
   setUserCover(u.cover_url||'');
   showUserCoverBtn(uid);
-  renderUserBio(u);
-  document.getElementById('upMeta').textContent=(u.country||'')+' · Member since '+(u.created_at?new Date(u.created_at).getFullYear():new Date().getFullYear());
-  const memCount=CACHE.deceased.filter(d=>d.created_by===uid).length;
-  const friendCount=CACHE.friends.filter(f=>(f.from_id===uid||f.to_id===uid)&&f.status==='accepted').length;
-  document.getElementById('upTags').innerHTML=`<div class="u-tag">🌻 ${memCount} Memorial${memCount!==1?'s':''}</div><div class="u-tag">🤝 ${friendCount} Friend${friendCount!==1?'s':''}</div>`;
+
+  // ── PRIVACY GATE ──
+  // Profiles are private by default. Non-friends see only avatar + cover + name.
+  // Full profile (bio, stats, memorials, friends, posts) is visible to:
+  // self, accepted friends, family, or any accepted relation.
+  var relForPrivacy=CACHE.friends.find(function(f){
+    return ((f.from_id===CU?.id&&f.to_id===uid)||(f.from_id===uid&&f.to_id===CU?.id))
+      && f.status==='accepted';
+  });
+  var canSeeFull = isMe || !!relForPrivacy;
+
+  var bioEl=document.getElementById('upCoverBio');
+  var metaEl=document.getElementById('upMeta');
+  var tagsEl=document.getElementById('upTags');
+  var tabsEl=document.getElementById('upTabsRow');
+  var lockEl=document.getElementById('upLockedMsg');
+
+  if(canSeeFull){
+    // Show everything as normal
+    if(lockEl)lockEl.style.display='none';
+    if(bioEl)bioEl.style.display='';
+    if(metaEl)metaEl.style.display='';
+    if(tagsEl)tagsEl.style.display='';
+    if(tabsEl)tabsEl.style.display='';
+    renderUserBio(u);
+    metaEl.textContent=(u.country||'')+' · Member since '+(u.created_at?new Date(u.created_at).getFullYear():new Date().getFullYear());
+    const memCount=CACHE.deceased.filter(d=>d.created_by===uid).length;
+    const friendCount=CACHE.friends.filter(f=>(f.from_id===uid||f.to_id===uid)&&f.status==='accepted').length;
+    tagsEl.innerHTML=`<div class="u-tag">🌻 ${memCount} Memorial${memCount!==1?'s':''}</div><div class="u-tag">🤝 ${friendCount} Friend${friendCount!==1?'s':''}</div>`;
+  }else{
+    // LOCKED: hide bio, meta, stats, tabs; show only name + cover + avatar + notice
+    if(bioEl)bioEl.style.display='none';
+    if(metaEl)metaEl.style.display='none';
+    if(tagsEl)tagsEl.style.display='none';
+    if(tabsEl)tabsEl.style.display='none';
+    var tc=document.getElementById('uTabContent');
+    if(tc){
+      tc.innerHTML='<div id="upLockedMsg" style="text-align:center;padding:2.4rem 1.2rem;margin:1rem 0;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:14px">'
+        +'<div style="font-size:2.4rem;margin-bottom:.6rem">🔒</div>'
+        +'<div style="font-size:1rem;font-weight:600;color:var(--ivory);margin-bottom:.4rem">This profile is private</div>'
+        +'<div style="font-size:.82rem;color:var(--lavender);line-height:1.6;max-width:280px;margin:0 auto">Add '+uName(u)+' as a friend to see their memorials, posts, and connections.</div>'
+        +'</div>';
+    }
+  }
   const acts=document.getElementById('upActions');
   if(isMe){
     var isAdm=(CU.email==='desmond@cttsb.com.my'||CU.email==='deswatson.semarak@gmail.com');
@@ -2501,7 +2540,7 @@ async function openUserProfile(uid){
       acts.appendChild(addBtn);
     }
   }
-  showUTab('memorials',null,uid);
+  if(canSeeFull){ showUTab('memorials',null,uid); }
   showPageDirect('userPage');
 }
 async function quickAvatarUpload(input){
@@ -7765,7 +7804,7 @@ function guestBrowse(){showPage('appPage');}
         <div style="margin-left:auto;display:flex;gap:.5rem;flex-wrap:wrap;align-self:flex-end" id="upActions"></div>
       </div>
     </div>
-    <div class="u-tabs">
+    <div class="u-tabs" id="upTabsRow">
       <button type="button" class="u-tab act" onclick="showUTab('memorials',this)">🌻 Memorials</button>
       <button type="button" class="u-tab" onclick="showUTab('connections',this)">👥 Connections</button>
       <button type="button" class="u-tab" onclick="showUTab('friends',this)">🤝 Friends</button>
