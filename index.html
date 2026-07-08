@@ -5181,13 +5181,12 @@ function renderUserBio(u){
 // ═══════════════════════════════════════════════════════════
 function renderAnniversaries(){
   var listEl=document.getElementById('anniversaryList');
-  var obsEl=document.getElementById('monthlyObservance');
+  
   // Also try calList as fallback
   if(!listEl){listEl=document.getElementById('calList');}
   if(!listEl)return;
 
   var now=new Date();
-  var thisMonth=now.getMonth();
 
   // ── Memorial anniversaries ──
   var upcoming=[];
@@ -5229,24 +5228,7 @@ function renderAnniversaries(){
     }).join('');
   }
 
-  // ── Monthly observance note ──
-  var MONTHLY=['January — New Year Day of Prayer (All Faiths)',
-    'February — Qingming / Tomb Sweeping Day (Buddhist)',
-    'March — Lent season (Christian)',
-    'April — Good Friday & Easter (Christian)',
-    'May — Vesak Day (Buddhist)',
-    'June — Eid celebrations (Muslim)',
-    'July — Eid al-Adha (Muslim)',
-    'August — Hungry Ghost Festival (Buddhist)',
-    'September — Mid-Autumn Festival',
-    'October — All Hallows season (Christian)',
-    'November — All Saints and All Souls Day (Christian)',
-    'December — Christmas Memorial Mass (Christian)'];
-  if(obsEl){
-    obsEl.style.display='block';
-    obsEl.innerHTML='<div style="font-size:.68rem;color:var(--gold);font-weight:600;margin-bottom:.2rem">📅 This Month</div>'
-      +'<div style="font-size:.72rem;color:var(--lavender);line-height:1.5">'+MONTHLY[thisMonth]+'</div>';
-  }
+  // (Monthly observance / holiday note removed)
 }
 
 
@@ -7543,7 +7525,7 @@ function guestBrowse(){showPage('appPage');}
       <div class="w">
         <p class="wt" id="sidebarCalTitle">📅 Memorial Anniversaries</p>
         <div id="calList"></div>
-        <div id="monthlyObservance" style="margin-top:.5rem"></div>
+        <div id="monthlyObservance" style="display:none"></div>
       </div>
       <!-- MOBILE AFFILIATE STRIP — shown on mobile in left sidebar -->
       <div class="w" id="mobileAffiliateStrip">
