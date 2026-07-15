@@ -3152,7 +3152,7 @@ function applyTranslations(){
   if(joinEl)joinEl.textContent=L.joinFree;
   // Hero
   se('heroEyebrow',L.eyebrow);se('heroTitle',L.heroTitle,true);se('heroSub',L.heroSub);
-  se('heroCelebBtn',L.celebrate);se('heroBrowseBtn',L.browse);
+  se('heroJoinBtn','🌻 '+(L.joinFree||'Join Free'));
   // Auth
   se('loginTitle',L.welcomeBack);se('loginSub',L.signInSub);
   se('loginEmailLabel',L.emailLabel);se('loginPassLabel',L.passLabel);
@@ -7491,8 +7491,7 @@ function guestBrowse(){showPage('appPage');}
   <h1 class="h-title" id="heroTitle">Laugh. <em>Celebrate.</em><br>Always Remember.</h1>
   <p class="h-sub" id="heroSub">Remembered is where families and friends come together to honour, celebrate, and hold onto what matters most — sharing photos, stories, prayers, and the connections that keep these memories alive in our hearts.</p>
   <div class="h-acts">
-    <button type="button" class="btn btn-g" onclick="showPage('authPage');setAuthMode('register')" id="heroCelebBtn">🌻 Celebrate Someone</button>
-    <button type="button" class="btn btn-o" onclick="guestBrowse()" id="heroBrowseBtn">Browse Memorials</button>
+    <button type="button" class="btn btn-g" onclick="showPage('authPage');setAuthMode('register')" id="heroJoinBtn">🌻 Join Free</button>
   </div>
   <div id="loadingHint" style="margin-top:1rem;font-size:.75rem;color:var(--muted);display:none">⏳ Connecting to server…</div>
 </div>
