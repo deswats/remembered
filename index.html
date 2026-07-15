@@ -1441,7 +1441,7 @@ async function doForgotPassword(){
     var {error}=await sb.auth.resetPasswordForEmail(email,{
       redirectTo:'https://remembered.asia/'
     });
-    if(btn){btn.disabled=false;btn.textContent='📧 Send Reset Link';}
+    if(btn){btn.disabled=false;btn.textContent='📧 Send Reset Code';}
     if(error){
       if(msg){
         msg.style.display='block';
@@ -1451,18 +1451,68 @@ async function doForgotPassword(){
         msg.textContent='❌ '+error.message;
       }
     }else{
+      window._resetEmail=email;
       if(msg){
         msg.style.display='block';
         msg.style.background='rgba(76,175,123,.1)';
         msg.style.border='1px solid rgba(76,175,123,.3)';
         msg.style.color='#80cbc4';
-        msg.innerHTML='✅ Reset link sent! Check your email inbox.<br><span style="font-size:.76rem;opacity:.8">Can\'t find it? Check your Spam folder.</span>';
+        msg.innerHTML='✅ Code sent! Enter the 6-digit code from your email below.<br><span style="font-size:.76rem;opacity:.8">Can\'t find it? Check your Spam/Junk folder.</span>';
       }
+      var codeSec=document.getElementById('resetCodeSection');
+      if(codeSec)codeSec.style.display='block';
       if(btn){btn.style.display='none';}
+      var emailInput=document.getElementById('forgotEmail');
+      if(emailInput)emailInput.disabled=true;
     }
   }catch(e){
-    if(btn){btn.disabled=false;btn.textContent='📧 Send Reset Link';}
+    if(btn){btn.disabled=false;btn.textContent='📧 Send Reset Code';}
     toast('❌ '+e.message);
+  }
+}
+
+// ── VERIFY 6-DIGIT CODE + SET NEW PASSWORD (works even if email scanners consume the link) ──
+async function doVerifyResetCode(){
+  if(!sb){toast('Not connected. Please refresh.');return;}
+  var email=window._resetEmail||((document.getElementById('forgotEmail')||{}).value||'').trim();
+  var code=((document.getElementById('resetCode')||{}).value||'').trim();
+  var p1=(document.getElementById('resetNewPass1')||{}).value||'';
+  var p2=(document.getElementById('resetNewPass2')||{}).value||'';
+  var msg=document.getElementById('resetCodeMsg');
+  var btn=document.getElementById('verifyCodeBtn');
+  function show(ok,text){
+    if(!msg)return;
+    msg.style.display='block';
+    msg.style.background=ok?'rgba(76,175,123,.1)':'rgba(255,82,82,.1)';
+    msg.style.border=ok?'1px solid rgba(76,175,123,.3)':'1px solid rgba(255,82,82,.3)';
+    msg.style.color=ok?'#80cbc4':'#ff8a80';
+    msg.textContent=text;
+  }
+  if(!email){show(false,'❌ Please enter your email above first.');return;}
+  if(!code||code.length<6){show(false,'❌ Enter the 6-digit code from your email.');return;}
+  if(p1.length<6){show(false,'❌ New password must be at least 6 characters.');return;}
+  if(p1!==p2){show(false,'❌ Passwords do not match.');return;}
+  if(btn){btn.disabled=true;btn.textContent='Verifying…';}
+  try{
+    var vr=await sb.auth.verifyOtp({email:email,token:code,type:'recovery'});
+    if(vr.error){
+      if(btn){btn.disabled=false;btn.textContent='✔️ Reset Password';}
+      show(false,'❌ '+vr.error.message+' — the code may be wrong or expired. Request a new one.');
+      return;
+    }
+    var ur=await sb.auth.updateUser({password:p1});
+    if(ur.error){
+      if(btn){btn.disabled=false;btn.textContent='✔️ Reset Password';}
+      show(false,'❌ '+ur.error.message);
+      return;
+    }
+    show(true,'✅ Password updated! You can now sign in with it.');
+    if(btn)btn.style.display='none';
+    setTimeout(function(){closeModal('forgotPasswordModal');},2200);
+    toast('🔐 Password reset successfully!');
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='✔️ Reset Password';}
+    show(false,'❌ '+e.message);
   }
 }
 
@@ -8328,10 +8378,28 @@ function guestBrowse(){showPage('appPage');}
         <input type="email" id="forgotEmail" placeholder="you@email.com" autocomplete="email">
       </div>
       <div id="forgotMsg" style="display:none;margin-top:.6rem;padding:.7rem .9rem;border-radius:10px;font-size:.82rem;line-height:1.5"></div>
+
+      <!-- Code entry (revealed after sending) -->
+      <div id="resetCodeSection" style="display:none;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
+        <div class="fg">
+          <label>6-Digit Code (from email)</label>
+          <input type="text" id="resetCode" placeholder="123456" inputmode="numeric" maxlength="6" autocomplete="one-time-code" style="letter-spacing:.3em;text-align:center;font-size:1.1rem">
+        </div>
+        <div class="fg">
+          <label>New Password</label>
+          <input type="password" id="resetNewPass1" placeholder="At least 6 characters" autocomplete="new-password">
+        </div>
+        <div class="fg">
+          <label>Confirm New Password</label>
+          <input type="password" id="resetNewPass2" placeholder="Repeat new password" autocomplete="new-password">
+        </div>
+        <div id="resetCodeMsg" style="display:none;margin-top:.4rem;padding:.7rem .9rem;border-radius:10px;font-size:.82rem;line-height:1.5"></div>
+        <button type="button" class="btn btn-g" id="verifyCodeBtn" onclick="doVerifyResetCode()" style="width:100%;margin-top:.6rem">✔️ Reset Password</button>
+      </div>
     </div>
     <div class="mftr">
       <button type="button" class="btn btn-o" onclick="closeModal('forgotPasswordModal')">Cancel</button>
-      <button type="button" class="btn btn-g" id="forgotBtn" onclick="doForgotPassword()">📧 Send Reset Link</button>
+      <button type="button" class="btn btn-g" id="forgotBtn" onclick="doForgotPassword()">📧 Send Reset Code</button>
     </div>
   </div>
 </div>
