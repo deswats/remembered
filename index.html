@@ -1053,49 +1053,56 @@ async function loadMyNotifications(){
 }
 
 // ═══════════════════════════════════════════════════════════
-// FILE UPLOAD to Supabase Storage
+// FILE UPLOAD to Cloudflare R2 (via Worker) — zero egress cost
 // ═══════════════════════════════════════════════════════════
-async function uploadFile(file,folder){
-  const ext=file.name.split('.').pop()||'jpg';
-  const path=`${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-  const {data,error}=await sb.storage.from('media').upload(path,file,{cacheControl:'3600',upsert:false});
-  if(error)throw error;
-  return sb.storage.from('media').getPublicUrl(path).data.publicUrl;
+var R2_WORKER='https://remembered-upload.deswatson-semarak.workers.dev';
+
+// Core R2 uploader: takes a Blob/File, returns the public R2 URL.
+async function uploadToR2(blob,folder){
+  var mime=blob.type||'application/octet-stream';
+  var ext=(mime.split('/')[1]||'bin');
+  if(ext==='jpeg')ext='jpg';
+  if(ext==='quicktime')ext='mov';
+  var filename=Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.'+ext;
+  var safeFolder=(folder||'').replace(/[^a-z0-9-]/gi,'');
+  try{
+    var resp=await fetch(R2_WORKER,{
+      method:'POST',
+      headers:{
+        'Content-Type':mime,
+        'X-Filename':filename,
+        'X-Folder':safeFolder
+      },
+      body:blob
+    });
+    var out=await resp.json().catch(function(){return {};});
+    if(!resp.ok||!out.url){
+      console.error('R2 upload failed:',out.error||resp.status);
+      toast('❌ Upload failed: '+(out.error||resp.status));
+      return '';
+    }
+    console.log('Uploaded to R2:',out.url);
+    return out.url;
+  }catch(e){
+    console.error('uploadToR2 exception:',e);
+    toast('❌ Upload error: '+e.message);
+    return '';
+  }
 }
+
+// Takes a File object (avatars, covers, songs) → R2
+async function uploadFile(file,folder){
+  if(!file)return '';
+  return await uploadToR2(file,folder);
+}
+
+// Takes a base64 data URL (photos, posts, media) → R2
 async function uploadBase64(dataUrl,folder){
   if(!dataUrl||!dataUrl.startsWith('data:'))return dataUrl;
   try{
     const res=await fetch(dataUrl);
     const blob=await res.blob();
-    // Get proper extension
-    var mime=blob.type||'image/jpeg';
-    var ext=mime.split('/')[1]||'jpg';
-    if(ext==='jpeg')ext='jpg';
-    if(ext==='quicktime')ext='mov';
-    // Unique filename
-    var filename=Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.'+ext;
-    // Pick correct bucket - path is just filename (no folder prefix)
-    var bucket='media';
-    if(folder==='posts'||folder==='post-images')bucket='posts';
-    else if(folder==='post-videos')bucket='post-videos';
-    else if(folder==='photos')bucket='photos';
-    else if(folder==='covers')bucket='media';
-    else if(folder==='avatars')bucket='media';
-    else bucket='media';
-    // Upload to bucket
-    var res2=await sb.storage.from(bucket).upload(filename,blob,{
-      cacheControl:'3600',
-      upsert:false,
-      contentType:mime
-    });
-    if(res2.error){
-      console.error('Upload error:',res2.error.message,'bucket:',bucket);
-      toast('❌ Upload failed: '+res2.error.message);
-      return '';
-    }
-    var publicUrl=sb.storage.from(bucket).getPublicUrl(filename).data.publicUrl;
-    console.log('Uploaded to:',bucket,filename,'URL:',publicUrl);
-    return publicUrl;
+    return await uploadToR2(blob,folder);
   }catch(e){
     console.error('uploadBase64 exception:',e);
     toast('❌ Upload error: '+e.message);
