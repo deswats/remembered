@@ -1457,7 +1457,7 @@ async function doForgotPassword(){
         msg.style.background='rgba(76,175,123,.1)';
         msg.style.border='1px solid rgba(76,175,123,.3)';
         msg.style.color='#80cbc4';
-        msg.innerHTML='✅ Code sent! Enter the 6-digit code from your email below.<br><span style="font-size:.76rem;opacity:.8">Can\'t find it? Check your Spam/Junk folder.</span>';
+        msg.innerHTML='✅ Code sent! Enter the code from your email below.<br><span style="font-size:.76rem;opacity:.8">Can\'t find it? Check your Spam/Junk folder.</span>';
       }
       var codeSec=document.getElementById('resetCodeSection');
       if(codeSec)codeSec.style.display='block';
@@ -1475,7 +1475,7 @@ async function doForgotPassword(){
 async function doVerifyResetCode(){
   if(!sb){toast('Not connected. Please refresh.');return;}
   var email=window._resetEmail||((document.getElementById('forgotEmail')||{}).value||'').trim();
-  var code=((document.getElementById('resetCode')||{}).value||'').trim();
+  var code=((document.getElementById('resetCode')||{}).value||'').replace(/\D/g,'');
   var p1=(document.getElementById('resetNewPass1')||{}).value||'';
   var p2=(document.getElementById('resetNewPass2')||{}).value||'';
   var msg=document.getElementById('resetCodeMsg');
@@ -1489,7 +1489,7 @@ async function doVerifyResetCode(){
     msg.textContent=text;
   }
   if(!email){show(false,'❌ Please enter your email above first.');return;}
-  if(!code||code.length<6){show(false,'❌ Enter the 6-digit code from your email.');return;}
+  if(!code||code.length<6){show(false,'❌ Enter the full code from your email.');return;}
   if(p1.length<6){show(false,'❌ New password must be at least 6 characters.');return;}
   if(p1!==p2){show(false,'❌ Passwords do not match.');return;}
   if(btn){btn.disabled=true;btn.textContent='Verifying…';}
@@ -8382,8 +8382,8 @@ function guestBrowse(){showPage('appPage');}
       <!-- Code entry (revealed after sending) -->
       <div id="resetCodeSection" style="display:none;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
         <div class="fg">
-          <label>6-Digit Code (from email)</label>
-          <input type="text" id="resetCode" placeholder="123456" inputmode="numeric" maxlength="6" autocomplete="one-time-code" style="letter-spacing:.3em;text-align:center;font-size:1.1rem">
+          <label>Reset Code (from email)</label>
+          <input type="text" id="resetCode" placeholder="Enter the code from your email" inputmode="numeric" maxlength="10" autocomplete="one-time-code" style="letter-spacing:.2em;text-align:center;font-size:1.1rem">
         </div>
         <div class="fg">
           <label>New Password</label>
